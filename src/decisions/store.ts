@@ -1,10 +1,11 @@
 import { DECISIONS_PATH } from "../config.ts";
 import { DECISIONS_HEADER } from "../stubs.ts";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { createHash, type Hash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
+import { reasonFrom } from "../fields.ts";
 import { required } from "../present.ts";
 
 export const HASH_LENGTH = 12;
@@ -25,7 +26,12 @@ export type Standing =
   | { readonly kind: "watched"; readonly decision: Decision }
   | { readonly kind: "moved"; readonly decision: Decision; readonly now: string }
   | { readonly kind: "gone"; readonly decision: Decision; readonly missing: readonly string[] }
+  | { readonly kind: "unreadable"; readonly decision: Decision; readonly why: string }
   | { readonly kind: "unwatchable"; readonly decision: Decision };
+
+export type Hashed =
+  | { readonly kind: "hashed"; readonly hash: string }
+  | { readonly kind: "unreadable"; readonly why: string };
 
 const ENTRY = /^##\s+(\d{4}-\d{2}-\d{2})\s+[—-]\s+(.*)$/;
 const FIELD = /^(kind|depends|checked):\s*(.*)$/;
@@ -93,18 +99,39 @@ export function readDecisions(root: string): readonly Decision[] {
   return parseDecisions(readFileSync(path, "utf8"));
 }
 
+function hashInto(digest: Hash, root: string, rel: string): void {
+  const full = join(root, rel);
+  if (!statSync(full).isDirectory()) {
+    digest.update(readFileSync(full));
+    return;
+  }
+  for (const name of readdirSync(full).sort()) {
+    digest.update(name);
+    hashInto(digest, root, join(rel, name));
+  }
+}
+
 export function hashOf(root: string, depends: readonly string[]): string {
   const digest = createHash("sha256");
-  for (const one of depends) digest.update(readFileSync(join(root, one)));
+  for (const one of depends) hashInto(digest, root, one);
   return digest.digest("hex").slice(0, HASH_LENGTH);
+}
+
+export function hashing(root: string, depends: readonly string[]): Hashed {
+  try {
+    return { kind: "hashed", hash: hashOf(root, depends) };
+  } catch (cause) {
+    return { kind: "unreadable", why: reasonFrom(cause) };
+  }
 }
 
 export function standingOf(root: string, decision: Decision): Standing {
   if (decision.depends.length === 0) return { kind: "unwatchable", decision };
   const missing = decision.depends.filter((one) => !existsSync(join(root, one)));
   if (missing.length > 0) return { kind: "gone", decision, missing };
-  const now = hashOf(root, decision.depends);
-  if (now !== decision.hash) return { kind: "moved", decision, now };
+  const now = hashing(root, decision.depends);
+  if (now.kind === "unreadable") return { kind: "unreadable", decision, why: now.why };
+  if (now.hash !== decision.hash) return { kind: "moved", decision, now: now.hash };
   return { kind: "watched", decision };
 }
 
@@ -140,6 +167,12 @@ export type Forgotten =
   | { readonly kind: "not-there" }
   | { readonly kind: "busy"; readonly why: string };
 
+export type Reread =
+  | { readonly kind: "gone" }
+  | { readonly kind: "not-there" }
+  | { readonly kind: "unreadable"; readonly why: string }
+  | { readonly kind: "busy"; readonly why: string };
+
 export function record(root: string, decision: Decision): Written {
   const path = join(root, DECISIONS_PATH);
   const missing = decision.depends.filter((one) => !existsSync(join(root, one)));
@@ -147,8 +180,13 @@ export function record(root: string, decision: Decision): Written {
     return { kind: "unreadable", why: `it depends on ${missing.join(", ")}, which is not there` };
   }
 
+  const now = hashing(root, decision.depends);
+  if (now.kind === "unreadable") {
+    return { kind: "unreadable", why: `it depends on something looper cannot read: ${now.why}` };
+  }
+
   let written: Written = { kind: "added", total: 0 };
-  const stamped = { ...decision, hash: hashOf(root, decision.depends) };
+  const stamped = { ...decision, hash: now.hash };
 
   const lock = withLock(path, () => {
     const held = readDecisions(root);
@@ -164,28 +202,39 @@ export function record(root: string, decision: Decision): Written {
   return written;
 }
 
-export function reread(root: string, summary: string, today: string): Forgotten {
+export function reread(root: string, summary: string, today: string): Reread {
   const path = join(root, DECISIONS_PATH);
   let found = false;
+  let unreadable = "";
 
   const lock = withLock(path, () => {
     const held = readDecisions(root);
     const wanted = held.filter((one) => one.summary === summary);
     if (wanted.length === 0) return;
+    const stamps = new Map<string, string>();
+    for (const one of wanted) {
+      const now = hashing(root, one.depends);
+      if (now.kind === "unreadable") {
+        unreadable = now.why;
+        return;
+      }
+      stamps.set(one.summary, now.hash);
+    }
     found = true;
     writeAtomically(
       path,
       render(
-        held.map((one) =>
-          one.summary === summary
-            ? { ...one, checked: today, hash: hashOf(root, one.depends) }
-            : one,
-        ),
+        held.map((one) => {
+          const stamp = stamps.get(one.summary);
+          if (stamp === undefined) return one;
+          return { ...one, checked: today, hash: stamp };
+        }),
       ),
     );
   });
 
   if (lock.kind === "busy") return { kind: "busy", why: lock.why };
+  if (unreadable.length > 0) return { kind: "unreadable", why: unreadable };
   return found ? { kind: "gone" } : { kind: "not-there" };
 }
 
