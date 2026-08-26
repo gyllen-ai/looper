@@ -65,6 +65,9 @@ function shown(standing: Standing): string {
   if (standing.kind === "gone") {
     return `${head}\nREAD IT AGAIN: it rests on ${standing.missing.join(", ")}, which is no longer there\n${one.body}`;
   }
+  if (standing.kind === "unreadable") {
+    return `${head}\nREAD IT AGAIN: looper cannot read what it rests on (${standing.why}), so nothing is watching it\n${one.body}`;
+  }
   if (standing.kind === "unwatchable") {
     return `${head}\nchecked: ${one.checked} — nothing watches this one, only a person can\n${one.body}`;
   }
@@ -95,7 +98,9 @@ export class Decisions implements Capability {
     const shown = found.slice(0, NAMED_AT_ONCE);
     const over = found.length - shown.length;
     const more = over <= 0 ? "" : `\n  and ${over} more, by name from the tool.`;
-    const stale = found.filter((one) => one.kind === "moved" || one.kind === "gone");
+    const stale = found.filter(
+      (one) => one.kind === "moved" || one.kind === "gone" || one.kind === "unreadable",
+    );
     if (stale.length === 0) {
       return [
         {
@@ -177,6 +182,12 @@ export class Decisions implements Capability {
         return {
           kind: "text",
           text: `looper could not re-record that entry: ${done.why}. Nothing was changed — try again.`,
+        };
+      }
+      if (done.kind === "unreadable") {
+        return {
+          kind: "text",
+          text: `looper could not re-record that entry: it rests on something it cannot read (${done.why}). Nothing was changed — point it at what you meant, or fix the permission.`,
         };
       }
       return {
