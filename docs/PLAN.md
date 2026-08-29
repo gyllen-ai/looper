@@ -7057,3 +7057,47 @@ what the person wrote, not the envelope* — so `fileFrom`, `targetOf`,
 so the hook could not load its own code: *"Nothing is being checked — not the
 rules, not the edits, not the commit."* Fail open, never fail silent, working on
 the person who broke it. Four importers were repointed and it came back.
+
+## The two open CSS cells, measured, and still open — 2026-08-29
+
+Both `open` cells in the CSS column were put to the corpus the same day they were
+written, so that "open" records a decision rather than an absence of attention.
+
+Over **61,666 stylesheets and pages** — the same deduplicated, hand-written-only
+corpus the five CSS rules were run against, measured 2026-08-29:
+
+| candidate rule | findings |
+|---|---:|
+| an empty rule block — `.card { }` | 1 |
+| `url()` pointing at another origin | 1 |
+| `@import` from another origin | 0 |
+
+The one empty block is an empty `@media` query, not a named selector. The one
+off-origin `url()` is a CDN image inside a saved copy of somebody else's web
+page, not authored CSS.
+
+**Neither number is a verdict, because the instrument is wrong for the
+question.** Every CSS minifier deletes empty rules. This corpus is overwhelmingly
+built output, so the harm is removed by the build step before the file being
+measured exists. A rule aimed at what an agent writes cannot be validated against
+what a bundler shipped, and 1 in 61,666 says almost nothing about how often
+`.card { }` gets written in the first place.
+
+So the two cells stay open, each for its own reason:
+
+- **Unfinished work reads as finished.** An empty rule block is decidable, has
+  near-zero false positives and hands back an obvious legal spelling — delete it
+  or declare something. What is missing is evidence it leaks, and the only corpus
+  here is structurally incapable of showing that. It needs CSS as authored:
+  adopter source, or looper's own pages once it has any.
+- **Something from outside is used as an instruction.** This row does not fit the
+  language. A static stylesheet is inert text; nothing arrives at it at runtime,
+  so it has no "outside" to be instructed by. The two real shapes belong
+  elsewhere — CSS built by string concatenation is a TypeScript rule about a
+  template literal, and a stylesheet reaching a third-party origin is closer to
+  *the language's own guarantees are stepped around* than to injection. **The row
+  needs reshaping before the cell needs a rule**, and that is a decision rather
+  than a measurement.
+
+Recorded so the next session does not run this probe again to reach the same two
+answers.
