@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::violation::{LawError, Rule, Violation};
+use crate::violation::{Category, LawError, Rule, Violation};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -98,6 +98,20 @@ impl Default for ErrorConfig {
 }
 
 
+const OURS: &str = "RUST-";
+
+fn engine_owns(id: &str) -> Option<&str> {
+    if let Some(bare) = id.strip_prefix(OURS) {
+        return Some(bare);
+    }
+    let (category, _) = id.split_once(':')?;
+    if Category::ORDER.iter().any(|known| known.name() == category) {
+        Some(id)
+    } else {
+        None
+    }
+}
+
 impl LawConfig {
     pub fn load(root: &Path) -> Result<LawConfig, LawError> {
         let mut dir = root.to_path_buf();
@@ -138,6 +152,7 @@ impl LawConfig {
 
     fn validate(&self, path: &Path) -> Result<(), LawError> {
         for id in &self.rules.disabled {
+            let Some(id) = engine_owns(id) else { continue };
             match Rule::from_id(id) {
                 Ok(_known) => {}
                 Err(unknown) => {
@@ -153,6 +168,7 @@ impl LawConfig {
                 if id == "ALL" {
                     continue;
                 }
+                let Some(id) = engine_owns(id) else { continue };
                 match Rule::from_id(id) {
                     Ok(_known) => {}
                     Err(unknown) => {
@@ -179,12 +195,12 @@ impl LawConfig {
 
     pub fn permits(&self, violation: &Violation) -> bool {
         let id = violation.rule.id();
-        if self.rules.disabled.iter().any(|d| d == id) {
+        if self.rules.disabled.iter().any(|d| engine_owns(d) == Some(id)) {
             return true;
         }
         for (file, ids) in &self.exempt {
             if file_matches(&violation.file, file)
-                && ids.iter().any(|i| i == "ALL" || i == id) {
+                && ids.iter().any(|i| i == "ALL" || engine_owns(i) == Some(id)) {
                     return true;
                 }
         }

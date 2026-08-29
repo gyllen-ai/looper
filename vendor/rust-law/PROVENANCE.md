@@ -39,6 +39,20 @@ read law.toml" rather than as anything naming the cause. The four
 `deny_unknown_fields` on the inner tables are untouched, because there a typo
 really is a concession nobody notices: `sanctm` is still refused by name.
 
+**Two loops and one function in `src/config.rs`, 2026-08-29.** `validate`
+refused a `law.toml` whose `[exempt]` or `[rules] disabled` named a rule the
+engine did not know, and every id of another language (`TS-ERROR:3`,
+`CSS-TRUTH:1`, `PY-ERROR:4`) and looper's own spelling of the engine's rules
+(`RUST-TRUTH:1`) was such an id: the whole file came back as "could not read
+law.toml" and every `.rs` file in the project went unjudged, which looper
+reported as unread rather than clean but a project could carry for weeks. Now
+`engine_owns` decides which ids the engine can vouch for: `RUST-` followed by a
+bare id, or a bare id in one of its own categories. Those are refused when
+unknown exactly as before, so a typo in our own spelling is still named, and an
+id of another language passes through to the half that owns it. `permits`
+accepts both spellings. `tests/rust.test.ts` drives the built engine over a
+crate whose pardons name three other languages and then our own spelling.
+
 **The one line in the manifest that is ours.** `[workspace]`, empty, at the top
 of `Cargo.toml`. Without it, a looper checked out inside a Rust project is
 claimed by that project's workspace and cargo refuses to build it at all —
