@@ -8,7 +8,8 @@ import { join } from "node:path";
 
 import { commitMessageScript } from "../src/config.ts";
 import { intentOf } from "../src/law/commit-command.ts";
-import { Law, aboutToCommit, judgeStaged } from "../src/law/capability.ts";
+import { Law, judgeStaged } from "../src/law/capability.ts";
+import { aboutToCommit } from "../src/law/payload.ts";
 import { surveyProject } from "../src/law/project.ts";
 import { stagedText } from "../src/git.ts";
 import { readFileSync } from "node:fs";

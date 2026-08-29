@@ -5,7 +5,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Law, targetOf } from "../src/law/capability.ts";
+import { Law } from "../src/law/capability.ts";
+import { targetOf } from "../src/law/payload.ts";
 import { dispatchHook } from "../src/registry.ts";
 
 const GUILTY = `export function find(id: string) {
@@ -166,6 +167,33 @@ test("a page is judged too, so the styles cannot be moved somewhere unread", () 
     const reason = first(result.refusals).reason;
     assert.ok(reason.includes("CSS-LAYER:1"), reason.slice(0, 300));
     assert.ok(reason.includes("src/index.html:2"), reason.slice(0, 300));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const A_RAZOR_PAGE = `<div style="padding: 4px">@Title</div>
+
+@code {
+    private string Markup = "<b style=\\"color:red\\">x</b>";
+    private int Rank => Left < Right ? 1 : 2;
+}
+`;
+
+test("the markup half of a Razor page is judged, which the C# reader never read", () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "src/Card.razor"), A_RAZOR_PAGE);
+    const result = judgeEdit(root, "src/Card.razor");
+
+    assert.equal(result.refusals.length, 1);
+    const reason = first(result.refusals).reason;
+    assert.ok(reason.includes("CSS-LAYER:1"), reason.slice(0, 300));
+    assert.ok(reason.includes("src/Card.razor:1"), reason.slice(0, 300));
+    assert.ok(
+      !reason.includes("src/Card.razor:4"),
+      `the style= inside a C# string was read as markup: ${reason.slice(0, 300)}`,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

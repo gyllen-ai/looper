@@ -85,7 +85,7 @@ export const LAW_PATH = "law.toml";
 
 export const STYLESHEET_EXTENSIONS: readonly string[] = [".css", ".scss", ".sass"];
 
-export const PAGE_EXTENSIONS: readonly string[] = [".html", ".htm"];
+export const PAGE_EXTENSIONS: readonly string[] = [".html", ".htm", ".razor"];
 
 export const JUDGED_EXTENSIONS: readonly string[] = [
   ".ts",

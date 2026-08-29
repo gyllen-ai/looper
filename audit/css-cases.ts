@@ -6,6 +6,8 @@ const A_SHEET = "src/app.css";
 
 const A_SASS_SHEET = "src/app.scss";
 
+const A_RAZOR_PAGE = "Components/Card.razor";
+
 const THE_PALETTE = "src/tokens.css";
 
 export const CSS_CASES: readonly Case[] = [
@@ -115,4 +117,23 @@ export const CSS_CASES: readonly Case[] = [
     code: `$radius: 4px !default;` },
   { rule: "CSS-TYPE:1", name: "the word in a string is text", expect: "silent", file: A_SHEET,
     code: `.card::after { content: "!important"; }` },
+
+  { rule: "CSS-LAYER:1", name: "a Razor page carries elements, so it carries this rule", expect: "fires", file: A_RAZOR_PAGE,
+    code: `<div style="color: red">@Title</div>` },
+  { rule: "CSS-LAYER:1", name: "a value bound into the attribute is still the attribute", expect: "fires", file: A_RAZOR_PAGE,
+    code: `<div style="@Chosen">@Title</div>` },
+  { rule: "CSS-LAYER:1", name: "a comparison in a code block is C#, not a tag", expect: "silent", file: A_RAZOR_PAGE,
+    code: `<p>@Count</p>\n@code {\n    private int Count => Left < Right ? 1 : 2;\n}` },
+  { rule: "CSS-LAYER:1", name: "the words inside a C# string are that string's business", expect: "silent", file: A_RAZOR_PAGE,
+    code: `<p>@Held</p>\n@code {\n    private string Held = "<div style=\\"color:red\\">";\n}` },
+  { rule: "CSS-LAYER:1", name: "a class on a Razor element is the shape the rule wants", expect: "silent", file: A_RAZOR_PAGE,
+    code: `<div class="card">@Title</div>` },
+
+  { rule: "CSS-TRUTH:1", name: "a style block in a Razor page is a stylesheet", expect: "fires", file: A_RAZOR_PAGE,
+    code: `<style>\n.card { color: #ff0088; }\n</style>\n<div class="card">@Title</div>` },
+  { rule: "CSS-TRUTH:1", name: "a hex inside a Razor code block is C#, not a declaration", expect: "silent", file: A_RAZOR_PAGE,
+    code: `<p>@Held</p>\n@code {\n    private string Held = "#ff0088";\n}` },
+
+  { rule: "CSS-TYPE:1", name: "a Razor page cannot escape this one either", expect: "fires", file: A_RAZOR_PAGE,
+    code: `<style>\n.card { display: none !important; }\n</style>` },
 ];

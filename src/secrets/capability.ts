@@ -20,7 +20,7 @@ import type {
   ToolResult,
 } from "../capability.ts";
 import { stagedAdditions } from "../git.ts";
-import { commandFrom } from "../law/capability.ts";
+import { commandFrom } from "../law/payload.ts";
 import { intentOf } from "../law/commit-command.ts";
 import { saidAboutStrangers, strangersLeaving } from "./strangers.ts";
 import { findingsIn } from "./detect.ts";

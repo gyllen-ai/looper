@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 611 cases · 645 tests
+90 rules · 5 languages · 619 cases · 646 tests
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -103,11 +103,11 @@ run to prove it needs nothing fetched.
 | **TypeScript & JavaScript** | 32 | Babel, including React, Next and JSX |
 | **Rust** | 30 | `syn`, built from vendored source with the `cargo` you have |
 | **Python** | 14 | Python's own parser — `python3`, nothing to install |
-| **C# & Razor** | 8 | Roslyn, `@code` blocks judged, markup left alone |
-| **CSS, Sass & HTML** | 5 | read as declarations; `<style>` blocks in a page judged on the page's own lines, and `style=` attributes refused |
+| **C# & Razor** | 8 | Roslyn, `@code` blocks judged; the markup goes to the CSS rules |
+| **CSS, Sass & HTML** | 5 | read as declarations; `<style>` blocks in a page or a Razor component judged on its own lines, and `style=` attributes refused |
 | **every language at once** | 1 | `COPY:1` reads the directory, not the file: a name that says it is a second go at the file beside it |
 
-**611 cases** hold those rules to their own ban text — what must fire, what must
+**619 cases** hold those rules to their own ban text — what must fire, what must
 stay silent — and every rule was run over code nobody here wrote before it
 shipped.
 

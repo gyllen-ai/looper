@@ -7008,3 +7008,52 @@ list, and the guard reads every `readonly string[]` in such a file as node types
 It was right to complain — the two lists mean different things and looked
 identical. The constructor names are a `Set` now, which is both what the guard
 wanted and the better lookup.
+
+## The unread half of a Razor page, 2026-08-29
+
+The CSS law shipped naming its own nearest gap: a `.razor` file goes to the C#
+reader, which judges `@code` blocks and leaves the markup alone, so a `style=`
+attribute in a Blazor component was still read by nothing. Closing it the same
+day, because a gap named in a document and not in a gate is a gap.
+
+A `.razor` file is now judged **twice**: by the C# reader for its code, and by
+the CSS checks for its markup. That is the first file type here that two readers
+answer for, and it is the honest shape — the two halves are different languages
+in one file, and neither reader can see the other's.
+
+The markup scanner learned one thing to make it safe: **`@code`, `@functions`
+and `@{ }` blocks are blanked before the tags are read**, with brace matching
+that steps over C# strings. Without it, `Left < Right` in a C# expression opens a
+tag that never closes, and a `"<b style=\"color:red\">"` inside a C# string is an
+inline style that isn't on the page. Both are silent cases.
+
+### Where the evidence stops, and it stops earlier than usual
+
+**There is not one `.razor` file on this machine that we did not write.** Every
+other rule here was run over a corpus of somebody else's code before it shipped —
+95,907 files for `COPY:1`, 61,664 for the CSS five, 38,438 for the TypeScript
+four, 5,420 for the Python three. For this change that corpus does not exist and
+could not be fetched, because nothing in this repository may reach the network.
+
+So this ships on eight hit-and-evasion cases and one component written here to
+exercise it, and **that is weaker evidence than anything else in this file**. The
+shapes most likely to be wrong are the ones a real Blazor page would have and our
+one page does not: a `@bind-style` attribute, a `<style>` block inside a
+`@if` branch, and Razor's `@:` line-literal syntax. If an adopter runs this on a
+real Blazor tree, that run is worth more than everything above it.
+
+### `capability.ts` split, because its own rule said so
+
+Adding the second reader took `src/law/capability.ts` to 501 lines and
+`TS-DECOMPOSITION:1` refused it — looper's own file cap, on looper. The cap was
+not raised and the file was not pardoned. The second job in it was reading the
+hook envelope, which the law branch already names as its own concern — *judge
+what the person wrote, not the envelope* — so `fileFrom`, `targetOf`,
+`commandFrom`, `aboutToCommit` and the payload parsing behind them are
+`src/law/payload.ts` now, and `capability.ts` is 404 lines of judging.
+
+**looper stopped judging while that split was happening, and said so.**
+`src/secrets/capability.ts` imported `commandFrom` from the file it had just left,
+so the hook could not load its own code: *"Nothing is being checked — not the
+rules, not the edits, not the commit."* Fail open, never fail silent, working on
+the person who broke it. Four importers were repointed and it came back.
