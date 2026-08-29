@@ -22,6 +22,18 @@ PRINTS_ITS_OWN_OUTPUT = "PY-LOG:1"
 
 VALUE_IN_THE_MESSAGE = "PY-LOG:3"
 
+A_GUESSED_WAIT = "PY-ERROR:4"
+
+CONJURED_CODE = "PY-SECURITY:3"
+
+REACHES_UPWARD = "PY-TRUTH:3"
+
+CLOCKS = frozenset({"time", "asyncio", "trio", "anyio"})
+
+CONJURING = frozenset({"eval", "exec", "compile"})
+
+A_LOOP = (ast.For, ast.AsyncFor, ast.While)
+
 LOG_LEVELS = frozenset(
     {"debug", "info", "warning", "warn", "error", "exception", "critical", "fatal", "log"}
 )
@@ -379,8 +391,16 @@ def violations_in(tree, in_a_test_file, is_where_it_starts):
     settled = names_that_carry_nothing(tree)
     found = []
     a_logger_here = a_logger_is_imported(tree)
+    for line in guessed_waits_in(tree, sleepers_imported(tree), False, set()):
+        found.append({"rule": A_GUESSED_WAIT, "line": line})
+    shadowed = names_bound_in(tree)
     for node in ast.walk(tree):
+        if isinstance(node, ast.Global):
+            found.append({"rule": REACHES_UPWARD, "line": node.lineno})
+            continue
         if isinstance(node, ast.Call):
+            if conjures_code(node, shadowed):
+                found.append({"rule": CONJURED_CODE, "line": node.lineno})
             if builds_a_query(node, settled):
                 found.append({"rule": A_BUILT_QUERY, "line": node.lineno})
             if builds_a_command(node):
@@ -422,6 +442,96 @@ def violations_in(tree, in_a_test_file, is_where_it_starts):
                 if is_mutable_default(given):
                     found.append({"rule": MUTABLE_DEFAULT, "line": given.lineno})
     return found
+
+
+def sleepers_imported(tree):
+    found = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if (node.module or "").split(".")[0] not in CLOCKS:
+            continue
+        for alias in node.names:
+            if alias.name == "sleep":
+                found.add(alias.asname or alias.name)
+    return found
+
+
+def names_a_sleep(node, sleepers):
+    if not isinstance(node, ast.Call):
+        return False
+    held = node.func
+    if isinstance(held, ast.Attribute):
+        if held.attr != "sleep":
+            return False
+        root = held.value
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        return isinstance(root, ast.Name) and root.id in CLOCKS
+    return isinstance(held, ast.Name) and held.id in sleepers
+
+
+def waits_forever(node):
+    if isinstance(node, ast.Attribute):
+        return node.attr == "inf"
+    return isinstance(node, ast.Constant) and node.value == float("inf")
+
+
+def is_a_guess(node, given_here):
+    if not node.args:
+        return False
+    asked = node.args[0]
+    if isinstance(asked, ast.Constant) and asked.value == 0:
+        return False
+    if waits_forever(asked):
+        return False
+    if isinstance(asked, ast.Name) and asked.id in given_here:
+        return False
+    return True
+
+
+def parameters_of(node):
+    held = node.args
+    named = {one.arg for one in held.posonlyargs + held.args + held.kwonlyargs}
+    if held.vararg is not None:
+        named.add(held.vararg.arg)
+    return named
+
+
+def guessed_waits_in(node, sleepers, in_a_loop, given_here):
+    found = []
+    if not in_a_loop and names_a_sleep(node, sleepers) and is_a_guess(node, given_here):
+        found.append(node.lineno)
+    deeper = in_a_loop or isinstance(node, A_LOOP)
+    for child in ast.iter_child_nodes(node):
+        taken = given_here
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            taken = parameters_of(child)
+        found.extend(guessed_waits_in(child, sleepers, deeper, taken))
+    return found
+
+
+def names_bound_in(tree):
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            found.add(node.name)
+            continue
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                found.add(alias.asname or alias.name.split(".")[0])
+            continue
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            found.add(node.id)
+    return found
+
+
+def conjures_code(node, shadowed):
+    if not isinstance(node, ast.Call):
+        return False
+    if not isinstance(node.func, ast.Name):
+        return False
+    return node.func.id in CONJURING and node.func.id not in shadowed
 
 
 def silences_the_checker(text):

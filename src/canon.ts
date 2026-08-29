@@ -9,7 +9,7 @@ export type CanonBranch = {
 };
 
 const BRANCH_NAMES: readonly string[] = ["law", "process",
-  "architecture", "rust", "python", "csharp", "doctrine", "security", "evidence",
+  "architecture", "rust", "python", "csharp", "css", "doctrine", "security", "evidence",
   "frontend", "sources",
   "structure", "discipline", "authority", "voice", "deps", "debugging",
   "data/schema", "data/indexing", "data/migrations", "data/queries",
@@ -38,6 +38,14 @@ const PYTHON: readonly string[] = ["**/*.py"];
 
 const CSHARP: readonly string[] = ["**/*.cs", "**/*.razor"];
 
+const STYLED: readonly string[] = [
+  "**/*.css",
+  "**/*.scss",
+  "**/*.sass",
+  "**/*.html",
+  "**/*.htm",
+];
+
 const WHERE_SECRETS_LIVE: readonly string[] = [
   "**/.env*",
   "**/*secret*",
@@ -54,7 +62,7 @@ const WIRE_LIVES: readonly string[] = ["**/protocol/**", "**/*.proto", "**/schem
 const WHO_YOU_ARE: readonly string[] = ["**/*auth*", "**/*session*", "**/*permission*", "**/*role*"];
 const DRAWN: readonly string[] = ["**/*.tsx", "**/*.jsx", "**/pages/**", "**/components/**"];
 const PICTURES: readonly string[] = ["**/assets/**", "**/design/**", "**/*.svg", "**/*.png", "**/*.woff2"];
-const MOVING: readonly string[] = ["**/*.css", "**/*.scss", "**/*anim*", "**/*motion*", "**/*transition*"];
+const MOVING: readonly string[] = ["**/*.css", "**/*.scss", "**/*.sass", "**/*anim*", "**/*motion*", "**/*transition*"];
 const PROVEN: readonly string[] = ["**/tests/**", "**/*.test.*", "**/*_test.*", "**/*spec*"];
 const SHIPPED: readonly string[] = ["**/deploy*", "**/*.service", "**/.github/workflows/**", "**/Dockerfile*"];
 const SETTINGS: readonly string[] = ["**/config.*", "**/*.env*", "**/settings.*"];
@@ -63,6 +71,10 @@ const LOOKED_AT: readonly string[] = [
   "**/*.tsx",
   "**/*.jsx",
   "**/*.css",
+  "**/*.scss",
+  "**/*.sass",
+  "**/*.html",
+  "**/*.htm",
   "**/*.razor",
   "**/components/**",
   "**/pages/**",
@@ -74,6 +86,7 @@ export function canonGoverns(): ReadonlyMap<string, readonly string[]> {
     ["rust", RUST],
     ["python", PYTHON],
     ["csharp", CSHARP],
+    ["css", STYLED],
     ["evidence", WRITTEN_DOWN],
     ["frontend", LOOKED_AT],
     ["doctrine", [`${DOCTRINE_DIR}/**`]],

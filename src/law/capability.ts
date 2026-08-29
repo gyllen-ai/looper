@@ -3,6 +3,9 @@ import { writeAtomically } from "../atomic.ts";
 import { stackOf } from "../stack/read.ts";
 import { stackDocument } from "../stack/write.ts";
 import { isCsharp, judgeCsharpIn, judgePythonIn, judgeRustIn } from "./readers.ts";
+import { CSS_CHECKS } from "./css/checks.ts";
+import { variantsIn } from "./copy.ts";
+import { isStyling } from "./css/read.ts";
 import { rustRuleFor } from "./rust/rules.ts";
 import { roleOf, shapeOf } from "./shape.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -115,21 +118,30 @@ function judgedByTheCsharpLaw(root: string, target: Judging): readonly Violation
   return said.violations.filter((held) => held.file === target.relative);
 }
 
-function lawFor(relative: string): "rust" | "python" | "csharp" | "typescript" {
+function lawFor(relative: string): "rust" | "python" | "csharp" | "css" | "typescript" {
   if (relative.endsWith(RUST_EXTENSION)) return "rust";
   if (relative.endsWith(PYTHON_EXTENSION)) return "python";
   if (isCsharp(relative)) return "csharp";
+  if (isStyling(relative)) return "css";
   return "typescript";
 }
 
 function judgeOneFile(root: string, target: Judging): Carried {
   const law = lawFor(target.relative);
+  const copied = variantsIn(root, [target.relative], readConcessions(root));
   const found = law === "rust"
     ? judgedByTheRustLaw(root, target)
     : law === "python"
     ? judgedByThePythonLaw(root, target)
     : law === "csharp"
     ? judgedByTheCsharpLaw(root, target)
+    : law === "css"
+    ? judge(
+        CSS_CHECKS,
+        "fast",
+        { file: target.relative, text: readFileSync(target.path, "utf8") },
+        readConcessions(root),
+      ).violations
     : judge(
         [...CHECKS, ...checksAdoptedIn(root)],
         "fast",
@@ -140,10 +152,11 @@ function judgeOneFile(root: string, target: Judging): Carried {
         },
         readConcessions(root),
       ).violations;
-  if (found.length === 0) return { yours: [], older: [] };
+  const all = [...copied, ...found];
+  if (all.length === 0) return { yours: [], older: [] };
 
   const touched = changedLines(root, target.relative, "commit");
-  return againstBaseline(readBaseline(root), found, () => touched);
+  return againstBaseline(readBaseline(root), all, () => touched);
 }
 
 function judgeWhatTheCommandWrote(root: string): Outcome {
@@ -317,6 +330,10 @@ export function judgeStaged(root: string): Outcome {
     if (stagedCsharp.has(violation.file)) keep(violation, violation.file);
   }
 
+  for (const violation of variantsIn(root, judged, concessions)) {
+    keep(violation, violation.file);
+  }
+
   const inRust = judged.filter((path) => path.endsWith(RUST_EXTENSION));
   const stagedRust = new Set(inRust);
   const rustSaid = judgeRustIn(root, inRust.map((path) => resolve(root, path)));
@@ -334,16 +351,19 @@ export function judgeStaged(root: string): Outcome {
   const shape = shapeOf(root);
 
   for (const path of judged) {
-    if (lawFor(path) !== "typescript") continue;
+    const law = lawFor(path);
+    if (law !== "typescript" && law !== "css") continue;
     const held = stagedText(root, path);
     if (held.kind === "unreadable") continue;
 
-    const found = judge(
-      [...CHECKS, ...checksAdoptedIn(root)],
-      "fast",
-      { file: path, text: held.text, role: roleOf(shape, path) },
-      concessions,
-    ).violations;
+    const found = law === "css"
+      ? judge(CSS_CHECKS, "fast", { file: path, text: held.text }, concessions).violations
+      : judge(
+          [...CHECKS, ...checksAdoptedIn(root)],
+          "fast",
+          { file: path, text: held.text, role: roleOf(shape, path) },
+          concessions,
+        ).violations;
 
     for (const violation of found) keep(violation, path);
   }

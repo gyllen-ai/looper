@@ -53,7 +53,9 @@ Fork it. Then, in this order, because the order is the whole discipline:
 
 1. **Write the cases first, from the rule's own ban text**, in
    `audit/cases.ts` — or `audit/rust-cases.ts` for a Rust rule, which is judged
-   by the real engine in a temporary crate — what must fire and what must stay silent. Before you touch
+   by the real engine in a temporary crate, `audit/css-cases.ts` for a rule about
+   a stylesheet or a page, or `audit/copy-cases.ts` for one about a file's name,
+   which needs a real directory — what must fire and what must stay silent. Before you touch
    any code. A test written by reading the implementation can only ever agree
    with the implementation, which is how ten rules here shipped saying less than
    they did.

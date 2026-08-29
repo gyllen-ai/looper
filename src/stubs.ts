@@ -136,6 +136,14 @@ export const LAW_STUB = `# What this project concedes to looper, and nothing els
 # [ts]
 # sanctum = "src/config.ts"
 #
+# [css] palette — the file the colour palette lives in, the one place a colour
+# may be written out rather than pointed at. Defaults to tokens.css, matched by
+# name in any directory.
+# [css] z_max — the highest z-index this project allows.
+# [css]
+# palette = ["src/styles/tokens.css"]
+# z_max = 100
+#
 # [exempt] — one file, one rule, one reason. A pardon is read in a diff.
 # [exempt]
 # "src/legacy.ts" = ["TS-TYPE:3"]

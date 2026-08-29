@@ -2,13 +2,16 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import {
+  CSS_SECTION,
   ENTRY_SECTION,
   LAW_PATH,
   MAX_LOC_DEFAULT,
+  PALETTE_DEFAULT,
   SANCTUM_DEFAULT,
   TRACE_SYMBOLS,
   SHARED_TRUTH_SECTION,
   TS_SECTION,
+  Z_INDEX_CAP_DEFAULT,
 } from "../config.ts";
 import {
   ROOT_SECTION,
@@ -44,6 +47,8 @@ export type Concessions = {
   readonly traceSymbols: readonly string[];
   readonly loggers: readonly string[];
   readonly generated: readonly string[];
+  readonly palette: readonly string[];
+  readonly zIndexCap: number;
 };
 
 export const CONCEDING_NOTHING: Concessions = {
@@ -57,6 +62,8 @@ export const CONCEDING_NOTHING: Concessions = {
   generated: [],
   traceSymbols: TRACE_SYMBOLS,
   loggers: [],
+  palette: [PALETTE_DEFAULT],
+  zIndexCap: Z_INDEX_CAP_DEFAULT,
 };
 
 export function isNamed(file: string, names: readonly string[]): boolean {
@@ -120,6 +127,7 @@ export function readConcessions(root: string): Concessions {
   }
 
   const document = parseToml(readFileSync(path, "utf8"), LAW_PATH);
+  const css = tableIn(document, CSS_SECTION);
   const ts = tableIn(document, TS_SECTION);
   const shared = tableIn(document, SHARED_TRUTH_SECTION);
   const eitherWay = (key: string): readonly string[] => {
@@ -139,6 +147,8 @@ export function readConcessions(root: string): Concessions {
     traceSymbols: orElse(eitherWay("trace_symbols"), TRACE_SYMBOLS),
     loggers: eitherWay("loggers"),
     generated: stringsAt(tableIn(document, ROOT_SECTION), "generated", LAW_PATH),
+    palette: orElse(oneOrManyAt(css, "palette", LAW_PATH), [PALETTE_DEFAULT]),
+    zIndexCap: numberAt(css, "z_max", Z_INDEX_CAP_DEFAULT),
   };
 }
 

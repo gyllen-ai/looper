@@ -107,11 +107,80 @@ test("installed packages and build output are not ours to judge", () => {
   }
 });
 
-test("a file that is not TypeScript is passed over without complaint", () => {
+test("a file in a language no rule here reads is passed over without complaint", () => {
   const root = project();
   try {
-    for (const path of ["README.md", "package.json", "src/style.css"]) {
+    for (const path of ["README.md", "package.json", "src/logo.svg"]) {
       assert.equal(targetOf(root, editOf(root, path)).kind, "not-ours", path);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const A_FOUGHT_STYLESHEET = `.card {
+  color: #ff0088;
+  margin-top: -8px;
+}
+`;
+
+const A_TOKEN_STYLESHEET = `.card {
+  color: var(--color-pink);
+  padding: var(--space-2);
+}
+`;
+
+test("a stylesheet is judged at the edit gate, which it never used to be", () => {
+  const root = project();
+  try {
+    assert.equal(targetOf(root, editOf(root, "src/app.css")).kind, "judge");
+
+    writeFileSync(join(root, "src/app.css"), A_FOUGHT_STYLESHEET);
+    const result = judgeEdit(root, "src/app.css");
+
+    assert.equal(result.refusals.length, 1);
+    const reason = first(result.refusals).reason;
+    assert.ok(reason.includes("CSS-TRUTH:1"), reason.slice(0, 300));
+    assert.ok(reason.includes("CSS-TRUTH:3"), reason.slice(0, 300));
+    assert.ok(reason.includes("src/app.css:2"), reason.slice(0, 300));
+
+    writeFileSync(join(root, "src/app.css"), A_TOKEN_STYLESHEET);
+    assert.deepEqual([...judgeEdit(root, "src/app.css").refusals], []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const A_PAGE_WITH_A_WORKAROUND = `<html>
+  <body><div style="color: red">hi</div></body>
+</html>
+`;
+
+test("a page is judged too, so the styles cannot be moved somewhere unread", () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "src/index.html"), A_PAGE_WITH_A_WORKAROUND);
+    const result = judgeEdit(root, "src/index.html");
+
+    assert.equal(result.refusals.length, 1);
+    const reason = first(result.refusals).reason;
+    assert.ok(reason.includes("CSS-LAYER:1"), reason.slice(0, 300));
+    assert.ok(reason.includes("src/index.html:2"), reason.slice(0, 300));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("no TypeScript rule fires on a stylesheet, which cannot be parsed as one", () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "src/app.css"), A_TOKEN_STYLESHEET);
+    const result = judgeEdit(root, "src/app.css");
+    for (const refusal of result.refusals) {
+      assert.ok(
+        !refusal.reason.includes("TS-"),
+        `a TypeScript rule judged a stylesheet: ${refusal.reason.slice(0, 200)}`,
+      );
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
