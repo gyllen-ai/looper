@@ -2,7 +2,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { withLockFor, type Locked, type Patience } from "../../atomic.ts";
 import {
+  A_FAILURE_IS_QUOTED_UP_TO,
+  CSHARP_BUILD_LOCK,
+  CSHARP_BUILD_LOCK_WAIT_MS,
   CSHARP_BUILD_TIMEOUT_MS,
   CSHARP_ENGINE_DIR,
   CSHARP_ENGINE_NAME,
@@ -10,7 +14,7 @@ import {
   CSHARP_TIMEOUT_MS,
   A_READER_MAY_ANSWER_WITH,
 } from "../../config.ts";
-import { fieldAt, reasonFrom } from "../../fields.ts";
+import { failureOf, fieldAt, reasonFrom } from "../../fields.ts";
 import { freshnessOf } from "../engine-age.ts";
 
 export type CsharpHit = {
@@ -33,6 +37,14 @@ export type Judged =
       readonly unreadable: readonly Unreadable[];
     };
 
+const NOTHING_TO_BUILD: Judged = { kind: "found", hits: [], unreadable: [] };
+
+const A_BUILD: Patience = {
+  waitMs: CSHARP_BUILD_LOCK_WAIT_MS,
+  giveUpMs: CSHARP_BUILD_TIMEOUT_MS,
+  staleMs: CSHARP_BUILD_TIMEOUT_MS,
+};
+
 export function engineIsHere(looperRoot: string): boolean {
   return existsSync(join(looperRoot, CSHARP_ENGINE_DIR, CSHARP_ENGINE_PROJECT));
 }
@@ -49,22 +61,43 @@ function builtAt(looperRoot: string): string {
   return join(looperRoot, CSHARP_ENGINE_DIR, "bin", "Release", "net10.0", CSHARP_ENGINE_NAME);
 }
 
-
 export function buildEngine(looperRoot: string): Judged {
   try {
     execFileSync("dotnet", ["build", "-c", "Release", "--nologo", "-v", "q"], {
       cwd: join(looperRoot, CSHARP_ENGINE_DIR),
       encoding: "utf8",
       timeout: CSHARP_BUILD_TIMEOUT_MS,
-      stdio: ["ignore", "ignore", "pipe"],
+      maxBuffer: A_READER_MAY_ANSWER_WITH,
+      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (cause) {
     return {
       kind: "unavailable",
-      detail: `looper's C# half would not build (${reasonFrom(cause)})`,
+      detail: `looper's C# half would not build: dotnet ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}`,
     };
   }
-  return { kind: "found", hits: [], unreadable: [] };
+  return NOTHING_TO_BUILD;
+}
+
+function readied(looperRoot: string): Judged {
+  let locked: Locked<Judged>;
+  try {
+    locked = withLockFor(join(looperRoot, CSHARP_ENGINE_DIR, CSHARP_BUILD_LOCK), A_BUILD, () =>
+      engineIsBuilt(looperRoot) ? NOTHING_TO_BUILD : buildEngine(looperRoot),
+    );
+  } catch (cause) {
+    return {
+      kind: "unavailable",
+      detail: `looper's C# half could not be readied, because its build lock could not be taken (${reasonFrom(cause)})`,
+    };
+  }
+  if (locked.kind === "busy") {
+    return {
+      kind: "unavailable",
+      detail: `looper's C# half was being built by another looper, which did not finish in time (${locked.why})`,
+    };
+  }
+  return locked.result;
 }
 
 function hitsFrom(payload: unknown): readonly CsharpHit[] {
@@ -101,12 +134,12 @@ function ranWith(binary: string, args: readonly string[]): Judged {
       encoding: "utf8",
       timeout: CSHARP_TIMEOUT_MS,
       maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (cause) {
     const said = fieldAt(cause, "stdout");
     if (typeof said !== "string" || said.length === 0) {
-      return { kind: "unavailable", detail: reasonFrom(cause) };
+      return { kind: "unavailable", detail: `the C# reader ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}` };
     }
     output = said;
   }
@@ -128,13 +161,11 @@ export function judgeCsharp(
   projectRoot: string,
   files: readonly string[],
 ): Judged {
-  if (files.length === 0) return { kind: "found", hits: [], unreadable: [] };
+  if (files.length === 0) return NOTHING_TO_BUILD;
   if (!engineIsHere(looperRoot)) {
     return { kind: "unavailable", detail: "looper's C# reader is not in this copy" };
   }
-  if (!engineIsBuilt(looperRoot)) {
-    const built = buildEngine(looperRoot);
-    if (built.kind !== "found") return built;
-  }
+  const ready = readied(looperRoot);
+  if (ready.kind !== "found") return ready;
   return ranWith(builtAt(looperRoot), [projectRoot, ...files]);
 }

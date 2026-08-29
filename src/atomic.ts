@@ -20,13 +20,19 @@ export type Held =
   | { readonly kind: "held" }
   | { readonly kind: "busy"; readonly why: string };
 
+export type Locked<T> =
+  | { readonly kind: "held"; readonly result: T }
+  | { readonly kind: "busy"; readonly why: string };
+
+export type Patience = {
+  readonly waitMs: number;
+  readonly giveUpMs: number;
+  readonly staleMs: number;
+};
+
 const LOCK_SUFFIX = ".looper-lock";
 
-const LOCK_WAIT_MS = 20;
-
-const LOCK_PATIENCE_MS = 1000;
-
-const LOCK_STALE_MS = 5000;
+const A_WRITE: Patience = { waitMs: 20, giveUpMs: 1000, staleMs: 5000 };
 
 function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -42,16 +48,20 @@ function takeLock(path: string): boolean {
   }
 }
 
+function abandonedFor(lockWrittenMs: number, arrivedMs: number, staleMs: number): boolean {
+  return arrivedMs - lockWrittenMs > staleMs;
+}
+
 export function abandonedBefore(lockWrittenMs: number, arrivedMs: number): boolean {
-  return arrivedMs - lockWrittenMs > LOCK_STALE_MS;
+  return abandonedFor(lockWrittenMs, arrivedMs, A_WRITE.staleMs);
 }
 
-function leftBehind(path: string, arrivedMs: number): boolean {
+function leftBehind(path: string, arrivedMs: number, staleMs: number): boolean {
   if (!existsSync(path)) return false;
-  return abandonedBefore(statSync(path).mtimeMs, arrivedMs);
+  return abandonedFor(statSync(path).mtimeMs, arrivedMs, staleMs);
 }
 
-export function withLock(path: string, body: () => void): Held {
+export function withLockFor<T>(path: string, patience: Patience, body: () => T): Locked<T> {
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}${LOCK_SUFFIX}`;
   const arrived = Date.now();
@@ -59,20 +69,24 @@ export function withLock(path: string, body: () => void): Held {
   do {
     if (takeLock(lock)) {
       try {
-        body();
+        return { kind: "held", result: body() };
       } finally {
         if (existsSync(lock)) unlinkSync(lock);
       }
-      return { kind: "held" };
     }
-    if (leftBehind(lock, arrived)) unlinkSync(lock);
-    else sleep(LOCK_WAIT_MS);
-  } while (Date.now() - arrived < LOCK_PATIENCE_MS);
+    if (leftBehind(lock, arrived, patience.staleMs)) unlinkSync(lock);
+    else sleep(patience.waitMs);
+  } while (Date.now() - arrived < patience.giveUpMs);
 
   return {
     kind: "busy",
-    why: `${lock} was held by another looper for ${LOCK_PATIENCE_MS / 1000} seconds`,
+    why: `${lock} was held by another looper for ${patience.giveUpMs / 1000} seconds`,
   };
+}
+
+export function withLock(path: string, body: () => void): Held {
+  const held = withLockFor(path, A_WRITE, body);
+  return held.kind === "held" ? { kind: "held" } : held;
 }
 
 export type Backup =
