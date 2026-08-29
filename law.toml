@@ -5,7 +5,7 @@ files = ["src/main.ts", "bin/looper.js", "audit/evasion.ts", "audit/dup-scan.ts"
 # One line builds a rule whose pass is a word no rule declares, to prove the
 # engine refuses it rather than guessing. The type system says that value cannot
 # exist, which is the point, so there is no honest spelling without the cast.
-"tests/law.test.ts" = ["TS-TYPE:3"]
+"tests/law.test.ts" = ["TS-TYPE:3", "TS-TRUTH:3"]
 
 # A corpus, not logic. This file is one entry per case and grows by one every
 # time a rule earns a new spelling, which is the discipline working. The cap is
@@ -13,4 +13,9 @@ files = ["src/main.ts", "bin/looper.js", "audit/evasion.ts", "audit/dup-scan.ts"
 # no second job in it, and cutting it in half would not make any case easier to
 # read. It stood at 491 lines, so the next case written was going to cross 500
 # whoever wrote it.
-"audit/cases.ts" = ["TS-DECOMPOSITION:1"]
+"audit/cases.ts" = ["TS-DECOMPOSITION:1", "TS-TRUTH:3"]
+
+# TS-TRUTH:3 reads strings, and a case file is the one place the banned string
+# is written down on purpose: the colour in a case is the shape the rule must
+# fire on, and the test that proves the palette knob holds a colour too.
+"audit/css-cases.ts" = ["TS-TRUTH:3"]

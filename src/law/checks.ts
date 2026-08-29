@@ -23,6 +23,8 @@ import { bornDefaultCheck } from "./ts/born-default.ts";
 import { stubValueCheck } from "./ts/stub-value.ts";
 import { unreadableFileCheck } from "./ts/unreadable.ts";
 import { conjuredCodeCheck } from "./ts/conjured-code.ts";
+import { codeColourCheck } from "./ts/code-colour.ts";
+import { inlineStyleCheck } from "./ts/inline-style.ts";
 import { guessedWaitCheck } from "./ts/guessed-wait.ts";
 import { rewrappedFailureCheck } from "./ts/rewrapped-failure.ts";
 import { roundTripCopyCheck } from "./ts/round-trip-copy.ts";
@@ -65,6 +67,8 @@ export const CHECKS: readonly Check[] = [
   clientSecretCheck,
   uncheckedInputCheck,
   conjuredCodeCheck,
+  codeColourCheck,
+  inlineStyleCheck,
   guessedWaitCheck,
   rewrappedFailureCheck,
   roundTripCopyCheck,
