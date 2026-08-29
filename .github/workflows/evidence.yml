@@ -42,7 +42,7 @@ jobs:
                    | grep -E '^[+-][^+-]' \
                    | grep -E 'CS-|yield return At|case .*Syntax' || true)
           cases=$(git diff --name-only "$range" \
-                  | grep -E '^audit/(cases|rust-cases|python-cases|csharp-cases)\.ts$' || true)
+                  | grep -E '^audit/(cases|rust-cases|python-cases|csharp-cases|css-cases|copy-cases)\.ts$' || true)
           # STACK:1 is about a project rather than a file's text, so the case
           # harness in audit/ cannot express it. Its cases live beside it.
           stack=$(git diff -U0 "$range" -- 'src/law/stack.ts' \
@@ -58,9 +58,10 @@ jobs:
             echo "This changes what a rule says:"
             echo "$said$rust$python$csharp" | sed 's/^/  /' | head -20
             echo
-            echo "and none of audit/cases.ts, audit/rust-cases.ts, audit/python-cases.ts"
-            echo "or audit/csharp-cases.ts"
-            echo "moved with it."
+            echo "and none of the case files under audit/ moved with it:"
+            echo "  cases, rust-cases, python-cases, csharp-cases, css-cases, copy-cases"
+            echo "A rule judged from a file's name rather than its text keeps its cases"
+            echo "in tests/copy.test.ts, which needs a real directory to write them in."
             echo "A rule's cases are written first,"
             echo "from its own ban text: what must fire and what must stay silent."
             echo "A test written after the code can only agree with the code."
