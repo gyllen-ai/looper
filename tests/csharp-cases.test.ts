@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 
 import { CSHARP_CASES } from "../audit/csharp-cases.ts";
 import { judgeCsharp } from "../src/law/csharp/drive.ts";
+import { judgeCsharpIn } from "../src/law/readers.ts";
 import { reasonFrom } from "../src/fields.ts";
 
 const LOOPER = join(import.meta.dirname, "..");
@@ -53,6 +54,33 @@ test("the C# reader answers at all, and says why when it does not", WITHOUT_DOTN
       said.kind,
       "found",
       `the C# reader did not answer, so every case below would fail as though the rules were wrong. It said: ${said.kind === "found" ? "" : said.detail}`,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a pardon in law.toml reaches the C# reader, by whole file or by rule", WITHOUT_DOTNET, () => {
+  const root = mkdtempSync(join(tmpdir(), "looper-cs-"));
+  try {
+    const commented = "class C {\n    // a comment\n    void F() { }\n}\n";
+    mkdirSync(join(root, "vendor"), { recursive: true });
+    writeFileSync(join(root, "vendor/Theirs.cs"), commented);
+    writeFileSync(join(root, "Ours.cs"), commented);
+    writeFileSync(
+      join(root, "Partly.cs"),
+      "class P {\n    // a comment\n    void F() { try { G(); } catch { } }\n    void G() { }\n}\n",
+    );
+    writeFileSync(join(root, "law.toml"), '[exempt]\n"vendor/Theirs.cs" = ["ALL"]\n"Partly.cs" = ["DEAD:2"]\n');
+    const said = judgeCsharpIn(root, [
+      join(root, "vendor/Theirs.cs"),
+      join(root, "Ours.cs"),
+      join(root, "Partly.cs"),
+    ]);
+    assert.deepEqual(said.unreadable, []);
+    assert.deepEqual(
+      said.violations.map((one) => `${one.file} ${one.rule.id}`).sort(),
+      ["Ours.cs CS-DEAD:2", "Partly.cs CS-ERROR:1"],
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

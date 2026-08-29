@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { PYTHON_EXTENSION, RUST_EXTENSION, CSHARP_EXTENSIONS } from "../config.ts";
 import { reasonFrom } from "../fields.ts";
 import { required } from "../present.ts";
+import { readConcessions, standingOf } from "./concessions.ts";
 import { judgeCsharp } from "./csharp/drive.ts";
 import { csharpRuleFor } from "./csharp/rules.ts";
 import { judgePython } from "./python/drive.ts";
@@ -145,6 +146,7 @@ export function judgePythonIn(root: string, files: readonly string[]): PythonSai
     };
   }
 
+  const concessions = readConcessions(root);
   const violations: Violation[] = [];
   const unreadable = said.unreadable.map(
     (one) => `${relative(root, one.file)} (${one.detail})`,
@@ -155,7 +157,9 @@ export function judgePythonIn(root: string, files: readonly string[]): PythonSai
       unreadable.push(`the Python half reported ${hit.rule}, which looper has no words for`);
       continue;
     }
-    violations.push({ rule: known, file: relative(root, hit.file), line: hit.line });
+    const named = relative(root, hit.file);
+    if (standingOf(concessions, named, known.id).kind !== "stands") continue;
+    violations.push({ rule: known, file: named, line: hit.line });
   }
   return { violations, unreadable, unjudged: said.unreadable.length };
 }
@@ -180,6 +184,7 @@ export function judgeCsharpIn(root: string, files: readonly string[]): PythonSai
     };
   }
 
+  const concessions = readConcessions(root);
   const violations: Violation[] = [];
   const unreadable = said.unreadable.map((one) => `${one.file} (${one.detail})`);
   for (const hit of said.hits) {
@@ -188,6 +193,7 @@ export function judgeCsharpIn(root: string, files: readonly string[]): PythonSai
       unreadable.push(`the C# half reported ${hit.rule}, which looper has no words for`);
       continue;
     }
+    if (standingOf(concessions, hit.file, known.rule.id).kind !== "stands") continue;
     violations.push({ rule: known.rule, file: hit.file, line: hit.line });
   }
   return { violations, unreadable, unjudged: said.unreadable.length };

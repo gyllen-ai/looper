@@ -24,6 +24,25 @@ function firedOn(code: string, named: string | undefined): readonly string[] {
   }
 }
 
+test("a pardon in law.toml reaches the Python reader", () => {
+  const root = mkdtempSync(join(tmpdir(), "looper-py-"));
+  try {
+    const swallowing = `def f(p):\n    try:\n        open(p)\n    except Exception:\n        pass\n`;
+    mkdirSync(join(root, "vendor"), { recursive: true });
+    writeFileSync(join(root, "vendor/theirs.py"), swallowing);
+    writeFileSync(join(root, "ours.py"), swallowing);
+    writeFileSync(join(root, "law.toml"), '[exempt]\n"vendor/theirs.py" = ["ALL"]\n');
+    const said = judgePythonIn(root, [join(root, "vendor/theirs.py"), join(root, "ours.py")]);
+    assert.deepEqual(said.unreadable, []);
+    assert.deepEqual(
+      said.violations.map((one) => `${one.file} ${one.rule.id}`),
+      ["ours.py PY-ERROR:1"],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("every Python case agrees with the rule it was written from", () => {
   const wrong: string[] = [];
   for (const held of PYTHON_CASES) {
