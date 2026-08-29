@@ -129,6 +129,8 @@ export const RUST_TIMEOUT_MS = 120_000;
 
 export const A_READER_MAY_ANSWER_WITH = 256 * 1024 * 1024;
 
+export const A_FAILURE_IS_QUOTED_UP_TO = 600;
+
 export const PYTHON_EXTENSION = ".py";
 
 export const PYTHON_COMMAND = "python3";
@@ -156,6 +158,10 @@ export const CSHARP_ENGINE_PROJECT = "looper-csharp.csproj";
 export const CSHARP_TIMEOUT_MS = 120_000;
 
 export const CSHARP_BUILD_TIMEOUT_MS = 300_000;
+
+export const CSHARP_BUILD_LOCK = "building";
+
+export const CSHARP_BUILD_LOCK_WAIT_MS = 200;
 
 export const STACK_PATH = "CURRENTSTACK.md";
 

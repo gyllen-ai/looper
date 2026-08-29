@@ -7172,3 +7172,57 @@ webview page and script) shows the rule only its `rgba()` calls; its hexes sit
 inside prose-shaped text. A style object handed to a component that forwards it
 to a DOM element (`<Input style>`) is the component's own rule to write. A
 named colour in code is a word this rule does not read.
+
+## Two loopers built the C# half at once, and a reader ran what was half written — 2026-08-29
+
+CI went red on `main` twice in an hour — #179 and #180, both on
+`test (22.18.0, ubuntu-latest)` — with the three C# tests failing: *the reader
+answers at all* said `unavailable`, and its detail was `Command failed:
+…/looper-csharp …` and nothing else. The same code passed as pull requests and
+passed on re-run. Over the last twenty runs the failure hit 22.18.0 three
+times, 26.x twice and 24.x once, every one since #177 merged at 18:16. #178 had
+already met it, and recorded it as transient.
+
+**The cause.** `judgeCsharp` builds the engine on first use. `node --test` runs
+files in parallel processes, so on a fresh checkout every file that needs C#
+runs `dotnet build` in `vendor/csharp-law`. Until #177 that was one file. #177's
+*the markup half of a Razor page is judged* in `tests/edit-gate.test.ts` is a
+second: in the green run of the same commit, test 92 took 8.7 s and test 130
+took 7 s, each a build. Two builds in one directory rewrite `bin/` under each
+other, and a reader run while that happens reads a half-written file.
+
+**Seen, not inferred.** Two `dotnet build` started together here, with the
+binary run as soon as it appeared, three rounds out of three: `exit 147 —
+Failed to map file. mmap(…looper-csharp.runtimeconfig.json) failed with error
+22`, and twice `exit 154 — The application to execute does not exist:
+'…/looper-csharp.dll'`; one of the builds itself exited 1 on `MSB3026: Could
+not copy … resources.dll`. Through the driver, on a fresh copy of the engine,
+three loopers at once pinned to four CPUs like the runner: with the old driver
+one or two of the three came back `unavailable` in every one of three rounds;
+with this change, nine of nine answered.
+
+**Why #178 saw nothing.** `ranWith` ran the binary with stderr set to `ignore`,
+and `reasonFrom` keeps only the message, so the exit status and the runtime's
+own words never reached anyone. A failure with its evidence thrown away reads
+as transient.
+
+**What changed.** `withLock` in `src/atomic.ts` became
+`withLockFor(path, patience, body)`, the write case keeping its old patience.
+`judgeCsharp` takes `vendor/csharp-law/building.looper-lock` around deciding
+whether the engine is current and building it if not, with the build's own
+patience of 300 s, so a second looper waits for the first build and then runs
+the finished binary rather than starting a build of its own; a lock a dead
+builder left behind is taken over after the same patience. And a reader or a
+build that fails now says `exited with status 154 saying: The application to
+execute does not exist …` or `was stopped by SIGTERM`, quoting up to 600
+characters of what it wrote — `dotnet build` puts its errors on stdout, so that
+is read too.
+
+**What it does not cover.** A build that starts while another looper is already
+running the binary, which needs the engine's own source to change between two
+calls — that is, working on looper itself. It is now loud rather than silent.
+
+Nine cases, written before the change and red against the old driver for the
+reasons they name — the lock-wait one says *the reader ran the half-written
+binary instead of waiting for the build*. `npm test`: 655 pass, 0 fail.
+`looper law` over the seven changed files: nothing to fix. `looper loop`: whole.

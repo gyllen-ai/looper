@@ -3,6 +3,7 @@ node_modules/
 dist/
 *.looper-tmp
 *.looper-backup
+*.looper-lock
 vendor/rust-law/target/
 vendor/csharp-law/bin/
 vendor/csharp-law/obj/
