@@ -457,7 +457,7 @@ test("init leaves the knobs where somebody can find them, and changes nothing by
     runInit(root, DEV, []);
     const written = readFileSync(join(root, LAW_PATH), "utf8");
 
-    for (const key of ["generated", "max_loc", "sanctum", "env_files", "trace_symbols", "loggers", "[entry]", "[exempt]"]) {
+    for (const key of ["generated", "max_loc", "sanctum", "env_files", "trace_symbols", "loggers", "palette", "z_max", "[entry]", "[css]", "[exempt]"]) {
       assert.ok(
         written.includes(key),
         `${key} can be set in law.toml and appears nowhere a reader would look, so it is found only by reading looper's own diff`,

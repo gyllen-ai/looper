@@ -1,8 +1,9 @@
 Writing looper's own code.
 
 - **looper is governed by its own canon at full strength.** `src/config.ts` is
-  the one file where a missing value may become a default; only `src/git.ts` and
-  the language drivers under `src/law/rust` and `src/law/python` start a process.
+  the one file where a missing value may become a default, and only the files
+  `tests/invariants.test.ts` names may start a process. Naming them here instead
+  drifted this line to two of its five.
 - **Fail open, but never fail silent.** A refusal is announced, and it must not
   wedge the session it watches. Observe, then pass.
 - **Ask what a file is before asking what is wrong with it.** A gate that forgot

@@ -169,4 +169,49 @@ export const PYTHON_RULES: readonly Rule[] = [
     ],
     valve: { kind: "none" },
   },
+  {
+    id: "PY-ERROR:4",
+    category: "ERROR",
+    pass: "fast",
+    bans: "`time.sleep` and `asyncio.sleep` outside a loop, given a duration this code chose — waiting a fixed number of seconds for something to probably be finished",
+    why:
+      "the number is a guess about how fast another machine is today, wrong in both directions at once. Too short and it races, on the slowest machine, under the heaviest load, which is exactly where nobody is watching. Too long and every call pays it forever, including the thousand calls where the thing was ready immediately. Nothing in the test suite can catch either half, because the failure belongs to somebody else's hardware",
+    instead: [
+      "wait for the thing itself — `process.wait()`, `event.wait()`, `await task`",
+      "poll for the condition and sleep between tries: `while not ready(): time.sleep(0.5)` — a sleep inside a loop is pacing, and this rule is silent on it",
+      "if a service genuinely needs settling time, that is a readiness endpoint it owes you, not a number for the caller to guess",
+      "`sleep(0)` yields to the event loop, `sleep(math.inf)` waits to be cancelled, and a duration that arrived as a parameter is the caller's number — this rule is silent on all three",
+    ],
+    valve: { kind: "none" },
+  },
+  {
+    id: "PY-SECURITY:3",
+    category: "SECURITY",
+    pass: "fast",
+    bans: "`eval`, `exec` and `compile` — code made out of a string while the program runs",
+    why:
+      "a string that becomes code is code no linter, no type checker and no rule here ever read. Every check this project has runs before that string exists. If any part of it came from outside — a request, a config file, a column in a table — then whoever supplied it is writing your program, with everything the process can reach",
+    instead: [
+      "a dict from a name to a function, so what can run is written down: `doing = {\"save\": save, \"send\": send}`",
+      "`json.loads` for data that arrived as text, which reads data and cannot run it",
+      "`getattr(held, name)` against an allowed list of names, if it really is dispatch",
+      "`ast.literal_eval` if all you need is a literal, which is the one spelling that cannot call anything",
+    ],
+    valve: { kind: "none" },
+  },
+  {
+    id: "PY-TRUTH:3",
+    category: "TRUTH",
+    pass: "fast",
+    bans: "`global` — a function claiming the right to rewrite a module-level name",
+    why:
+      "state that a function can rewrite from underneath is state nobody can reason about from where it is declared. The value at the top of the file is not the value, and finding the real one means reading every function that could have run first. Each one also makes the next easier to justify, which is how a module ends up with four of them and no order anybody can name",
+    instead: [
+      "return the new value and let the caller hold it: `def bump(count): return count + 1`",
+      "put it on an object, so the state has an owner and a name: `self.count += 1`",
+      "if it is genuinely one thing for the whole process, make that explicit — a class with one instance, built where the program starts and passed down",
+      "`nonlocal` is not this rule: its reach stops at the function above it, and the declaration it rewrites is a few lines up rather than a file away",
+    ],
+    valve: { kind: "none" },
+  },
 ];

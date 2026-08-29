@@ -83,6 +83,10 @@ export const INDEX_CEILING = 900;
 
 export const LAW_PATH = "law.toml";
 
+export const STYLESHEET_EXTENSIONS: readonly string[] = [".css", ".scss", ".sass"];
+
+export const PAGE_EXTENSIONS: readonly string[] = [".html", ".htm"];
+
 export const JUDGED_EXTENSIONS: readonly string[] = [
   ".ts",
   ".tsx",
@@ -96,6 +100,11 @@ export const JUDGED_EXTENSIONS: readonly string[] = [
   ".py",
   ".cs",
   ".razor",
+  ".css",
+  ".scss",
+  ".sass",
+  ".html",
+  ".htm",
 ];
 
 export const RUST_EXTENSION = ".rs";
@@ -131,6 +140,12 @@ export const PYTHON_SKELETON = "src/law/python/skeleton.py";
 export const PYTHON_TIMEOUT_MS = 60_000;
 
 export const CSHARP_EXTENSIONS: readonly string[] = [".cs", ".razor"];
+
+export const CSS_SECTION = "css";
+
+export const PALETTE_DEFAULT = "tokens.css";
+
+export const Z_INDEX_CAP_DEFAULT = 100;
 
 export const CSHARP_ENGINE_DIR = "vendor/csharp-law";
 

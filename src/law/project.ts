@@ -14,6 +14,9 @@ import { readConcessions } from "./concessions.ts";
 import { required } from "../present.ts";
 import { judge } from "./engine.ts";
 import { CHECKS } from "./checks.ts";
+import { CSS_CHECKS } from "./css/checks.ts";
+import { variantsIn } from "./copy.ts";
+import { isStyling } from "./css/read.ts";
 import { checksAdoptedIn } from "./adopted.ts";
 import type { Violation } from "./rule.ts";
 import { UNREADABLE_FILE } from "./ts/unreadable.ts";
@@ -304,9 +307,9 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
   violations.push(...rustSaid.violations);
   unreadable.push(...rustSaid.unreadable);
 
-  violations.push(
-    ...undeclaredLanguagesIn(root, files.map((path) => relative(root, path))),
-  );
+  const named = files.map((path) => relative(root, path));
+  violations.push(...undeclaredLanguagesIn(root, named));
+  violations.push(...variantsIn(root, named, concessions));
 
   const pythonFiles = files.filter((path) => path.endsWith(PYTHON_EXTENSION));
   const pythonSaid = judgePythonIn(root, pythonFiles);
@@ -322,6 +325,19 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
     if (path.endsWith(RUST_EXTENSION) || path.endsWith(PYTHON_EXTENSION)) continue;
     if (isCsharp(path)) continue;
     const named = relative(root, path);
+    if (isStyling(named)) {
+      let styling = "";
+      try {
+        styling = readFileSync(path, "utf8");
+      } catch (cause) {
+        unreadable.push(`${named} (${reasonFrom(cause)})`);
+        continue;
+      }
+      violations.push(
+        ...judge(CSS_CHECKS, "fast", { file: named, text: styling }, concessions).violations,
+      );
+      continue;
+    }
     let text = "";
     try {
       text = readFileSync(path, "utf8");

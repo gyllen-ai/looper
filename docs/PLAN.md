@@ -1883,25 +1883,34 @@ lets an agent do that the others do not.
 Every rule the engine loads appears exactly once below, and
 `tests/plan-is-true.test.ts` refuses the suite if one is added without a row.
 
-| what goes wrong | TypeScript | Rust | Python | C# |
-|---|---|---|---|---|
-| a failure vanishes, and nobody hears it | `TS-ERROR:1` `TS-ERROR:4` `TS-ERROR:6` `TS-ERROR:7` `TS-ERROR:8` | `RUST-ERROR:1` `RUST-ERROR:2` `RUST-ERROR:4` `RUST-ERROR:6` `RUST-ERROR:8` `RUST-ERROR:9` | `PY-ERROR:1` `PY-TRUTH:2` | `CS-ERROR:1` `CS-ERROR:4` |
-| a failure is answered with a made-up value | `TS-ERROR:3` `TS-TYPE:5` | `RUST-ERROR:3` `RUST-TYPE:5` | `PY-ERROR:2` | `CS-ERROR:3` |
-| the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` |
-| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below |
-| "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` | none built |
-| output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` |
-| a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built |
-| the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built |
-| unfinished work reads as finished | `TS-DEAD:2` `TS-DEAD:3` | `RUST-DEAD:2` `RUST-DEAD:3` | **tried and not shippable**, measured 2026-08-18 — the argument is below | `CS-TRUTH:1` `CS-DEAD:2` |
-| the language's own guarantees are stepped around | none built | `RUST-ERROR:5` `RUST-ERROR:7` `RUST-TESTS:1` | none built | none built |
-| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` | none built | `PY-SECURITY:1` `PY-SECURITY:2` | `CS-SECURITY:1` |
-| a framework's own contract is broken in silence | `REACT:1` `REACT:2` `TAURI:1` | — | — | — |
-| the project gains a language nobody chose | `STACK:1`, which reads the project rather than a file, so it answers for all four | | | |
+| what goes wrong | TypeScript | Rust | Python | C# | CSS |
+|---|---|---|---|---|---|
+| a failure vanishes, and nobody hears it | `TS-ERROR:1` `TS-ERROR:4` `TS-ERROR:6` `TS-ERROR:7` `TS-ERROR:8` `TS-ERROR:10` | `RUST-ERROR:1` `RUST-ERROR:2` `RUST-ERROR:4` `RUST-ERROR:6` `RUST-ERROR:8` `RUST-ERROR:9` | `PY-ERROR:1` `PY-TRUTH:2` | `CS-ERROR:1` `CS-ERROR:4` | a stylesheet cannot fail |
+| a failure is answered with a made-up value | `TS-ERROR:3` `TS-TYPE:5` | `RUST-ERROR:3` `RUST-TYPE:5` | `PY-ERROR:2` | `CS-ERROR:3` | a stylesheet cannot fail |
+| the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
+| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
+| "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
+| output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
+| a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built | a stylesheet writes no logs |
+| the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built | `CSS-LAYER:1` `CSS-TRUTH:2` |
+| unfinished work reads as finished | `TS-DEAD:2` `TS-DEAD:3` | `RUST-DEAD:2` `RUST-DEAD:3` | **tried and not shippable**, measured 2026-08-18 — the argument is below | `CS-TRUTH:1` `CS-DEAD:2` | open |
+| the language's own guarantees are stepped around | none built | `RUST-ERROR:5` `RUST-ERROR:7` `RUST-TESTS:1` | none built | none built | `CSS-TYPE:1` |
+| a number is guessed where a fact was available | `TS-ERROR:9` | none built | `PY-ERROR:4` | none built | — |
+| the same file exists twice under two names | `COPY:1`, which reads the directory rather than a file, so it answers for all five | | | | |
+| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` `TS-SECURITY:1` | none built | `PY-SECURITY:1` `PY-SECURITY:2` `PY-SECURITY:3` | `CS-SECURITY:1` | open |
+| a framework's own contract is broken in silence | `REACT:1` `REACT:2` `TAURI:1` | — | — | — | — |
+| the project gains a language nobody chose | `STACK:1`, which reads the project rather than a file, so it answers for all four | | | | |
 
 **A cell that says `open` is a gap, not a decision.** A cell that says a harm does
 not exist in that language has to carry the argument, not the assertion, and none
 of them does yet — which is why the four blanks above say `open` instead.
+
+**The CSS column, added 2026-08-29.** Its five "cannot" cells are the one place a
+cell carries an argument rather than an assertion, and the argument is the same
+each time: CSS has no control flow, no return, no output stream and no type
+checker, so five of the twelve harms have nothing in the language to happen to.
+The two cells that say `open` are genuine gaps — a half-written stylesheet and a
+value pasted in from outside both exist, and neither has a rule yet.
 
 Counted from the table on 2026-08-19, when C# joined: it answers four of the
 twelve rows with four rules. That is the smallest column here on purpose — the
@@ -6772,3 +6781,230 @@ scaffold that is live on arrival changes every project that runs `init`.
 wired into `src/init.ts` before `LAW_PATH` was imported, so its own code would
 not load. *"Nothing is being checked — not the rules, not the edits, not the
 commit."* Fail open, never fail silent, working on the person who broke it.
+
+## The stylesheet was the one file nobody read, 2026-08-29
+
+Every gate looper has — the project law, the edit hook, the commit gate — asked
+`JUDGED_EXTENSIONS` which files it was allowed to open, and `.css` was not on
+that list. Neither was `.scss`, `.sass`, `.html` or `.htm`. A stylesheet passed
+through all three in silence, an inline style in a page was invisible to every
+rule of the seventy-seven, and the survey counted neither as unread: they were
+not counted at all, which reads exactly like nothing being wrong.
+
+That is the same failure shape as **a rule that never arrived** — a file nobody
+judged and a file with nothing in it produce the same output. It is worse here
+than for a language looper simply does not speak, because the front end is where
+an agent does its fastest and least reviewed work.
+
+### Five rules, and the one thing they have in common
+
+Every one of them bans something a machine can decide, that great stylesheets sit
+near zero on, and that an agent optimising for "the screen looks right now"
+produces constantly.
+
+| rule | bans |
+|---|---|
+| `CSS-LAYER:1` | a `style=` attribute on an element |
+| `CSS-TRUTH:1` | a colour written where it is used, outside the palette file |
+| `CSS-TRUTH:2` | a z-index above the cap |
+| `CSS-TRUTH:3` | a negative margin |
+| `CSS-TYPE:1` | `!important` |
+
+`CSS-LAYER:1` is the one that makes the other four hold. An inline style outranks
+every stylesheet and — before this — was read by no rule at all, so it was the
+place a workaround went to live. Judging stylesheets without judging `style=`
+would have shipped a law with a hole in the shape of its own evasion.
+
+### The scanner, and what it refuses to be fooled by
+
+The rules do not run over raw text. Each file is first turned into a **CSS view**:
+same length, same line breaks, everything that is not a live declaration blanked
+to spaces. That is where the precision comes from, and every step of it exists
+because of a shape that would otherwise have fired wrongly.
+
+- **Comments and quoted strings are blanked**, so `/* the old brand was #ff0088 */`
+  is a comment and `content: "!important"` is text.
+- **`url(...)` contents are blanked**, quoted ones to their matching quote. A
+  colour inside an inline SVG data URI belongs to the image, not to the sheet.
+- **Token names are stripped from values before matching**, so `var(--color-pink)`
+  is not the colour pink and `var(--space-2)` is not a negative number.
+- **`calc()` contents are exempt from the negative-margin rule.** Subtraction is
+  arithmetic; `margin: calc(var(--space-4) - var(--border))` places a box.
+- **A declaration is read from its colon to its `;`, `}` or `{`**, so a value
+  spread over four lines is one declaration and `a:hover {` is a selector. This is
+  what keeps `#face { padding: 0 }` from reading as a hex, and `@media
+  (min-width: 700px)` from reading as a property.
+- **`<style>` blocks in a page are judged as CSS**, on the page's own line
+  numbers, and `<script>` bodies and `<!-- -->` comments are blanked first.
+- **`.scss` and `.sass` are judged too**, with `//` comments understood and
+  `$brand: #ff0088` read as the token declaration it is. A law that stopped at
+  `.css` would be dodged by renaming the file.
+
+The palette's home is a knob, `[css] palette`, defaulting to `tokens.css` matched
+by name in any directory. It is the only file where a colour may be written out.
+The cap is a knob too, `[css] z_max`.
+
+### The z-index cap is 100, and the number was measured
+
+Deduplicated by content, 62,224 `.css`, `.scss` and `.html` files on this machine
+hold 260 `z-index` declarations. **238 of them — 91.5% — are already at or below
+100.** The 22 above it are 101, 200 (twice), 1000 (ten times), 1001, 9900
+(twice), 999999999, 2147483644, 2147483645 (twice), 2147483647, 9999999999 and
+99999999999 (twice). That tail is not a scale anybody designed; it is the war the
+rule is named after. Measured 2026-08-29.
+
+A cap of 1000 was the alternative and was rejected: it would have let 9900 and
+1001 through while catching only the 32-bit-maximum end, and 1000 is not a small
+scale — past it the number has stopped saying which layer this is.
+
+### Run over 61,777 files nobody here wrote, and the one false positive
+
+The five rules were run over every `.css`, `.scss` and `.html` file on this
+machine, deduplicated by content, with installed packages and build output
+excluded — 61,777 named, 61,664 read, the other 113 skipped for being over
+400KB. None of them was written for looper. Measured 2026-08-29.
+
+| rule | findings |
+|---|---|
+| `CSS-LAYER:1` | 6,102 |
+| `CSS-TRUTH:1` | 1,546 |
+| `CSS-TRUTH:2` | 17 |
+| `CSS-TRUTH:3` | 28 |
+| `CSS-TYPE:1` | 103 |
+
+**112 findings were judged by hand** — 28 inline styles, 26 named-colour hits, 16
+z-index hits, 12 negative margins and 30 `!important`s — and every one was a
+genuine hit. Nothing was reported that was not really there.
+
+**One false positive was found, and it was found by attacking the scanner rather
+than by reading the corpus.** A quoted `url()` holding an inline SVG whose markup
+contains a `)` — `transform="translate(2,2)"` is the common way that happens —
+ended the blanking at that first `)`, leaving the rest of the SVG exposed, and
+the image's own `stroke='black'` fired `CSS-TRUTH:1`. A quoted `url()` is now
+blanked to its matching quote. It is a case: *a colour inside a data URI belongs
+to the image, not the sheet*.
+
+That is the order the contribution rules ask for, and it earned its keep: the
+corpus never showed the fault, because the corpus does not contain an adversary.
+
+### What was left out, and why
+
+- **`float`, absolute positioning, fixed pixel heights, CSS comments.** Each has
+  uses a machine cannot tell from a workaround, so a rule would nag rather than
+  judge. A blunt rule is not a strict rule.
+- **`style={{ }}` in JSX and TSX.** It is the same harm as `CSS-LAYER:1`, and it
+  is also the only way to hand a computed value to the browser. It needs a rule
+  that can tell a literal object from a computed one, and that rule is not
+  written yet.
+- **`.vue` and `.svelte`.** Their `<style>` blocks are CSS, but the rest of the
+  file is TypeScript that the parser here cannot read, so adding them would fire
+  `TS-ERROR:8` on every one. They stay out until the file is split by section.
+- **`.razor`.** It goes to the C# reader, which judges `@code` blocks and leaves
+  the markup alone, so a `style=` attribute in a Razor page is still unread. It
+  is the nearest gap left.
+- **File length for stylesheets.** `TS-DECOMPOSITION:1` is a TypeScript rule and
+  stayed one. A cap for stylesheets would need its own measurement.
+
+### CSS is not added to the language table, on purpose
+
+`.css` and `.html` are deliberately absent from `A_LANGUAGE_BY_EXTENSION`, so
+`STACK:1` still says nothing about them. Adding them would make every project
+with a stylesheet and a `CURRENTSTACK.md` that predates this fail the moment they
+upgraded, for a decision nobody made. Judging a file and demanding it be declared
+are two different things, and only the first one shipped.
+
+## Eight rules for the shortcuts that compound, 2026-08-29
+
+The CSS law closed a place nobody was reading. These eight close a different
+thing: shortcuts that are individually survivable and get worse as they
+accumulate, because each one is the precedent for the next.
+
+| rule | bans |
+|---|---|
+| `COPY:1` | a file whose name says it is a second go at the one beside it |
+| `TS-ERROR:9` / `PY-ERROR:4` | waiting a fixed time for something to probably be done |
+| `TS-ERROR:10` | throwing a built-in `Error` from inside a `catch` |
+| `TS-SECURITY:1` / `PY-SECURITY:3` | `eval`, `exec`, `compile`, `new Function` |
+| `TS-TYPE:6` | `JSON.parse(JSON.stringify(x))` as a deep copy |
+| `PY-TRUTH:3` | `global` |
+
+`TS-ERROR:10` has no Python twin on purpose: Python chains exceptions
+implicitly, so `raise Missing(path) from error` — and even a bare re-raise inside
+an `except` — keeps the original. The harm that rule names does not exist there.
+
+### What the measurement changed, which is most of it
+
+Every rule was run over the code on this machine that nobody here wrote, before
+it was called done. Four of the eight came back wrong, and the corpus is the only
+reason anybody knows.
+
+**`COPY:1` lost the half it was named for.** Over **95,907 source files** —
+`.ts`, `.tsx`, `.js`, `.mjs`, `.py`, `.rs`, `.cs`, `.css`, `.scss`, deduplicated
+by path — the first draft found **252 files**, and essentially none of them were
+the harm. Measured 2026-08-29:
+
+| the shape | findings | what they actually were |
+|---|---:|---|
+| a bare trailing number — `utils2.ts` | 230 | 115 icons in one set (`edit-2`, `clock-7`, `music-3`); the rest domain numbers — `es256.py`, `terminal256.py`, `webgl2.js`, `woff2.js`, `http11.py`, `mips64.rs`, `macaddr8.js`, `SOCKADDR_IN6.rs`, `items2020.js`, `applyDecs2301.js` |
+| a version tail — `-v1`, `-v2` | 14 | published API versions: `_decorators_v1.py`, `rekor-v2.js`, `colr-v1.js` |
+| `-copy`, `-fixed` | 6 | `book-copy.mjs`, `clipboard-copy.mjs`, `locate-fixed.mjs`, `fs_copy.rs`, `rgbxyz_fixed.rs` — copying and fixed-point are things code does |
+| `-backup` | 2 | `cloud-backup.mjs`, `database-backup.mjs` — backing up is also a thing code does |
+| `-old`, `-new`, `-final`, `-orig`, `-tmp`, `-bak`, `-updated`, `-improved`, `-enhanced`, ` copy`, ` (1)` | **0** | — |
+
+So the rule ships as the last row only: **0 findings in 95,907 files**, which is
+the profile the contribution rules ask for — a machine can check it, and great
+codebases sit at zero. The headline example from the idea it came from,
+`utils2.ts`, is **deliberately not in it**: a trailing number is a fact about a
+standard far more often than a confession about a file, and no reading of the
+name can tell those apart. Every false positive above is now a silent case in
+`audit/copy-cases.ts`, so the narrowing cannot be quietly undone.
+
+`COPY:1` is judged from the filesystem rather than from a file's contents, so it
+is the first rule here that runs on every language at once, and the first that
+had to be wired into the three gates by hand rather than by joining `CHECKS`.
+
+**`TS-ERROR:9` fired on two things that were not guesses.** Over **38,438**
+deduplicated `.ts`, `.tsx`, `.js` and `.mjs` files, 53 findings, of which three
+were wrong: a `new Promise` whose body did real work *and* set a timeout
+alongside it, and `setTimeout(resolve)` with no delay at all, which yields a tick
+rather than guessing a duration. The rule now requires the promise's body to be
+*only* a delayed timer. Both are cases.
+
+**`PY-ERROR:4` fired on 36 things that were not guesses**, out of 100, over
+**5,420** deduplicated `.py` files: 18 were `sleep(0)`, which hands control to
+the event loop, and 18 were a duration that arrived as a parameter of the
+enclosing function — the caller's number, passed through, not this code's guess.
+`sleep(math.inf)` waits to be cancelled and was the 37th. 64 remain, every
+sampled one a genuine fixed wait.
+
+**`PY-SECURITY:3` fired on a function called `eval` that a module had defined
+itself** — `setuptools/wheel.py` has `def eval(req, **env)`. Six findings of 118.
+It now checks whether the name is bound in the module first, the same way the
+TypeScript half already resolved aliases.
+
+**`PY-TRUTH:3` was cut in half on purpose.** The first draft banned `nonlocal`
+alongside `global`: 419 findings, of which 98 were `nonlocal`. Reading them, they
+are the closure-accumulator idiom — `nonlocal attempts` in a retry test,
+`nonlocal request_complete` in an ASGI transport — where the declaration being
+rewritten is a few lines up in the enclosing function rather than a file away.
+That is a much weaker version of the harm, TypeScript has no equivalent rule for
+closure mutation, and making Python stricter than TypeScript for the same shape
+needs an argument nobody has. `global` alone: 321 findings, all genuine.
+
+**Two rules came back clean and needed nothing.** `TS-SECURITY:1`: 98 findings,
+every one a real `eval` or `Function` constructor, including `const F = Function;
+new F("")` — a CSP probe deliberately aliased to dodge bundler analysis, which
+the existing alias resolution caught without being asked. `TS-TYPE:6`: 96
+findings, every one a real `JSON.parse(JSON.stringify(...))`.
+
+**All eight run clean over looper's own code**, which still stands at the seven
+problems that were there before any of this.
+
+### What the vocabulary guard caught while this was being written
+
+`tests/vocabulary.test.ts` refused the suite: `TS-ERROR:10` holds a list of
+built-in error *constructor* names in a file that also tests node types against a
+list, and the guard reads every `readonly string[]` in such a file as node types.
+It was right to complain — the two lists mean different things and looked
+identical. The constructor names are a `Set` now, which is both what the guard
+wanted and the better lookup.

@@ -22,10 +22,16 @@ import { valueInMessageCheck } from "./ts/value-in-message.ts";
 import { bornDefaultCheck } from "./ts/born-default.ts";
 import { stubValueCheck } from "./ts/stub-value.ts";
 import { unreadableFileCheck } from "./ts/unreadable.ts";
+import { conjuredCodeCheck } from "./ts/conjured-code.ts";
+import { guessedWaitCheck } from "./ts/guessed-wait.ts";
+import { rewrappedFailureCheck } from "./ts/rewrapped-failure.ts";
+import { roundTripCopyCheck } from "./ts/round-trip-copy.ts";
+import { CSS_CHECKS } from "./css/checks.ts";
 import { RUST_RULES } from "./rust/rules.ts";
 import { PYTHON_RULES } from "./python/rules.ts";
 import { CSHARP_RULES } from "./csharp/rules.ts";
 import { UNDECLARED_LANGUAGE } from "./stack.ts";
+import { VARIANT_FILE } from "./copy.ts";
 import { CROSSED_BOUNDARY } from "./rust/boundary.ts";
 import { suppressionCheck } from "./ts/suppression.ts";
 import { vanishedErrorCheck } from "./ts/vanished-error.ts";
@@ -58,15 +64,21 @@ export const CHECKS: readonly Check[] = [
   builtCommandCheck,
   clientSecretCheck,
   uncheckedInputCheck,
+  conjuredCodeCheck,
+  guessedWaitCheck,
+  rewrappedFailureCheck,
+  roundTripCopyCheck,
 ];
 
 export function knownRuleIds(): readonly string[] {
   return [
     ...CHECKS.map((held) => held.rule.id),
+    ...CSS_CHECKS.map((held) => held.rule.id),
     ...RUST_RULES.map((held) => held.id),
     ...PYTHON_RULES.map((held) => held.id),
     ...CSHARP_RULES.map((held) => held.id),
     UNDECLARED_LANGUAGE.id,
+    VARIANT_FILE.id,
     CROSSED_BOUNDARY.id,
   ];
 }

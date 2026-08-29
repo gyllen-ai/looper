@@ -1,8 +1,9 @@
 Writing TypeScript in a governed project. This language lets a failure disappear
 without a warning from anything, so the law reads every edit: the empty `catch`,
 the value answered for a failure, the promise nobody awaits, `as`, `any`, `!`,
-the comment, the silenced lint and the stray print are refused before you see
-them.
+the comment, the silenced lint, the stray print, `eval`, the guessed sleep, the
+built-in `Error` rethrown from a `catch` and the round-trip deep copy are refused
+before you see them.
 
 - **Nothing from outside is pasted into a query, a shell command or a page the
   browser sees.** A parameter, an argument array and a schema at the edge.
