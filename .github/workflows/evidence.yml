@@ -61,7 +61,7 @@ jobs:
             echo "and none of the case files under audit/ moved with it:"
             echo "  cases, rust-cases, python-cases, csharp-cases, css-cases, copy-cases"
             echo "A rule judged from a file's name rather than its text keeps its cases"
-            echo "in tests/copy.test.ts, which needs a real directory to write them in.
+            echo "in tests/copy.test.ts, which needs a real directory to write them in."
             echo "A rule's cases are written first,"
             echo "from its own ban text: what must fire and what must stay silent."
             echo "A test written after the code can only agree with the code."
