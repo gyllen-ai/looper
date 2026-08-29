@@ -1889,10 +1889,10 @@ Every rule the engine loads appears exactly once below, and
 | a failure is answered with a made-up value | `TS-ERROR:3` `TS-TYPE:5` | `RUST-ERROR:3` `RUST-TYPE:5` | `PY-ERROR:2` | `CS-ERROR:3` | a stylesheet cannot fail |
 | the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
 | the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
-| "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
+| "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` `TS-TRUTH:3` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
 | output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
 | a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built | a stylesheet writes no logs |
-| the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built | `CSS-LAYER:1` `CSS-TRUTH:2` |
+| the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-LAYER:3` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built | `CSS-LAYER:1` `CSS-TRUTH:2` |
 | unfinished work reads as finished | `TS-DEAD:2` `TS-DEAD:3` | `RUST-DEAD:2` `RUST-DEAD:3` | **tried and not shippable**, measured 2026-08-18 — the argument is below | `CS-TRUTH:1` `CS-DEAD:2` | open |
 | the language's own guarantees are stepped around | none built | `RUST-ERROR:5` `RUST-ERROR:7` `RUST-TESTS:1` | none built | none built | `CSS-TYPE:1` |
 | a number is guessed where a fact was available | `TS-ERROR:9` | none built | `PY-ERROR:4` | none built | — |
@@ -7101,3 +7101,74 @@ So the two cells stay open, each for its own reason:
 
 Recorded so the next session does not run this probe again to reach the same two
 answers.
+
+## The law reads the colour and the style written in TypeScript, 2026-08-29
+
+The CSS reader arrived in the morning and the companion's stylesheet was clean
+by the afternoon: every literal a token, no `style=` on a page. Beside that
+stylesheet sat a canvas holding forty colours and a page holding seven `style`
+attributes that no rule could see, because they were written in TypeScript,
+which is the language the interface is actually written in. The rule set had a
+hole in the shape of the language.
+
+Two rules close it, both in the fast pass, both reading the AST the other
+TypeScript rules read:
+
+- `TS-TRUTH:3`: a string literal, or a template with no holes, that is a whole
+  hex of 3, 4, 6 or 8 digits, a colour function (`rgb`, `rgba`, `hsl`, `hsla`,
+  `hwb`, `lab`, `lch`, `oklab`, `oklch`) whose arguments are numbers, a
+  `color()` that names a colour space first, or a hex inside a gradient. It is
+  silent inside the files `[css] palette` names, and that knob now names a
+  TypeScript file as readily as a stylesheet, because React Native's palette is
+  `theme.ts`. It does not read a named colour (a word), a hex inside prose (an
+  issue number), an id handed to `querySelector`, `querySelectorAll`, `closest`
+  or `matches`, a template with holes (a colour built from values is not a
+  literal), or `rgb(var(--r), ...)` built from tokens.
+- `TS-LAYER:3`: a `style` attribute on a lowercase JSX element, which is a DOM or
+  SVG element. A capitalised or member element (`<View style>`,
+  `<Animated.View style>`, `<CardPicker style>`) is a component, and what it
+  does with the prop is its own business, so React Native is never judged by
+  this rule. An object whose every key is a custom property is the remedy the
+  rule asks for (`style={{ "--tint": tint }}`), so it is silent.
+
+### Measured 2026-08-29, over four corpora nobody wrote for looper
+
+Every `.ts`, `.tsx`, `.js` and `.mjs` file under each root, deduplicated by
+content inside a run, `.d.ts` and files over 1 MB skipped (57 in all), judged
+with the default concessions. The fourth corpus is the previous product's
+checkout on the Windows drive, which holds largely the same files as one of the
+nine repositories, counted again on purpose so its number stands alone.
+
+| corpus | files | `TS-TRUTH:3` | in files | `TS-LAYER:3` | in files |
+|---|---|---|---|---|---|
+| this project's own code (RustOnTop) | 956 | 103 | 27 | 41 | 12 |
+| its installed packages | 8,809 | 454 | 72 | 26 | 10 |
+| nine other repositories on the machine, packages included | 20,612 | 3,748 | 444 | 1,924 | 244 |
+| the old app's checkout on the Windows drive | 16,224 | 2,806 | 350 | 1,179 | 120 |
+
+**One hit in 7,111 was not a colour.** `color(vec2 coords, float blur)`: a GLSL
+function signature inside a shader string. The first draft took any `color(`
+with a digit in its arguments. The rule now asks `color()` for a colour space
+first and every other function for numeric arguments, and both shapes are
+cases. Everything else read was a colour: the largest files are tinycolor2's
+own tests (288 each), the `debug` package's console palette (76, and bundled
+again inside playwright and yarn's lockfile parser), expo's log-box overlay and
+react-navigation's default theme. In a governed project those are installed
+packages, which the law does not read. The 1,924 inline styles in the nine
+repositories are mostly earlier apps of this team's (one tab file alone holds
+169), which is precisely the harm.
+
+**What the rules taught looper about itself.** A case file is now guilty by
+construction: this rule reads strings, and the string in a case is the shape
+the rule must fire on. looper's own `law.toml` pardons `audit/cases.ts`,
+`audit/css-cases.ts` and `tests/law.test.ts` for this one rule, with the
+argument beside the line, which is the first pardon looper has needed for a
+rule of its own. And `src/canon/law.md` was at its 1,300-character ceiling: the
+two rules got one bullet, and the opening sentence lost twelve words to pay for
+it.
+
+**Open, and said so.** A program carried as one string (the mobile map's
+webview page and script) shows the rule only its `rgba()` calls; its hexes sit
+inside prose-shaped text. A style object handed to a component that forwards it
+to a DOM element (`<Input style>`) is the component's own rule to write. A
+named colour in code is a word this rule does not read.

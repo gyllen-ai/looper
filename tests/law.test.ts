@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { CHECKS as EVERY_RULE } from "../src/law/checks.ts";
 import { parsesSoFar } from "../src/law/ts/parse.ts";
 import { CONCEDING_NOTHING, standingOf } from "../src/law/concessions.ts";
+import { codeColourCheck } from "../src/law/ts/code-colour.ts";
 import { judge, onlyForPass, type Check } from "../src/law/engine.ts";
 import { formatReport } from "../src/law/report.ts";
 import { RuleOnTheWrongPass } from "../src/errors.ts";
@@ -369,4 +370,12 @@ test("a file that points out of the project is not judged, and says so", () => {
     rmSync(root, { recursive: true, force: true });
     rmSync(elsewhere, { recursive: true, force: true });
   }
+});
+
+test("a colour in the file the palette names is the palette, in TypeScript too", () => {
+  const theme = { file: "src/theme.ts", text: `export const INK = "#f1ece4";` };
+  const copy = { file: "src/paint.ts", text: `export const INK = "#f1ece4";` };
+  const naming = { ...CONCEDING_NOTHING, palette: ["src/theme.ts"] };
+  assert.deepEqual([...judge([codeColourCheck], "fast", theme, naming).violations], []);
+  assert.equal(judge([codeColourCheck], "fast", copy, naming).violations.length, 1);
 });
