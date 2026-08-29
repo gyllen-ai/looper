@@ -24,3 +24,10 @@ The hooks in .claude/settings.json run as commands, so every prompt and every to
 Seen 2026-08-20: a server started on 18 August answered "there is no rule set called observe/logging" while the file sat on disk with that morning's mtime. That sentence is word for word what looper says when a branch genuinely does not exist, so the honest reading of it is the wrong one.
 
 Two things now soften it. canonBranch serves any branch whose file is on disk even when its compiled list has never heard of it, and src/code-age.ts prepends a line to every tool answer once the source has moved under a running server. Neither restarts it: reconnecting the MCP server is still the fix, and it is worth suspecting first whenever a rule set is reported missing.
+
+## 2026-08-29 — A C# reader that fails to start reports as the C# rules being wrong
+On 2026-08-29, PR #177 went red on `test (26.x, ubuntu-latest)` with three failures: "the C# reader answers at all" (actual 'unavailable', expected 'found'), the pardon test, and "every C# case agrees with the rule it was written from — 4 of 71 cases disagree". That headline number reads as four broken rules. It was none of them: the vendored binary vendor/csharp-law/bin/Release/net10.0/looper-csharp started and died with empty stderr at 11.6s, well inside its 120s timeout.
+
+It was transient. Re-running the identical commit passed all four matrix jobs. In the failing run, test (24.x, ubuntu-latest) had already passed on the same OS image and the same dotnet, so only the Node version differed, and #176 had passed the same 26.x job ten minutes earlier.
+
+For the next session: when C# cases "disagree with their rule" on CI and nothing about the rules changed, read the "the C# reader answers at all" result in tests/csharp-cases.test.ts first. It is the one that tells a reader that did not start apart from rules that are wrong, and it is why the case count is not the thing to chase. Re-run before investigating the rules.
