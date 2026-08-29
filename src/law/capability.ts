@@ -37,7 +37,7 @@ import {
 } from "./baseline.ts";
 import { surveyProject, underAnotherLaw } from "./project.ts";
 import { BASELINE_PATH, BASELINE_PRIORITY } from "../config.ts";
-import { intentOf } from "./commit-command.ts";
+import { aboutToCommit, isBash, targetOf } from "./payload.ts";
 import { readConcessions } from "./concessions.ts";
 import { judge } from "./engine.ts";
 import { formatReport } from "./report.ts";
@@ -58,48 +58,6 @@ const LAW_EVENTS: readonly HookEvent[] = [
 ];
 
 const NO_TOOLS: readonly ToolDef[] = [];
-
-export type Named =
-  | { readonly kind: "none"; readonly why: string }
-  | { readonly kind: "named"; readonly path: string };
-
-export type Target =
-  | { readonly kind: "none"; readonly why: string }
-  | { readonly kind: "outside"; readonly path: string }
-  | { readonly kind: "not-ours"; readonly path: string }
-  | { readonly kind: "judge"; readonly path: string; readonly relative: string };
-
-type FromInput =
-  | { readonly kind: "none"; readonly why: string }
-  | { readonly kind: "read"; readonly value: string };
-
-function fromToolInput(payload: string, key: string, called: string): FromInput {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(payload);
-  } catch (cause) {
-    const detail = reasonFrom(cause);
-    return { kind: "none", why: `the hook payload was not JSON (${detail})` };
-  }
-  if (parsed === null || typeof parsed !== "object") {
-    return { kind: "none", why: "the hook payload was not an object" };
-  }
-  const input = fieldAt(parsed, "tool_input");
-  if (input === null || typeof input !== "object") {
-    return { kind: "none", why: "the hook payload named no tool input" };
-  }
-  const value = fieldAt(input, key);
-  if (typeof value !== "string") {
-    return { kind: "none", why: `the tool input carried no ${called}` };
-  }
-  return { kind: "read", value };
-}
-
-function fileFrom(payload: string): Named {
-  const held = fromToolInput(payload, "file_path", "file");
-  if (held.kind === "none") return held;
-  return { kind: "named", path: held.value };
-}
 
 type Judging = { readonly path: string; readonly relative: string };
 
@@ -129,6 +87,14 @@ function lawFor(relative: string): "rust" | "python" | "csharp" | "css" | "types
 function judgeOneFile(root: string, target: Judging): Carried {
   const law = lawFor(target.relative);
   const copied = variantsIn(root, [target.relative], readConcessions(root));
+  const styled = isStyling(target.relative)
+    ? judge(
+        CSS_CHECKS,
+        "fast",
+        { file: target.relative, text: readFileSync(target.path, "utf8") },
+        readConcessions(root),
+      ).violations
+    : [];
   const found = law === "rust"
     ? judgedByTheRustLaw(root, target)
     : law === "python"
@@ -136,12 +102,7 @@ function judgeOneFile(root: string, target: Judging): Carried {
     : law === "csharp"
     ? judgedByTheCsharpLaw(root, target)
     : law === "css"
-    ? judge(
-        CSS_CHECKS,
-        "fast",
-        { file: target.relative, text: readFileSync(target.path, "utf8") },
-        readConcessions(root),
-      ).violations
+    ? []
     : judge(
         [...CHECKS, ...checksAdoptedIn(root)],
         "fast",
@@ -152,7 +113,7 @@ function judgeOneFile(root: string, target: Judging): Carried {
         },
         readConcessions(root),
       ).violations;
-  const all = [...copied, ...found];
+  const all = [...copied, ...styled, ...found];
   if (all.length === 0) return { yours: [], older: [] };
 
   const touched = changedLines(root, target.relative, "commit");
@@ -207,64 +168,6 @@ function judgeWhatTheCommandWrote(root: string): Outcome {
     };
   }
   return { kind: "pass" };
-}
-
-type Tool =
-  | { readonly kind: "unreadable"; readonly why: string }
-  | { readonly kind: "named"; readonly name: string };
-
-function toolNamed(payload: string): Tool {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(payload);
-  } catch (cause) {
-    return { kind: "unreadable", why: reasonFrom(cause) };
-  }
-  const named = fieldAt(parsed, "tool_name");
-  if (typeof named !== "string") {
-    return { kind: "unreadable", why: "the payload names no tool" };
-  }
-  return { kind: "named", name: named };
-}
-
-function isBash(payload: string): boolean {
-  const tool = toolNamed(payload);
-  return tool.kind === "named" && tool.name === "Bash";
-}
-
-export function targetOf(root: string, payload: string): Target {
-  const named = fileFrom(payload);
-  if (named.kind === "none") return named;
-
-  const full = resolve(root, named.path);
-  const inside = relative(resolve(root), full);
-  if (inside.startsWith("..") || inside.length === 0) {
-    return { kind: "outside", path: full };
-  }
-  if (OUTSIDE_THE_LAW.some((part) => inside.split("/").includes(part))) {
-    return { kind: "not-ours", path: inside };
-  }
-  if (underAnotherLaw(root, inside)) return { kind: "not-ours", path: inside };
-  if (!JUDGED_EXTENSIONS.some((suffix) => inside.endsWith(suffix))) {
-    return { kind: "not-ours", path: inside };
-  }
-  return { kind: "judge", path: full, relative: inside };
-}
-
-export type Typed =
-  | { readonly kind: "none"; readonly why: string }
-  | { readonly kind: "command"; readonly text: string };
-
-export function commandFrom(payload: string): Typed {
-  const held = fromToolInput(payload, "command", "command");
-  if (held.kind === "none") return { kind: "none", why: held.why };
-  return { kind: "command", text: held.value };
-}
-
-export function aboutToCommit(payload: string): boolean {
-  const typed = commandFrom(payload);
-  if (typed.kind === "none") return false;
-  return intentOf(typed.text).kind === "commit";
 }
 
 function isUnreadableRust(violation: Violation): boolean {
@@ -352,11 +255,12 @@ export function judgeStaged(root: string): Outcome {
 
   for (const path of judged) {
     const law = lawFor(path);
-    if (law !== "typescript" && law !== "css") continue;
+    const styling = isStyling(path);
+    if (law !== "typescript" && !styling) continue;
     const held = stagedText(root, path);
     if (held.kind === "unreadable") continue;
 
-    const found = law === "css"
+    const found = styling
       ? judge(CSS_CHECKS, "fast", { file: path, text: held.text }, concessions).violations
       : judge(
           [...CHECKS, ...checksAdoptedIn(root)],

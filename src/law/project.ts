@@ -323,8 +323,8 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
 
   for (const path of files) {
     if (path.endsWith(RUST_EXTENSION) || path.endsWith(PYTHON_EXTENSION)) continue;
-    if (isCsharp(path)) continue;
     const named = relative(root, path);
+    if (isCsharp(path) && !isStyling(named)) continue;
     if (isStyling(named)) {
       let styling = "";
       try {

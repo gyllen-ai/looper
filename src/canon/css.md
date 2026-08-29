@@ -1,4 +1,5 @@
-Writing CSS and Sass, and the stylesheet inside a page. The law refuses
+Writing CSS and Sass, and the styles inside a page or a Razor component. The law
+refuses
 `!important`, a negative margin, a z-index past the cap, a colour written
 anywhere but the palette file, and a `style=` attribute on an element; these are
 the failures it cannot see.

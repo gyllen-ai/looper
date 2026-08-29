@@ -145,6 +145,35 @@ const A_SCRIPT_OPENER = /<script\b[^>]*>/gi;
 
 const A_SCRIPT_CLOSER = "</script>";
 
+const A_CODE_BLOCK = /@(?:code|functions)?\s*\{/g;
+
+function endOfBraces(text: string, from: number): number {
+  let depth = 1;
+  let at = from;
+  let quote = "";
+  while (at < text.length) {
+    const char = text.charAt(at);
+    if (quote.length > 0) {
+      if (char === "\\") at += 1;
+      else if (char === quote) quote = "";
+      at += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      at += 1;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return at + 1;
+    }
+    at += 1;
+  }
+  return text.length;
+}
+
 export function blankedPage(page: string): string {
   const out = [...page];
 
@@ -167,11 +196,20 @@ export function blankedPage(page: string): string {
     held = A_SCRIPT_OPENER.exec(page);
   }
 
+  A_CODE_BLOCK.lastIndex = 0;
+  let block = A_CODE_BLOCK.exec(page);
+  while (block !== null) {
+    const to = endOfBraces(page, block.index + block[0].length);
+    blankRun(out, page, block.index, to);
+    A_CODE_BLOCK.lastIndex = to;
+    block = A_CODE_BLOCK.exec(page);
+  }
+
   return out.join("");
 }
 
 export function cssViewOf(file: string, text: string): string {
-  if (isPage(file)) return blankedCss(styleOnly(text), false);
+  if (isPage(file)) return blankedCss(styleOnly(blankedPage(text)), false);
   return blankedCss(text, hasLineComments(file));
 }
 

@@ -44,6 +44,7 @@ const STYLED: readonly string[] = [
   "**/*.sass",
   "**/*.html",
   "**/*.htm",
+  "**/*.razor",
 ];
 
 const WHERE_SECRETS_LIVE: readonly string[] = [
