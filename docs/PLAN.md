@@ -7226,3 +7226,65 @@ Nine cases, written before the change and red against the old driver for the
 reasons they name — the lock-wait one says *the reader ran the half-written
 binary instead of waiting for the build*. `npm test`: 655 pass, 0 fail.
 `looper law` over the seven changed files: nothing to fix. `looper loop`: whole.
+
+## The design registry: everything visible is tagged — 2026-08-30
+
+Born in RustOnTop the night a designed screen shipped wrong from memory:
+rounded corners an app whose radius is zero, a truncated button, two buttons
+on two rows, a backdrop crushed to black, while the approved artboard sat
+unopened beside the work. Every mechanical dimension of that session had a
+critic that judged it on save; the look had none, and effort follows the
+checks. The owner's design, given across five messages that evening, is
+recorded here as the feature it should be.
+
+**One registry per project, installed by looper.** `looper design init`
+renders the project's screens and seeds the registry from what it finds; a
+new project starts empty. The registry is the one fetched place a look is
+defined, beside the token files that hold values and the artboards that hold
+approved compositions.
+
+**Everything visible is tagged, and everything means everything.** Indicator
+colours, every font weight and where it is used, for what, when and how;
+every colour; page structure and where things are placed. A render can
+enumerate every visible element, which is what makes "everything" mechanical
+rather than a slogan: any visible element that traces to no registry entry
+is itself a failure, named as the choice it is — register this pattern, or
+reuse one that exists.
+
+**The model fills the registry as it invents.** The first dropdown ever
+built writes the dropdown entry in the same commit; the untagged-element
+failure makes forgetting impossible. An entry records the look (computed
+facts: colours, family, weight, size, radius, shadow, height), where it is
+used (screens and selectors), for what (purpose words), when (states:
+default, hover, disabled, connected), and how (behaviour notes). Structure
+entries record the page grammar: regions, order, gaps.
+
+**The checks are generated from the registry, never written.** For every
+screen the checker walks the rendered tree; every tagged element's computed
+look must equal its entry for the state being forced, and placement is
+asserted from the structure entries. The check holds instruments only.
+Computed facts, placement and forced pseudo-states are enforceable today;
+purpose and behaviour words guide reuse and review rather than the pixel
+check, and the split is stated so nobody mistakes guidance for enforcement.
+
+**Reuse is enforced by collision, and a restyle is one edit.** A fresh
+pattern that duplicates an existing entry's role fails, naming the entry to
+reuse. Changing a style is editing the entry and rerunning the checks across
+the whole app; every screen that quietly hardcoded instead of reusing fails
+exactly where it hid. The law is never edited for a design change — the same
+invariant the owner set for values that evening: one value-provenance rule
+(no look-carrying literal outside the token files), never a rule per
+property, so changing the radius changes a token and never the law.
+
+Two siblings ride with this feature: that provenance rule for the CSS law,
+and a stall shape — "ui edited, never rendered" — for the detector, because
+the same evening showed thirteen generic stall reports where one specific
+sentence would have stopped the failure. The working prototype is
+RustOnTop's `loop.client.look`: both pages rendered in one run, the artboard
+as a live template, every design value fetched at run time, proven by
+planting a corner radius and watching the layer refuse it against the
+artboard's zero.
+
+Build order: the registry format and `looper design init`; the walker and
+the generated per-screen check; the untagged-element and collision
+failures; state forcing; the provenance rule; the stall shape.
