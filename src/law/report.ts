@@ -17,24 +17,35 @@ function where(violation: Violation): string {
 function groupByRule(
   violations: readonly Violation[],
   category: Category,
-): ReadonlyMap<Rule, readonly string[]> {
-  const grouped = new Map<Rule, string[]>();
+): ReadonlyMap<Rule, readonly Violation[]> {
+  const grouped = new Map<Rule, Violation[]>();
   for (const violation of violations) {
     if (violation.rule.category !== category) continue;
     const held = grouped.get(violation.rule);
     if (held === undefined) {
-      grouped.set(violation.rule, [where(violation)]);
+      grouped.set(violation.rule, [violation]);
       continue;
     }
-    held.push(where(violation));
+    held.push(violation);
   }
   return grouped;
 }
 
-function entry(rule: Rule, places: readonly string[]): readonly string[] {
+const MOST_PLACES_SHOWN = 8;
+
+export function placesIn(found: readonly Violation[]): string {
+  const shown = found.slice(0, MOST_PLACES_SHOWN).map(where).join("  |  ");
+  const rest = found.slice(MOST_PLACES_SHOWN);
+  if (rest.length === 0) return shown;
+  const files = new Set(rest.map((held) => held.file)).size;
+  const spread = files === 1 ? "1 file" : `${files} files`;
+  return `${shown}  |  and ${rest.length} more, in ${spread} — fix these first and run again`;
+}
+
+function entry(rule: Rule, found: readonly Violation[]): readonly string[] {
   const lines = [
     ``,
-    `  [${rule.id}]  ${places.join("  |  ")}`,
+    `  [${rule.id}]  ${placesIn(found)}`,
     `    not allowed: ${rule.bans}`,
     `    why: ${rule.why}`,
     `    the shape that works instead — the names in it are examples, not code to copy:`,

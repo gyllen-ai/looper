@@ -22,9 +22,360 @@ is a suspicion and belongs in the notes at the bottom, not in the list.
 
 ## Open
 
-_Empty._
+### 119 · `noise` — the report printed every place on one line — cleared
 
-**All 105 are accounted for, checked 2026-08-19.** 101 entries carry a number;
+2026-09-01. Found by running `looper law` itself from inside a foreign checkout,
+which pass 8 had not done — the corpus was judged by calling `CHECKS` and `judge`
+directly, which is the same law but not the same command. On hono, one rule
+printed **348 `file:line` entries joined into a single line**:
+
+```
+  [DATA:2]  benchmarks/fetch/bench.mts:34  |  src/adapter/... (×348)
+```
+
+`formatReport` joined the whole group with no ceiling. This is the failure the
+`law` set already names for looper's own code — *a count is not something anyone
+can act on; say what it is about, capped and with "and N more"* — arrived at from
+the other side: not a bare number, but a list so long it is the same as one. It
+is also the first thing an adopter sees.
+
+**Cleared.** Eight places, then the tail:
+
+```
+  [DATA:2]  benchmarks/fetch/bench.mts:34  |  ...  |  and 340 more, in 24 files — fix these first and run again
+```
+
+Longest line in the hono report fell from several thousand characters to 708.
+
+---
+
+**106 through 119, from pass 8 below. Nothing open.** Ten cleared. Four were
+re-examined by hand against every finding they produced and **closed as not
+defects — they were overstated when first written**, and the correction is in
+each entry.
+
+Everything cleared here was fixed by the test in `contribution`: does the rule
+hand back a legal spelling? Where it did not, the check was sharpened to fire on
+exactly the harm its own ban text names. Where it did, the rule stayed.
+
+### 118 · `noise` — a suppression comment is counted twice — closed, not a defect
+
+2026-09-01. `// @ts-expect-error` is one line and two findings: `TS-DEAD:1`
+because it is a suppression and `TS-DEAD:2` because it is a comment. 552 of the
+26,220 comments in the foreign corpus, about 2% of the comment count.
+
+**Closed on re-examination, and this entry was overstated when written.** They
+are two true statements about one line, filed under two categories with two
+different reasons, and deleting the line answers both. Making `TS-DEAD:2` skip
+suppressions would also open a hole: a project that pardons `TS-DEAD:1` in a file
+would then have the suppression billed by nothing at all.
+
+### 117 · `wrong` — the response side counted as unchecked input — cleared
+
+2026-09-01. `DATA:2` matches any member call named `json`, so Express's
+`res.status(401).json({ error: 'Unauthorized' })` — a response being **written** —
+is read as a request body being trusted. 9 of 1,232 findings across the corpus,
+all of them in juice-shop's routes and one Next.js API example. The receiving
+call takes no arguments and the sending call takes one, which is the whole
+distinction.
+
+**Cleared.** `.json()` and `.formData()` now fire only when called with nothing,
+which is the shape that hands a body back. Measured over the corpus: the great
+code's 12 findings are unchanged — every one was a real read — and Juice Shop's
+12 fall to 5, the 7 removed all being `res.json(...)` sending a response.
+
+### 116 · `blunt` — the serialisation the rule's own advice blesses — closed, not a defect
+
+2026-09-01. `TS-TYPE:6`'s third `instead` is "if it is really serialisation
+rather than copying, keep the text and name it: `const wire = JSON.stringify(held)`".
+`namesHoldingStringify` then links that name to any later `JSON.parse` of it, so
+the code that took the advice fires:
+
+```
+TanStack_query/packages/query-core/src/__tests__/hydration.test.tsx:436
+    const parsed = JSON.parse(stringified)
+```
+
+**Closed on re-examination, and this entry was overstated when written.** All
+three findings outside tests were read by hand and all three are the harm:
+
+```
+zod/v4/classic/from-json-schema.ts:924   normalized = JSON.parse(JSON.stringify(schema));
+zod/v4/core/to-json-schema.ts:737        const finalized = JSON.parse(JSON.stringify(result));
+zod/v4/core/json-schema-processors.ts:708  if (!unrepresentable) return JSON.parse(serialized);
+```
+
+The third is the named-text spelling, and it is a deep copy through text used to
+detect values JSON cannot hold — which is the rule's own control case. The
+contradiction with `instead` #3 is real but only reaches test files that
+deliberately exercise a serialise-and-rehydrate round trip, and a rule is judged
+on the code it fires on, not on the sentence it could be argued into.
+
+### 115 · `blunt` — the no-op handler its own advice exempts — cleared
+
+2026-09-01. `TS-DEAD:3`'s fourth `instead` says an empty callback written inline
+"is not this rule". `writtenInlineAsAnArgument` recognises an arrow that **is** an
+argument, and not one reached through anything:
+
+```
+TanStack_query/packages/preact-query-devtools/src/PreactQueryDevtoolsPanel.tsx:83
+    devtools.setOnClose(props.onClose ?? (() => {}))
+```
+
+**Cleared** by narrowing the check to what the ban text already said. A function
+fires only where it exists under a name: a declaration, a method, one bound to a
+variable, or one held under an object or class key. An arrow with no name — an
+argument, a branch of a `??` or a ternary, a default value, a function handed
+back — has no name to go stale, which is the rule's own reason.
+
+Measured: 17 findings stopped, every one of them anonymous
+(`params?.override ?? (() => {})`, `descriptor.set ? () => {} : undefined`,
+`factory: SuiteFactory = () => {}`). 136 still fire, every one of them named
+(`export const assertEqual = () => {}`, `let releaseLock = () => {}`,
+`clearRect: () => {}`, and the `not implemented` throws).
+
+### 114 · `wrong` — "partway down a file", fired at line 1 — cleared
+
+2026-09-01. `TS-LAYER:2` bans "`require(...)` and `import(...)` used **partway
+down a file**". The check fires on every one regardless of position: 106 of its
+396 findings in the corpus are at line 5 or above the top, all in `.cjs` and
+CommonJS `.js` files where `require` at the top is the only module syntax there
+is, and where the rule's own first suggestion — `import { pdf } from './pdf.ts'
+at the top of the file` — is a syntax error.
+
+```
+TanStack_query/integrations/react-webpack-4/webpack.config.js:1
+    const HtmlWebPackPlugin = require('html-webpack-plugin')
+```
+
+Either the ban text or the check is wrong, and the advice is unusable in the file
+it fires on either way.
+
+**Cleared toward the ban text**, because that is the reading with a legal
+spelling: a `require` or `import()` reached from a top-level statement is the
+list of what the file needs and is silent; one inside a function, a block, an
+`if`, a `try` or a loop is partway down and still fires.
+
+Measured across all twelve projects: **82 findings stopped and 111 remain, and
+the split is clean.** Everything that stopped is a top-of-file `require` or
+`module.exports = require(...)` in a CommonJS file. Everything that remains is an
+`await import(...)` buried inside a function, which is the harm the rule names:
+
+```
+stopped:  nodegoat/server.js:16                    const routes = require("./app/routes");
+stopped:  vue/packages/vue/server-renderer/index.js:1  module.exports = require('@vue/server-renderer')
+remains:  vitest/packages/vitest/src/runtime/workers/base.ts:79
+              const { setupNodeLoaderHooks } = await import('./native')
+remains:  juice-shop/routes/nftMint.ts:17
+              const { WebSocketProvider, Contract } = await import('ethers')
+```
+
+### 113 · `blunt` — the rethrow that keeps the trace — cleared
+
+2026-09-01. `TS-ERROR:10`'s first `instead` is `throw new CouldNotRead(path, { cause })`.
+Half of what it asks for is the cause, and the check does not look for it:
+
+```
+sindresorhus_execa/lib/ipc/ipc-input.js:29
+    throw new Error('The `ipcInput` option is not serializable with JSON.', {cause: error})
+```
+
+The rule's `why` gives two reasons and `{ cause }` answers one of them outright —
+nothing is removed from the trace. The catch-by-kind argument still stands, so
+this is a message that is half wrong rather than a rule that is wrong, and it is
+the half the reader is asked to act on. 35 findings, mostly parsers throwing
+`SyntaxError` for a parse failure.
+
+**Cleared as a message, not a rule.** The rule still fires — a built-in `Error`
+still cannot be caught by kind, and `throw new CouldNotRead(path, { cause })` is
+a legal spelling that was available all along. What changed is that when the
+throw carries a `cause`, the finding now says which half of the reason applies:
+
+```
+lib/ipc/ipc-input.js:29 (the cause is kept, so the trace survives; what does
+                         not is the caller catching this by kind)
+```
+
+The count is unchanged at 35, which is the point: nothing was softened.
+
+### 112 · `blunt` — the predicate whose whole contract is "did this work?" — closed, not a defect
+
+2026-09-01. `TS-ERROR:3` bans answering a failure with a made-up value. 27 of its
+113 findings across the whole corpus return a boolean literal, and the clearest of
+them is a function whose name is the question:
+
+```
+denoland_std/semver/can_parse.ts:25
+    export function canParse(value: string): boolean {
+      try { parse(value); return true } catch { return false }
+    }
+```
+
+`false` is not a value standing in for a failure here — it is the answer the
+caller asked for, and the alternative is a throw the caller must catch to learn
+the same thing.
+
+**Closed on re-examination, and this entry was overstated when written.** All 65
+findings outside tests were read. `canParse` is the most sympathetic single case
+and it is not the shape of the rest: **3 of the 65 are the `try*`/`can*` family**.
+Of the remainder, 19 are `.catch(() => null)` on a read that might not be there
+and 43 are a `return` inside a `catch`, both of which are the harm as written and
+both of which have a legal spelling — narrow on the cause and rethrow the rest.
+One finding per 6,543 lines is not a blunt rule; a rule is judged on precision,
+and this one has it.
+
+### 111 · `blunt` — the rule that fires most on the best code — closed, not a defect
+
+2026-09-01. `TS-TRUTH:1` produced 4,510 findings across the 425,310 non-test
+lines of the pass-8 corpus — one every 94 lines, 10.6 per thousand, second only
+to the comment ban. Broken down by the shape that fired:
+
+| shape | count | share |
+|---|---|---|
+| `??` | 1,599 | 35.4% |
+| a default parameter or destructuring default | 1,309 | 29.0% |
+| `\|\|` with a fallback value | 980 | 21.7% |
+| `??=` / `\|\|=` | 358 | 7.9% |
+| an object literal spreading two or more things | 141 | 3.1% |
+| `if (!x) x = ...` | 133 | 2.9% |
+
+The rule's `why` is "two places answering *what happens when nobody said*". A
+default parameter is one place, and it is in the signature, which is the most
+read line the function has:
+
+```
+denoland_std/async/retry.ts:172        maxAttempts = 5,
+sindresorhus_ky/source/utils/merge.ts:64  (source1: KyHeadersInit = {}, source2: KyHeadersInit = {})
+```
+
+And the rule's own second `instead` — "if absence is a real answer, name it where
+the reader can see: `const n = held === undefined ? 0 : held`" — is `held ?? 0`
+written longer. 1,599 of the findings are that ternary in its short spelling.
+
+**Closed on measurement, and this entry asked the wrong question.** It counted
+how often great code does the banned thing and read the number as a defect. That
+is not the test `contribution` sets. The test is whether the rule hands back a
+legal spelling, and every one of the six shapes does — checked against the
+running rule, 2026-09-01, and gated as seven `silent` cases in `audit/cases.ts`
+so it cannot quietly stop being true:
+
+| shape | count | the spelling the rule accepts |
+|---|---|---|
+| `??` | 1,599 | `const held = counts.get(k); const n = held === undefined ? 0 : held` |
+| a default parameter | 1,309 | `page(size?: number)`, deciding in the body |
+| `\|\|` | 980 | `given.length === 0 ? "anonymous" : given` |
+| `??=` / `\|\|=` | 358 | `if (bag.patterns === undefined) { bag.patterns = new Set() }` |
+| a spread of two or more | 141 | `Object.assign({}, current, patch)`, and a generic loop |
+| `if (!x) x = …` | 133 | `if (size === undefined) { size = 20 }` |
+
+Even the spread case the ban text worries about has one, and it stays generic
+over the fields — so the confession in that ban text is about the rule being
+unable to *tell the two apart*, not about there being nowhere to go.
+
+That makes `TS-TRUTH:1` **strict, not blunt** — the same category as the comment
+ban, and the opposite of finding 114, which fired at line 1 of a `.cjs` file
+where its own advice was a syntax error. That one had no path. This one has six.
+A rule is judged on precision and on whether it leaves somewhere to stand, never
+on how much of the world it disagrees with.
+
+### 110 · `missing` — `==` was refused nowhere — cleared
+
+2026-09-01. Nothing in the TypeScript law, or in the Rust, Python, C# or CSS
+sets, mentioned `==`. It is the one comparison TypeScript cannot save you from:
+the conversion happens at runtime with every checked type erased.
+
+**Measured.** 22 findings across the 425,310 non-test lines of the great-code
+corpus — one per 19,300 lines, every one of them two sides of the same type where
+`===` would read identically. In juice-shop, 6, including the one it suppressed:
+
+```
+juice-shop/routes/order.ts:201
+    if (campaign && couponDate == campaign.validOn) { // eslint-disable-line eqeqeq
+```
+
+ESLint honoured that comment. `TS-TYPE:7` does not, and `TS-DEAD:1` bills the
+comment as well.
+
+**Cleared** by `TS-TYPE:7`, which exempts `== null` and `== undefined` — 420
+uses of that idiom in the corpus, and it is the one place the conversion is the
+question being asked.
+
+### 109 · `missing` — the sandbox ran a string past the rule that bans running strings — cleared
+
+2026-09-01. `TS-SECURITY:1` banned `eval` and the `Function` constructor. Node's
+`vm` module runs a string in exactly the same sense and was not named, so
+juice-shop's remote-code-execution challenge went unseen:
+
+```
+juice-shop/routes/b2bOrder.ts:23
+    vm.runInContext('safeEval(orderLinesData)', sandbox, { timeout: 2000 })
+```
+
+**Cleared.** `runInContext`, `runInNewContext`, `runInThisContext` and
+`compileFunction` on `vm` now fire. Three more findings in juice-shop, five in
+vitest's module runner and none anywhere else in the corpus.
+
+### 108 · `missing` — a third of the input rule had nothing behind it — cleared
+
+2026-09-01. `secure/input` and `law` both say "Nothing from outside is pasted
+into a query, a shell command, **or a page**". `DATA:1` held the query and
+`NODE:1` held the shell. Nothing held the page. juice-shop's headline
+cross-site-scripting challenge is one line and looper's only finding on it was
+that it carried a comment:
+
+```
+juice-shop/frontend/src/app/search-result/search-result.component.ts:144
+    this.searchValue = this.sanitizer.bypassSecurityTrustHtml(queryParam) // vuln-code-snippet
+```
+
+**Cleared** by `TS-SECURITY:2`: `innerHTML` and `outerHTML` assigned anything but
+a written-out string, `insertAdjacentHTML`, `document.write`,
+`dangerouslySetInnerHTML` and the `bypassSecurityTrust` family.
+
+**Measured.** 10 findings in juice-shop's own code. 6 across the 425,310
+non-test lines of the great-code corpus — one per 70,000 — and all 6 are a
+framework building the DOM on purpose —
+Vue's entity decoder, Vue's `unsafeToTrustedHTML`, hono's JSX renderer honouring
+`__html`, vitest's `toContainHTML` matcher, TanStack's hydration stream. Those are
+the six lines a reviewer of those projects should read.
+
+### 107 · `wrong` — JSX in a `.js` file was unreadable to the law — cleared
+
+2026-09-01. `pluginsFor` gave the parser the `jsx` plugin for `.tsx` and `.jsx`
+only. A React project that puts JSX in `.js` — which is what Create React App and
+every Vite React template do — was reported file by file as unable to be read as
+TypeScript at all, and judged by nothing:
+
+```
+TanStack_query/integrations/react-webpack-4/src/App.js:14
+    return <div>Loading...</div>
+```
+
+**Cleared.** `.js`, `.mjs` and `.cjs` are now retried with `jsx` when the first
+read fails. `.ts` is not, because there the `<T>value` cast and a JSX tag are the
+same characters, which is why babel separates them.
+
+### 106 · `wrong` — every declaration file was unreadable to the law — cleared
+
+2026-09-01. A `.d.ts` declares without initialising, so babel refuses it without
+`dts: true`, and every one of them came back "Missing initializer in const
+declaration":
+
+```
+TanStack_query/examples/lit/basic/config/port.d.ts:1
+    export const DEMO_PORT: number
+```
+
+The type-heaviest files in a TypeScript project were the ones the law never read.
+
+**Cleared**, and measured over the corpus: files the law could not read fell from
+51 to 41, and all 41 that remain are files that are genuinely not modules —
+juice-shop's 39 bare-method-body code fragments, one deliberate syntax-error
+fixture in vitest and one type-fest file of intentionally invalid types.
+
+---
+
+**All 105 earlier findings are accounted for, checked 2026-08-19.** 101 entries carry a number;
 the four that do not are explained rather than missing. **26 and 27** were folded
 into finding 30 and cleared with it. **18 and 19** were never written — no commit
 ever added them, so the numbering skips two and nothing is lost. Every other
@@ -3077,3 +3428,140 @@ Two rules for the clearing, both learned here. Every fix gets a case in
 touched, because finding 15 is what let all of this sit under 261 green tests.
 And nothing is called done until it has been run over the foreign corpus, which
 is what `.looper/doctrine/law.md` has said all along.
+
+
+### Pass 8 — the law against code nobody here wrote
+
+2026-09-01. Twelve projects, shallow-cloned that day and judged in a scratch
+directory. Ten chosen for being very good, two for being deliberately bad. The
+commit each was read at, because a measurement without it is folklore by October:
+
+| project | commit | dated | files | lines | non-test lines |
+|---|---|---|---|---|---|
+| colinhacks/zod | `68aca3d` | 2026-08-31 | 511 | 99,399 | 38,453 |
+| denoland/std | `ca58f94` | 2026-08-03 | 1,234 | 206,573 | 105,188 |
+| honojs/hono | `e2740d5` | 2026-08-28 | 390 | 85,764 | 26,583 |
+| sindresorhus/execa | `8017b27` | 2026-07-31 | 598 | 38,928 | 10,235 |
+| sindresorhus/ky | `d27ad21` | 2026-08-28 | 54 | 19,815 | 4,155 |
+| sindresorhus/type-fest | `3919b64` | 2026-08-31 | 455 | 39,194 | 19,209 |
+| TanStack/query | `1566c16` | 2026-08-31 | 1,130 | 182,479 | 49,285 |
+| trpc/trpc | `4f53152` | 2026-08-31 | 984 | 119,461 | 25,955 |
+| vitest-dev/vitest | `c4093fd` | 2026-08-31 | 2,343 | 204,953 | 88,477 |
+| vuejs/core | `d63616c` | 2026-08-27 | 527 | 159,419 | 57,770 |
+| juice-shop/juice-shop | `1618a61` | 2026-08-10 | 651 | 103,785 | 30,603 |
+| OWASP/NodeGoat | `c5cb68a` | 2023-06-21 | 44 | 3,128 | 2,032 |
+
+The corpus is judged in a scratch directory and nothing from it enters this
+repository. The harness calls `CHECKS` and `judge` directly, both passes, so it
+is the same law the commit gate runs. Everything below is on one basis: tests
+excluded, and vendored or minified blobs excluded, because Juice Shop carries a
+copy of three.js and dat.gui and neither is anybody's opinion about anything.
+
+| | files | lines | findings | per kLOC | without `TS-DEAD:2` | per kLOC |
+|---|---|---|---|---|---|---|
+| the great code | 2,943 | 425,310 | 44,265 | **104.1** | 16,365 | **38.5** |
+| the deliberately broken | 418 | 32,635 | 2,084 | **63.9** | 1,348 | **41.3** |
+
+**What the pass was for: nine defects, all of them closed.** Two whole kinds of
+file the law could not read at all (106, 107), three harms it had no rule for
+(108, 109, 110), three rules firing wider than their own ban text with no legal
+spelling to offer (114, 115, 117), one whose message was half untrue (113), and a
+report that printed 348 places on one line (119). Every one carries its evidence
+in its own entry above.
+
+**Finding rate does not separate good code from bad, and that is worth knowing.**
+Across the twelve projects, findings per thousand non-test lines, `TS-DEAD:2`
+set aside so the comparison is about the other thirty-two rules:
+
+```
+type-fest 9.2   execa 15.8   deno_std 26.2   TanStack 32.2   ky 37.8
+tRPC 40.3   vitest 43.0   hono 49.2   Vue 49.3   zod 65.4
+                    Juice Shop 41.6 ·  NodeGoat 37.4
+```
+
+Median 39.1, quartiles 27.7 and 47.7. **Both vulnerable applications land inside
+the great code's middle half** — Juice Shop noisier than six of the ten, NodeGoat
+than four. An earlier draft of this pass read the line-weighted aggregate as a
+separation; per project there is none, and deno_std and vitest carrying a third
+of the lines is what produced the illusion.
+
+**One category separates, and sharply.** SECURITY findings per thousand non-test
+lines: the ten great projects run 0.00 to 0.26, three of them at zero. Juice Shop
+is 0.85 — 3.3× the highest of the ten — and NodeGoat 2.46, which is 9.5×.
+`DATA:1` and `NODE:1` fire in the vulnerable corpus and **nowhere in the great
+one**.
+
+That is the honest account of what this law is: a body of taste rules that do not
+discriminate between projects, carrying a small set of security rules that
+discriminate very well. Both halves are wanted — the taste rules are what the
+agent is held to while it writes, not a classifier — but only the second half is
+evidence that the law catches what it was built to catch.
+
+`TS-DEAD:2` is 63% of that on the great code and 34% on Juice Shop, because the
+great code is documented and Juice Shop is not. **The rule stays; it is a stance
+this project has argued for and nothing measured here bears on it.** It is
+recorded only so the raw count is read correctly: a raw total compared between
+two projects is mostly comparing how well each is commented, so every comparison
+below sets it aside and compares the other thirty-two rules.
+
+Every rule above one finding per thousand lines is one of six: `TS-DEAD:2` at
+65.6, `TS-TYPE:3` at 12.9, `TS-TRUTH:1` at 10.6, `TS-TYPE:4` at 7.1, `TS-DEAD:4`
+at 2.0 and `TS-DEAD:1` at 1.4. Five are deliberate stances. The sixth,
+`TS-TRUTH:1`, already admits in its own ban text that it is wider than the harm;
+finding 111 is the one with the measurements, and it is the only thing pass 8
+leaves open.
+
+**Recall, where the law had something to catch.** On Juice Shop's own code
+`DATA:1` fired on both flagship SQL injections including `routes/login.ts:34`,
+the line the project itself labels `vuln-line loginAdminChallenge`, and
+`TS-SECURITY:1` fired on both `eval` challenges — both of which carry
+`// eslint-disable-line no-eval` and would pass a lint gate untouched. What it
+had nothing for was the cross-site scripting and the sandbox escape, which is
+findings 108 and 109.
+
+**What the great code does that the law had no opinion about.** Measured per
+thousand lines, great code against Juice Shop's hand-written half: type-only
+imports 7.5 against 1.1, `x is T` predicates 0.55 against 0.03, `#` private
+fields 1.68 against zero, `Readonly<>` 0.84 against 0.14, `AbortSignal` 0.43
+against 0.07. Four candidates were measured and **refused** because the great
+code does the same thing at the same rate or more: a `switch` over literals with
+no `default` (81 in the great corpus), `.sort()` with no comparator (24),
+`export let` (18, all of them Vue's reactivity globals), and `await` inside a
+loop (134, which great code does more than bad code does). One was refused for
+being a stance rather than a defect: `private` against `#`, where the great code
+uses both about equally.
+
+Two were built, and both of them close a promise the doctrine had already made
+rather than adding a new one: findings 108 and 110.
+
+**The second half of the pass: the blunt list, tested rather than argued.** Eight
+findings were opened against rules that fire on code that is fine. Each was put
+to the question `contribution` already asks — *does the rule hand back a legal
+spelling?* — and every finding it produced across the corpus was read by hand.
+
+Four failed that test and were sharpened to fire on exactly the harm their own
+ban text names: `TS-LAYER:2` (114), `TS-DEAD:3` (115), `DATA:2` (117), and
+`TS-ERROR:10` (113), whose rule was right and whose message was half wrong.
+Together they removed **48 findings from the great corpus and 58 from the
+vulnerable one**, and no other rule's count moved by one.
+
+**Four did not fail it, and were closed as not defects.** `TS-ERROR:3` (112),
+`TS-TYPE:6` (116), the double-billed suppression (118) and `TS-TRUTH:1` (111)
+were all overstated when first written — three from a small, sympathetic sample
+rather than from the whole set the rule produced, and the fourth from a headline
+count read as though frequency were the test. Reading every finding, and then
+running the compliant spellings through the rule, changed all four verdicts.
+That is worth writing down: the audit's own first pass had the same failure it
+was looking for, which is a conclusion reached ahead of the evidence.
+
+`TS-TRUTH:1` (111) closed last and closed the same way: it produced 4,510
+findings across the ten great projects, in 34% of their non-test files, and every
+one of its six banned shapes still hands back a spelling the rule accepts. Being
+disagreed with at scale is not a defect. **Pass 8 leaves nothing open.**
+
+**The pass had one blind spot of its own, and finding 119 is it.** Every number
+above came from a harness that calls `CHECKS` and `judge` directly. That is the
+same law, and it is not the same command: it never went through `surveyProject`,
+the baseline, the concessions or `formatReport`. Running `looper law` from inside
+a foreign checkout took one minute and found a defect in the first thing an
+adopter reads. A rule proven by its own unit is not a rule proven.

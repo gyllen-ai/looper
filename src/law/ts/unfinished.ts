@@ -15,7 +15,7 @@ export const UNFINISHED: Rule = {
     "write it now, even roughly, so it does something real",
     "delete it, and let whatever calls it fail to build — that is the loudest and cheapest error available",
     "if a step genuinely does nothing yet, say so where the caller can see it, not inside a body that looks complete",
-    "an empty callback written inline — `addEventListener('click', () => {})` — is not this rule: it has no name to go stale and says that nothing happens, which is a decision",
+    "a function with no name is not this rule — an argument, a branch of a `??`, a value handed back: it has no name to go stale and says that nothing happens, which is a decision",
   ],
   valve: { kind: "none" },
 };
@@ -74,29 +74,39 @@ function saysUnbuilt(node: Node): boolean {
   return found;
 }
 
-function writtenInlineAsAnArgument(root: Node): ReadonlySet<Node> {
-  const inline = new Set<Node>();
+const WRITTEN_INLINE: readonly string[] = ["ArrowFunctionExpression", "FunctionExpression"];
+
+const HOLDS_A_NAME: readonly string[] = [
+  "VariableDeclarator",
+  "ObjectProperty",
+  "ClassProperty",
+];
+
+function boundToAName(root: Node): ReadonlySet<Node> {
+  const named = new Set<Node>();
 
   const take = (value: unknown): void => {
-    if (value === null || typeof value !== "object") return;
-    const held = fieldAt(value, "type");
-    if (held === "ArrowFunctionExpression" || held === "FunctionExpression") {
-      if (isNode(value)) inline.add(value);
-    }
+    if (!isNode(value)) return;
+    if (WRITTEN_INLINE.includes(value.type)) named.add(value);
   };
 
   walk(root, (node) => {
-    if (node.type === "CallExpression" || node.type === "NewExpression") {
-      const args = node["arguments"];
-      if (Array.isArray(args)) for (const one of args) take(one);
+    if (HOLDS_A_NAME.includes(node.type)) {
+      take(node["init"]);
+      take(node["value"]);
       return;
     }
-    if (node.type === "JSXExpressionContainer") {
-      take(node["expression"]);
+    if (node.type === "AssignmentExpression") {
+      take(node["right"]);
     }
   });
 
-  return inline;
+  return named;
+}
+
+function existsUnderAName(node: Node, named: ReadonlySet<Node>): boolean {
+  if (WRITTEN_INLINE.includes(node.type)) return named.has(node);
+  return true;
 }
 
 export const unfinishedCheck: Check = {
@@ -107,13 +117,13 @@ export const unfinishedCheck: Check = {
     if (parsed.kind === "unreadable") return [];
 
     const found: Finding[] = [];
-    const inline = writtenInlineAsAnArgument(parsed.root);
+    const named = boundToAName(parsed.root);
     walk(parsed.root, (node) => {
       if (node.type === "ThrowStatement" && saysUnbuilt(node)) {
         found.push({ line: lineOfNode(node) });
         return;
       }
-      if (inline.has(node)) return;
+      if (!existsUnderAName(node, named)) return;
       if (isEmptyBody(functionBody(node))) found.push({ line: lineOfNode(node) });
     });
     return found;
