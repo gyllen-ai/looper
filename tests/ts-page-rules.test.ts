@@ -100,12 +100,12 @@ test("JSX in a .js file is read, because that is where most React is written", (
   );
 });
 
-test("TS-DEAD:3 asks whether the function has a name, which is what its ban says", () => {
-  const held = `export class Ops { close = (): void => {}; }\n`;
-  assert.equal(countIn(unfinishedCheck, held), 1, "a class field holding a no-op is reachable by that name");
+test("TS-DEAD:3 refuses the no-op an agent reaches for, wherever it is written", () => {
+  const fallback = `export function wire(on: (() => void) | undefined, set: (h: () => void) => void): void { set(on ?? (() => {})); }\n`;
+  assert.equal(countIn(unfinishedCheck, fallback), 1, "a no-op standing in for a handler nobody gave is the shortcut, not a decision");
 
-  const handed = `export function noneOf(): () => void { return () => {}; }\n`;
-  assert.equal(countIn(unfinishedCheck, handed), 0, "a function with no name has no name to go stale");
+  const inline = `export function wire(el: HTMLElement): void { el.addEventListener("click", () => {}); }\n`;
+  assert.equal(countIn(unfinishedCheck, inline), 0, "the one exception the rule names: an empty callback written inline as an argument");
 });
 
 test("TS-LAYER:2 means partway down, so the top of a CommonJS file is silent", () => {

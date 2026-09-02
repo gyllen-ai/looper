@@ -111,7 +111,7 @@ contradiction with `instead` #3 is real but only reaches test files that
 deliberately exercise a serialise-and-rehydrate round trip, and a rule is judged
 on the code it fires on, not on the sentence it could be argued into.
 
-### 115 · `blunt` — the no-op handler its own advice exempts — cleared
+### 115 · `blunt` — the no-op handler its own advice exempts — cleared, then reversed
 
 2026-09-01. `TS-DEAD:3`'s fourth `instead` says an empty callback written inline
 "is not this rule". `writtenInlineAsAnArgument` recognises an arrow that **is** an
@@ -133,6 +133,21 @@ Measured: 17 findings stopped, every one of them anonymous
 `factory: SuiteFactory = () => {}`). 136 still fire, every one of them named
 (`export const assertEqual = () => {}`, `let releaseLock = () => {}`,
 `clearRect: () => {}`, and the `not implemented` throws).
+
+**Reversed 2026-09-02, and both halves are kept.** The narrowing was wrong about
+who the law is for. `props.onClose ?? (() => {})` is a decision when TanStack
+writes it, because the API genuinely accepts an optional handler. It is a
+shortcut when an agent writes it, because a no-op that makes a type error go
+away is the nearest thing to hand when it does not know what the handler should
+do. The law cannot see which, so it has to refuse the text. The check is back to
+what it was; the 17 findings fire again; the ban text now says what the check
+does — *a function that does nothing, wherever it is written* — with the one
+exception the original author chose, an empty callback written inline as an
+argument. The three `silent` cases became `fires`. The mismatch between the ban
+text and the check was real; the fix was to the text, not to the check, which
+is what `contribution` says about a stricter reading that still has a legal
+spelling.
+
 
 ### 114 · `wrong` — "partway down a file", fired at line 1 — cleared
 
