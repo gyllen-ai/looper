@@ -22,6 +22,57 @@ is a suspicion and belongs in the notes at the bottom, not in the list.
 
 ## Open
 
+### 120 · `wrong` — a quarter of every Rust finding was the same finding twice — cleared
+
+2026-09-01, found by pass 9 below. `judgedCrate` grouped the project's files by
+crate with `byCrate`, then called the reader with an **empty file list**:
+
+```
+const said = judgeRust(looperRoot(), crate, []);
+```
+
+The engine takes a file list and honours it — given one file it judges one file.
+Given none it walks everything under the directory it was pointed at. A Cargo
+workspace root carries a `Cargo.toml` too, so it is a crate in that map, and its
+run re-walked every member. Measured on ripgrep: the workspace-root run alone
+produced **8,527 hits across 49 files**, every one of them a file already judged
+by its own crate.
+
+The second copy could not even be opened. The engine reports paths relative to
+each crate's own source root, so the duplicate arrived as `dir.rs` rather than
+`crates/ignore/src/dir.rs`, and `namedAmong` could not resolve it against the
+root group's file list. Across the ten-project corpus:
+
+| | findings | at a path that does not exist | duplicates of a real finding |
+|---|---|---|---|
+| before | 255,448 | 67,722 (26.5%) | 63,324 (24.8%) |
+| after | 194,449 | **0** | — |
+
+**23.9% of every Rust finding looper reported was inflation**, and in serde all
+4,398 of its ghost paths were the *only* report of that finding, because
+`serde/src/core` is a symlink to `../../serde_core/src` and the reader resolved
+it while looper's walker did not.
+
+**Cleared** by handing the reader the files `byCrate` had already assigned to
+that crate. Two tests written before the fix, both failing first: one that a
+workspace member is judged once, one that every path a finding names can be
+opened.
+
+**It closed a second blindness nobody had asked about.** The engine's own walk
+starts at the crate's module tree, so `benches/`, `examples/` and `tests/`
+were never judged at all. With the file list handed to it, tokio gained 227
+files with findings, hyper 30 and syn 28 — the corpus went up in five projects
+even as it fell by a quarter overall.
+
+**And it made one rule's `why` untrue.** `RUST-ERROR:9` said "a file nothing can
+parse takes the whole crate down with it. Every other file around it goes
+unjudged", which stopped being so the moment the reader was told which files to
+read. The text now says what the rule is actually for: a file nobody could read
+produces exactly what a clean file produces, and naming it is the only thing that
+tells the two apart. `tests/pre-commit.test.ts` carried the old behaviour as a
+`mention`; it now asserts the better one — a staged file nobody can parse blocks
+and is named, and a broken file no longer decides the verdict on its neighbours.
+
 ### 119 · `noise` — the report printed every place on one line — cleared
 
 2026-09-01. Found by running `looper law` itself from inside a foreign checkout,
@@ -49,7 +100,8 @@ Longest line in the hono report fell from several thousand characters to 708.
 
 ---
 
-**106 through 119, from pass 8 below. Nothing open.** Ten cleared. Four were
+**106 through 120. Nothing open.** Eleven cleared. 120 is from pass 9, the rest
+from pass 8. Four were
 re-examined by hand against every finding they produced and **closed as not
 defects — they were overstated when first written**, and the correction is in
 each entry.
@@ -147,7 +199,6 @@ argument. The three `silent` cases became `fires`. The mismatch between the ban
 text and the check was real; the fix was to the text, not to the check, which
 is what `contribution` says about a stricter reading that still has a legal
 spelling.
-
 
 ### 114 · `wrong` — "partway down a file", fired at line 1 — cleared
 
@@ -3580,3 +3631,69 @@ same law, and it is not the same command: it never went through `surveyProject`,
 the baseline, the concessions or `formatReport`. Running `looper law` from inside
 a foreign checkout took one minute and found a defect in the first thing an
 adopter reads. A rule proven by its own unit is not a rule proven.
+
+### Pass 9 — the same question asked of Rust
+
+2026-09-01. Ten Rust crates chosen for being very good, shallow-cloned that day,
+judged in a scratch directory and left there. Nothing from any of them entered
+this repository.
+
+| project | commit | dated | non-test files | non-test lines |
+|---|---|---|---|---|
+| BurntSushi/ripgrep | `3fce3b5` | 2026-08-04 | 87 | 49,558 |
+| tokio-rs/tokio | `ea91b33` | 2026-08-20 | 460 | 122,468 |
+| rust-lang/regex | `72d650c` | 2026-08-10 | 174 | 155,750 |
+| clap-rs/clap | `af30442` | 2026-09-01 | 118 | 42,135 |
+| dtolnay/syn | `7e2b27b` | 2026-08-25 | 79 | 55,095 |
+| serde-rs/serde | `a874a1b` | 2026-08-24 | 58 | 26,569 |
+| rayon-rs/rayon | `ee0a00b` | 2026-08-28 | 156 | 34,451 |
+| hyperium/hyper | `203e4c7` | 2026-08-31 | 63 | 22,050 |
+| tokio-rs/axum | `194030d` | 2026-09-01 | 109 | 33,231 |
+| dtolnay/anyhow | `c63b279` | 2026-08-21 | 13 | 4,126 |
+
+**The reader was proved to answer before anything was counted**, which is what
+the C# note asks for: `engineIsBuilt` true, and a known file judged with 36
+findings and nothing unreadable. Every number below rests on that.
+
+**Nothing was unreadable.** `RUST-ERROR:9` did not fire once across 545,433
+non-test lines. Rust has no equivalent of findings 106 and 107 — the parser
+reads everything it is given.
+
+**One defect, and it was worth the pass on its own:** finding 120, above.
+Almost a quarter of every Rust finding looper reported was the same finding
+counted twice, at a path nobody could open.
+
+**After it, the shape of the law on great Rust.** 180,754 findings in the
+non-test files, 331 per thousand lines. `RUST-DEAD:2` is 89% of that, which is
+higher than TypeScript's 63% because Rust carries its documentation in `///`.
+Setting it aside as pass 8 does, the rate is **35.0 per thousand lines against
+TypeScript's 38.5** — the two halves of the law fire at close to the same rate on
+comparable code, which is worth knowing and was not obvious.
+
+The rules above one finding per thousand lines are five:
+
+| rule | /kLOC | what it bans |
+|---|---|---|
+| `RUST-LAYER:2` | 9.85 | `crate::`, `self::`, `super::` outside a `use` |
+| `RUST-ERROR:1` | 8.93 | the `unwrap` / `expect` / `is_some` family |
+| `RUST-DECOMPOSITION:2` | 2.78 | anything in `lib.rs` or `mod.rs` that is not wiring |
+| `RUST-TYPE:2` | 2.61 | a `Result` with its error half hidden, `io::Result<T>` |
+| `RUST-TYPE:3` | 1.84 | an `Option` in a public signature |
+
+**The two biggest were put to the pass-8 question and both pass.** `RUST-LAYER:2`
+accepts `use crate::Thing;` and then the short name. `RUST-ERROR:1` accepts `?`,
+accepts a two-armed `match` that rethrows, and — for a bare presence check, where
+`is_some()`, `matches!(v, Some(_))` and `Some(_)` are all refused — accepts
+`match v { Some(..) => true, None => false }`. Strict, not blunt.
+
+**Two probes had to be thrown away first**, and the reason is worth keeping: a
+`Result<u8, u8>` trips `RUST-TYPE:1` for the bare primitive, and an `Option` in a
+`pub fn` trips `RUST-TYPE:3`, so a probe that means to isolate one rule tests
+three. The first run of both read as "no legal spelling exists" and neither did.
+
+**One residual, measured and left open as an observation rather than a finding:**
+685 repeated `(rule, file, line)` triples remain, 0.35% of the corpus, 680 of
+them `RUST-DEAD:2`. Two `unwrap`s on one line are two real findings at one triple,
+so that number is an upper bound on a defect, not a count of one. Judging the
+same file alone produces no repeat, so it is not finding 120 returning.
+
