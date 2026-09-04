@@ -8,7 +8,7 @@ export const UNFINISHED: Rule = {
   category: "DEAD",
   pass: "fast",
   bans:
-    "a function that exists under a name but does nothing — a declaration, a method, or one bound to a variable — and `throw new Error('not implemented')`",
+    "a function that does nothing, wherever it is written — a declaration, a method, one bound to a variable, one handed back, one standing in for a handler nobody gave — and `throw new Error('not implemented')`. The one exception is an empty callback written inline as an argument",
   why:
     "half-built code that compiles is worse than code that is missing. It passes every check, it looks finished to anyone reading the list of what exists, and it fails in front of whoever is using the thing rather than in front of you. Missing code fails immediately and loudly, which is the cheapest failure there is",
   instead: [
