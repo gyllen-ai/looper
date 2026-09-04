@@ -16,6 +16,7 @@ Writing the rules this project runs under.
   branch**, and a branch too broad to be selective is two branches, named in
   `map.toml`.
 - **A branch opens with one line saying when it is needed.** That line is what
-  the drop marker quotes; the index lists names only.
+  the drop marker quotes; the index carries names, and two words where one points
+  elsewhere.
 - **A rule states intent and stops nothing.** What must not happen belongs in a
   gate. Never describe a barrier that is not wired as though it were one.

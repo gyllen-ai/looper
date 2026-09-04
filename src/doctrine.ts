@@ -92,12 +92,18 @@ export function assembleBranch(root: string, name: string): BranchLookup {
 }
 
 const INDEX_HEADER = [
-  "Rule sets. The ones tied to the files you are editing arrive on their own; before",
-  "editing in another area, pull its set by name with the doctrine tool. A question",
-  "needs none of them: go to the running system first.",
+  "Rule sets. Those tied to what you are editing arrive on their own; before editing",
+  "elsewhere, pull that set by name. A question needs none: go to the running system",
+  "first.",
 ].join("\n");
 
-const SAID_AS: ReadonlyMap<string, string> = new Map([["law", "law (TypeScript)"]]);
+const SAID_AS: ReadonlyMap<string, string> = new Map([
+  ["law", "law (TypeScript)"],
+  ["sources", "sources (prior work)"],
+  ["structure", "structure (shape first)"],
+  ["discipline", "discipline (writing code)"],
+  ["evidence", "evidence (documents)"],
+]);
 
 function nameOf(branch: string): string {
   const said = SAID_AS.get(branch);
