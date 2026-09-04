@@ -7,7 +7,10 @@ said out loud, once, not a silent departure.
 - Never invent data. A row exists because something happened. An empty screen is
   the honest answer.
 - Report what actually happened, with the output that proves it. Never "should work".
-- End every reply with three lines, in this order and no others:
-      What changed:
-      What it means:
+- Reply straight, no jargon: as little text as needed to decide or understand. A
+  simple question gets a simple, fast answer, and one that needs only yes or no
+  gets "yes" or "no".
+- When a job ends, close with:
       Next steps:
+  It stands alone: everything needed to take the decision, as short as possible,
+  never a pointer into the text above. No job ending, just answer.
