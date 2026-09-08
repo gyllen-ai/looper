@@ -415,8 +415,8 @@ const INLINE_TEST: &str = concat!(
 );
 
 const FALLBACK_ROUTE: &str = concat!(
-    "a second route taken because the first one failed or was not there: an Err arm whose value\n",
-    "    comes from calling something else, or a `let ... else` whose else branch calls another route.\n",
+    "a second route taken because the first one failed: an Err arm whose value comes from calling\n",
+    "    something else. an absence is not a failure and this rule says nothing about one.\n",
     "    why: a fallback is a second implementation of the same behaviour, and from the moment it\n",
     "    exists nobody can say which one ran. the failure that sent the program down the second path\n",
     "    is invisible one line later, so the slow route quietly becomes the normal route and nothing\n",
@@ -424,7 +424,6 @@ const FALLBACK_ROUTE: &str = concat!(
     "    looks wrong. it is also the shape that hides an outage: the primary was down for a week and\n",
     "    every screen looked fine.\n",
     "    legal: `Err(cause) => return Err(CouldNotRead { path, cause })` | `Err(cause) => { warn!(?cause, \"unread\"); Held::Absent }`\n",
-    "    legal: `let Some(row) = table.get(key) else { return Held::Absent };` — a named absence, not a call\n",
     "    if the second route is genuinely needed, ask the person whose project this is, say why the\n",
     "    first one is not enough, and write the answer down: a `decisions` entry naming the file, what\n",
     "    it costs and what would have to be true to take it out again. a pardon in law.toml is honoured\n",

@@ -1890,7 +1890,8 @@ fallbacks:
 | `#[cfg(windows)]` beside `#[cfg(unix)]` | 60 | **not built.** A target is not a failure. Every hit was a Tauri desktop port |
 | `typeof x === "..."` anywhere | 18 | **narrowed to host objects.** 16 of the 18 were `typeof x === "object"` narrowing a parsed payload at an edge, which is the shape doctrine asks for |
 | a name that confesses: `fallback`, `legacy`, `backup`, `degraded` | about 120 | **not built.** `legacy` was the game's own item table (High External Legacy Gate, Legacy Furnace), `degraded` a health tone, `fallback` a product feature with its own module. A noun detector, not a shape detector |
-| a failure or an absence picks the route | see below | **built** |
+| a failure picks the route | see below | **built** |
+| an absence picks the route | 25 of 34 | **built, then taken out the same day**, measured below |
 
 So the rule reads a shape, never a word. It fires where a failure or an absence
 selects a second route, and on a capability probe against `window`, `globalThis`,
@@ -1907,12 +1908,29 @@ an absence test and never fires. In TypeScript a disjunction of two conditions
 (`isA(x) || isB(x)`) is told from a default (`x || slow()`) by whether the left
 side is a place, which is the same test the Rust half has always used.
 
-**Measured on the RustOnTop codebase, 2026-09-08:** 2 hits in 300 TypeScript
-files, 36 hits in 23 Rust files. The largest cluster, 8 hits in
-`crates/rustplus/src/session/socket.rs`, is a decoder for a protobuf with no
-oneof tag, so it probes optional fields in order. That is structurally identical
-to a fallback chain and cannot be told from one by shape. It is the case the
-`decisions` ledger exists for.
+**Narrowed the same day it shipped, on evidence.** The first cut also read an
+absence as a fallback: `let ... else` and `if (x === undefined) return other()`
+in TypeScript. Measured on the RustOnTop codebase that produced 36 hits, and
+reading all of them, **25 of the 34 Rust hits came from the `let ... else`
+clause and almost none were fallbacks**: a name read across a roster change,
+Bearer against Basic credential parsing, get-or-create, a bridge-versus-poll
+ingest path, an anonymous versus identified request, IPv4-mapped versus v6
+dispatch, and an eight-deep decoder for a protobuf with no oneof tag.
+
+The cause was a contradiction the rule introduced. `RUST-TRUTH:1` refuses
+`None => value`, so the law already tells a project to spell a real absence as
+`let Some(v) = it else { ... }`. Firing on that shape punished the spelling the
+law demands. **An absence is not a failure**, and the value-default case already
+has a rule in both languages, so the clause came out and the rule now reads only
+a failure: an `Err` arm, a `catch`, and a host capability probe.
+
+**Measured after the narrowing, 2026-09-08:** 10 hits, 9 Rust and 1 TypeScript,
+against 36 before. Four are the shape the rule was written for: a monument name
+guessed when the catalogue misses, the game's defaults standing in for convars
+that would not read (twice), and a vision model silently re-asked when its answer
+will not parse. The rest are a client id minted on first run, a steamid-versus-name
+search, and a queue's defer and backoff. About half right is the honest ceiling
+here: nothing lexical separates minting an id from standing a wrong number in.
 
 **The way through is a person, and it is wired.** Doctrine refuses a barrier that
 is only described, so the concession is not the honour system: a pardon for
@@ -1952,7 +1970,7 @@ Every rule the engine loads appears exactly once below, and
 | the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
 | the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
 | "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` `TS-TRUTH:3` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
-| a failure or an absence quietly takes a second route | `TS-TRUTH:4` | `RUST-TRUTH:3` | **left out on purpose**, 2026-09-08, measured below | none built | a stylesheet takes no route |
+| a failure quietly takes a second route | `TS-TRUTH:4` | `RUST-TRUTH:3` | **left out on purpose**, 2026-09-08, measured below | none built | a stylesheet takes no route |
 | output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
 | a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built | a stylesheet writes no logs |
 | the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-LAYER:3` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built | `CSS-LAYER:1` `CSS-TRUTH:2` |
