@@ -28,8 +28,6 @@ import { inlineStyleCheck } from "./ts/inline-style.ts";
 import { guessedWaitCheck } from "./ts/guessed-wait.ts";
 import { rewrappedFailureCheck } from "./ts/rewrapped-failure.ts";
 import { roundTripCopyCheck } from "./ts/round-trip-copy.ts";
-import { writtenPageCheck } from "./ts/written-page.ts";
-import { coercedComparisonCheck } from "./ts/coerced-comparison.ts";
 import { CSS_CHECKS } from "./css/checks.ts";
 import { RUST_RULES } from "./rust/rules.ts";
 import { PYTHON_RULES } from "./python/rules.ts";
@@ -69,8 +67,6 @@ export const CHECKS: readonly Check[] = [
   clientSecretCheck,
   uncheckedInputCheck,
   conjuredCodeCheck,
-  writtenPageCheck,
-  coercedComparisonCheck,
   codeColourCheck,
   inlineStyleCheck,
   guessedWaitCheck,

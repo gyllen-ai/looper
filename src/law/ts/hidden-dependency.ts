@@ -2,7 +2,7 @@ import type { Concessions } from "../concessions.ts";
 import { isNamed } from "../concessions.ts";
 import type { Check, Finding, Subject } from "../engine.ts";
 import type { Rule } from "../rule.ts";
-import { isNode, lineOfNode, parseSource, walk, type Node } from "./parse.ts";
+import { lineOfNode, parseSource, walk, type Node } from "./parse.ts";
 import { fieldAt } from "../../fields.ts";
 import { reachIn, reaches, type Reach } from "./globals.ts";
 
@@ -26,58 +26,6 @@ export const HIDDEN_DEPENDENCY: Rule = {
 
 const REQUIRE: readonly string[] = ["require"];
 
-const A_STATEMENT_AT_THE_TOP: readonly string[] = [
-  "VariableDeclaration",
-  "ExpressionStatement",
-  "ExportNamedDeclaration",
-  "ExportDefaultDeclaration",
-];
-
-const PARTWAY_DOWN: readonly string[] = [
-  "FunctionDeclaration",
-  "FunctionExpression",
-  "ArrowFunctionExpression",
-  "ClassMethod",
-  "ObjectMethod",
-  "ClassDeclaration",
-  "BlockStatement",
-  "IfStatement",
-  "TryStatement",
-  "SwitchStatement",
-  "ForStatement",
-  "ForOfStatement",
-  "ForInStatement",
-  "WhileStatement",
-  "DoWhileStatement",
-];
-
-function gatherAbove(node: Node, found: Set<Node>): void {
-  found.add(node);
-  for (const key of Object.keys(node)) {
-    if (key === "loc") continue;
-    const held = node[key];
-    if (Array.isArray(held)) {
-      for (const item of held) {
-        if (isNode(item) && !PARTWAY_DOWN.includes(item.type)) gatherAbove(item, found);
-      }
-      continue;
-    }
-    if (isNode(held) && !PARTWAY_DOWN.includes(held.type)) gatherAbove(held, found);
-  }
-}
-
-export function declaredAtTheTop(root: Node): ReadonlySet<Node> {
-  const found = new Set<Node>();
-  const body = root["body"];
-  if (!Array.isArray(body)) return found;
-  for (const statement of body) {
-    if (!isNode(statement)) continue;
-    if (!A_STATEMENT_AT_THE_TOP.includes(statement.type)) continue;
-    gatherAbove(statement, found);
-  }
-  return found;
-}
-
 const MAKES_REQUIRE = "createRequire";
 
 function isRequire(node: Node, reach: Reach): boolean {
@@ -99,10 +47,8 @@ export const hiddenDependencyCheck: Check = {
     if (parsed.kind === "unreadable") return [];
 
     const reach = reachIn(parsed.root);
-    const declared = declaredAtTheTop(parsed.root);
     const found: Finding[] = [];
     walk(parsed.root, (node) => {
-      if (declared.has(node)) return;
       if (node.type === "ImportExpression") {
         found.push({ line: lineOfNode(node) });
         return;

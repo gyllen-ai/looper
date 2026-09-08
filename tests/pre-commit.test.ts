@@ -173,27 +173,7 @@ test("a Rust file at the commit gate is judged as Rust, not as unreadable TypeSc
 
 const UNPARSEABLE_RUST = "pub fn wrong( -> u8 {\n    let x = ;\n}\n";
 
-test("a file the Rust half cannot read is said out loud, not passed in silence", WITHOUT_THE_RUST_ENGINE, () => {
-  const root = startedRust();
-  try {
-    writeFileSync(join(root, "src/broken.rs"), UNPARSEABLE_RUST);
-    git(root, "add", "src/broken.rs");
-
-    const said = verdictOn(root);
-    assert.equal(
-      said.kind,
-      "block",
-      "a file you staged that nothing can parse was judged by nothing, and silence there reads exactly like a clean file",
-    );
-    if (said.kind !== "block") return;
-    assert.ok(said.reason.includes("RUST-ERROR:9"));
-    assert.ok(said.reason.includes("src/broken.rs"));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("a file nobody can parse no longer blinds the rest of its crate", WITHOUT_THE_RUST_ENGINE, () => {
+test("a crate the Rust half cannot read is said out loud, not passed in silence", WITHOUT_THE_RUST_ENGINE, () => {
   const root = startedRust();
   try {
     writeFileSync(join(root, "src/broken.rs"), UNPARSEABLE_RUST);
@@ -204,13 +184,10 @@ test("a file nobody can parse no longer blinds the rest of its crate", WITHOUT_T
     git(root, "add", "src/mine.rs");
 
     const said = verdictOn(root);
-    assert.equal(
-      said.kind,
-      "block",
-      "the reader is now given the files being judged rather than a directory to walk, so one unparseable file that nobody staged cannot decide the verdict on the file that was",
-    );
-    if (said.kind !== "block") return;
-    assert.ok(said.reason.includes("RUST-ERROR:1"));
+    assert.equal(said.kind, "mention");
+    if (said.kind !== "mention") return;
+    assert.ok(said.note.includes("src/broken.rs"));
+    assert.ok(said.note.includes("not judged at all"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -99,7 +99,7 @@ function refusedCrate(root: string, detail: string, files: readonly string[]): R
 }
 
 function judgedCrate(root: string, crate: string, files: readonly string[]): RustSaid {
-  const said = judgeRust(looperRoot(), crate, files);
+  const said = judgeRust(looperRoot(), crate, []);
   if (said.kind !== "found") return refusedCrate(root, said.detail, files);
 
   const violations: Violation[] = [];

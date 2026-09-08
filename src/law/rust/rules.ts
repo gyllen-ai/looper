@@ -394,7 +394,7 @@ export const RUST_RULES: readonly Rule[] = [
     pass: "fast",
     bans: "a file that cannot be read as Rust at all",
     why:
-      "a file nobody can parse produces exactly what a clean file produces — no findings — and the two are indistinguishable in a report that only lists what is wrong. Naming it is the difference between a file that was judged and found clean and one that was never read at all. A file in this state will also not build",
+      "the Rust law is judged a crate at a time, so a file nothing can parse takes the whole crate down with it. Every other file around it goes unjudged, and without this rule the report says nothing to fix — which is indistinguishable from a crate with nothing wrong in it. A file in this state will also not build",
     instead: [
       "fix what the parser points at on the line named, and the rest of the crate can be seen again",
       "if the file is not Rust, give it the extension it actually is",

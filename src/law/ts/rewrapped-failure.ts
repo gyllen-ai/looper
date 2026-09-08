@@ -47,26 +47,9 @@ function isABuiltInError(value: unknown): boolean {
   return BUILT_IN_ERRORS.has(nameOf(fieldAt(value, "callee")));
 }
 
-const THE_CAUSE = "cause";
-
-function keepsTheCause(value: unknown): boolean {
-  const given = fieldAt(value, "arguments");
-  if (!Array.isArray(given)) return false;
-  return given.some((held) => {
-    if (fieldAt(held, "type") !== "ObjectExpression") return false;
-    const properties = fieldAt(held, "properties");
-    if (!Array.isArray(properties)) return false;
-    return properties.some((one) => nameOf(fieldAt(one, "key")) === THE_CAUSE);
-  });
-}
-
-const STILL_STANDS =
-  "the cause is kept, so the trace survives; what does not is the caller catching this by kind";
-
 function throwsInside(node: Node, found: Finding[]): void {
   if (node.type === "ThrowStatement" && isABuiltInError(node["argument"])) {
-    const kept = keepsTheCause(node["argument"]);
-    found.push(kept ? { line: lineOfNode(node), said: STILL_STANDS } : { line: lineOfNode(node) });
+    found.push({ line: lineOfNode(node) });
   }
   for (const key of Object.keys(node)) {
     if (key === "loc") continue;
