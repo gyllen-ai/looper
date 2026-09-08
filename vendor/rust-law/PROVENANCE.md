@@ -197,6 +197,42 @@ a crate goes missing, if a nineteenth arrives, or if anything here names
 Run `cargo vendor --offline vendor` from this directory after changing a
 dependency, and argue the dependency in `docs/PLAN.md` first.
 
+**A crate has four kinds of file and the engine knew two — changed here,
+2026-09-08, from adopter issues #185 and #187.** `is_bin` was `rel == "main.rs"
+|| rel.starts_with("bin/")` in `src/visitor.rs`, and the crate-root test in
+`src/scan.rs` had the same shape. Neither recognised a Cargo build script, so
+`LOG:1` fired on `println!("cargo:rerun-if-changed=…")`, which is the protocol
+cargo reads a build script's stdout for and not output at all. Neither
+recognised a cargo integration test, so `TRUTH:2` fired on
+`env!("CARGO_BIN_EXE_<name>")` and `env!("CARGO_MANIFEST_DIR")`, which are how a
+test finds the binary cargo just built for it and its own crate on disk.
+
+`Judge::new` now takes a `FileRole` — `judges_tests`, `build_script`,
+`cargo_test` — decided in `scan.rs` from the file's place on disk rather than
+its name, because `rel` collides: a crate-root `build.rs` and a `src/build.rs`
+are both `build.rs`. A build script is a `build.rs` beside the `Cargo.toml` it
+belongs to; a cargo test is a file under a `tests/` directory whose parent holds
+a `Cargo.toml`. `src/build.rs` is an ordinary module and still prints under the
+rule.
+
+Two halves of this are stricter, not looser. A build script is a crate root, so
+it now answers to `MissingDeputy` as `lib.rs` and `main.rs` do. And the `env!`
+allowance is the narrowest that closes the report: `tokens_name_a_cargo_key` in
+`src/patterns.rs` accepts exactly one string literal naming a key in cargo's own
+set — `CARGO`, `CARGO_BIN_NAME`, `CARGO_CRATE_NAME`, `CARGO_MANIFEST_DIR`,
+`CARGO_MANIFEST_PATH`, `CARGO_TARGET_TMPDIR`, `CARGO_BIN_EXE_*`, `CARGO_PKG_*` —
+and only in a cargo test file. `std::env` in every spelling, `env!("HOME")`, the
+two-argument `env!("KEY", "message")` form and the same keys anywhere under
+`src/` all still fire. `scan_tokens_for_env_macros` applies the same allowance to
+an `env!` nested inside another macro's tokens; `scan_tokens_for_macros` keeps
+its old behaviour for `todo!` and its family, and both now share one walk in
+`macro_sites`.
+
+`tests/rust-outside-src.test.ts` drives the built engine over a crate holding all
+four kinds of file, and `tests/invariants.test.ts` fails if a newer copy of
+lawkeeper arrives without `scan_tokens_for_env_macros` or
+`tokens_name_a_cargo_key`.
+
 **Updating it.** Nothing fetches this. If lawkeeper gains something worth having,
 someone copies the new source in by hand, deliberately, re-applies the changes
 listed above, and says so in the commit. That is the price of never downloading

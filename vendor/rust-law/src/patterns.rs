@@ -755,11 +755,11 @@ pub fn scan_tokens_for_env_calls(tokens: TokenStream, names: &[&str], out: &mut 
     }
 }
 
-pub fn scan_tokens_for_macros(tokens: TokenStream, names: &[&str], out: &mut Vec<usize>) {
+fn macro_sites(tokens: TokenStream, names: &[&str], out: &mut Vec<(usize, TokenStream)>) {
     let trees: Vec<TokenTree> = tokens.into_iter().collect();
     for idx in 0..trees.len() {
         if let TokenTree::Group(group) = &trees[idx] {
-            scan_tokens_for_macros(group.stream(), names, out);
+            macro_sites(group.stream(), names, out);
             continue;
         }
         let TokenTree::Ident(ident) = &trees[idx] else {
@@ -774,10 +774,55 @@ pub fn scan_tokens_for_macros(tokens: TokenStream, names: &[&str], out: &mut Vec
         if bang.as_char() != '!' {
             continue;
         }
-        let Some(TokenTree::Group(_args)) = trees.get(idx + 2) else {
+        let Some(TokenTree::Group(args)) = trees.get(idx + 2) else {
             continue;
         };
-        out.push(ident.span().start().line);
+        out.push((ident.span().start().line, args.stream()));
+    }
+}
+
+pub fn scan_tokens_for_macros(tokens: TokenStream, names: &[&str], out: &mut Vec<usize>) {
+    let mut found = Vec::new();
+    macro_sites(tokens, names, &mut found);
+    for (line, _args) in found {
+        out.push(line);
+    }
+}
+
+const CARGO_KEYS: &[&str] = &[
+    "CARGO",
+    "CARGO_BIN_NAME",
+    "CARGO_CRATE_NAME",
+    "CARGO_MANIFEST_DIR",
+    "CARGO_MANIFEST_PATH",
+    "CARGO_TARGET_TMPDIR",
+];
+
+const CARGO_KEY_FAMILIES: &[&str] = &["CARGO_BIN_EXE_", "CARGO_PKG_"];
+
+pub fn tokens_name_a_cargo_key(tokens: TokenStream) -> bool {
+    let trees: Vec<TokenTree> = tokens.into_iter().collect();
+    let [TokenTree::Literal(named)] = trees.as_slice() else {
+        return false;
+    };
+    let said = named.to_string();
+    let Some(inner) = said.strip_prefix('"') else {
+        return false;
+    };
+    let Some(key) = inner.strip_suffix('"') else {
+        return false;
+    };
+    CARGO_KEYS.contains(&key) || CARGO_KEY_FAMILIES.iter().any(|family| key.starts_with(family))
+}
+
+pub fn scan_tokens_for_env_macros(tokens: TokenStream, names: &[&str], out: &mut Vec<usize>) {
+    let mut found = Vec::new();
+    macro_sites(tokens, names, &mut found);
+    for (line, args) in found {
+        if tokens_name_a_cargo_key(args) {
+            continue;
+        }
+        out.push(line);
     }
 }
 
