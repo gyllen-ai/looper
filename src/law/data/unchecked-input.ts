@@ -7,7 +7,7 @@ export const UNCHECKED_INPUT: Rule = {
   id: "DATA:2",
   category: "SECURITY",
   pass: "fast",
-  bans: "reading a request body into an object and trusting its fields — `.json()` and `.formData()` called with nothing, which is the shape that hands one back",
+  bans: "reading a request body into an object and trusting its fields",
   why:
     "whatever is sent to your program is written by whoever is sending it, and they are not obliged to send what you expected. Unchecked, a missing field becomes undefined halfway through, a number arrives as text and every sum after it is wrong, and an extra field you never asked for gets written to the database. The type you wrote down is a wish until something checks it. This fires on .json() and .formData(), which hand back an object with fields in it, and the only thing that satisfies it is a schema parse: a hand-written check can prove one field and says nothing about the rest, which is the half that hurts you. Reading text is not this rule, because a string has no fields to be wrong about",
   instead: [
@@ -30,16 +30,10 @@ function memberName(value: unknown): string | null {
   return typeof name === "string" ? name : null;
 }
 
-function takesNothing(node: Node): boolean {
-  const given = node["arguments"];
-  return Array.isArray(given) && given.length === 0;
-}
-
 function isArrivalCall(node: Node): boolean {
   if (node.type !== "CallExpression") return false;
   const name = memberName(node["callee"]);
-  if (name === null || !ARRIVING.includes(name)) return false;
-  return takesNothing(node);
+  return name !== null && ARRIVING.includes(name);
 }
 
 function isCheckingCall(node: Node): boolean {

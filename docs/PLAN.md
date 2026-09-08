@@ -1888,7 +1888,7 @@ Every rule the engine loads appears exactly once below, and
 | a failure vanishes, and nobody hears it | `TS-ERROR:1` `TS-ERROR:4` `TS-ERROR:6` `TS-ERROR:7` `TS-ERROR:8` `TS-ERROR:10` | `RUST-ERROR:1` `RUST-ERROR:2` `RUST-ERROR:4` `RUST-ERROR:6` `RUST-ERROR:8` `RUST-ERROR:9` | `PY-ERROR:1` `PY-TRUTH:2` | `CS-ERROR:1` `CS-ERROR:4` | a stylesheet cannot fail |
 | a failure is answered with a made-up value | `TS-ERROR:3` `TS-TYPE:5` | `RUST-ERROR:3` `RUST-TYPE:5` | `PY-ERROR:2` | `CS-ERROR:3` | a stylesheet cannot fail |
 | the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
-| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` `TS-TYPE:7` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
+| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
 | "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` `TS-TRUTH:3` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
 | output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
 | a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built | a stylesheet writes no logs |
@@ -1897,7 +1897,7 @@ Every rule the engine loads appears exactly once below, and
 | the language's own guarantees are stepped around | none built | `RUST-ERROR:5` `RUST-ERROR:7` `RUST-TESTS:1` | none built | none built | `CSS-TYPE:1` |
 | a number is guessed where a fact was available | `TS-ERROR:9` | none built | `PY-ERROR:4` | none built | — |
 | the same file exists twice under two names | `COPY:1`, which reads the directory rather than a file, so it answers for all five | | | | |
-| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` `TS-SECURITY:1` `TS-SECURITY:2` | none built | `PY-SECURITY:1` `PY-SECURITY:2` `PY-SECURITY:3` | `CS-SECURITY:1` | open |
+| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` `TS-SECURITY:1` | none built | `PY-SECURITY:1` `PY-SECURITY:2` `PY-SECURITY:3` | `CS-SECURITY:1` | open |
 | a framework's own contract is broken in silence | `REACT:1` `REACT:2` `TAURI:1` | — | — | — | — |
 | the project gains a language nobody chose | `STACK:1`, which reads the project rather than a file, so it answers for all four | | | | |
 
@@ -7288,40 +7288,3 @@ artboard's zero.
 Build order: the registry format and `looper design init`; the walker and
 the generated per-screen check; the untagged-element and collision
 failures; state forcing; the provenance rule; the stall shape.
-
-## Names that pointed elsewhere, and a closing block that said less — 2026-09-04
-
-**The constitution's closing block became a rule about the whole reply.** It
-asked for three lines on every message — what changed, what it means, next
-steps — whether or not anything had changed. It now asks for as little text as
-the reader needs to decide, a yes or a no where that is the honest answer, and
-`Next steps:` alone when a job ends, standing on its own rather than pointing
-back into the text above. The wording came from outside looper, brought in by
-the owner; it is 905 characters against the 1,000 the constitution is allowed.
-
-**Four names in the branch index pointed at the wrong thing.** `law` is the
-TypeScript branch and already said so through `SAID_AS`. `sources` reads as
-source files and is about reading prior work; `structure` and `architecture`
-are one word apart with nothing to tell them apart; `discipline` reads as
-process and is about writing code; `evidence` reads as proof and is about
-documents. The index now says `sources (prior work)`, `structure (shape
-first)`, `discipline (writing code)` and `evidence (documents)`.
-
-**It cost 54 characters and 16 were spare, so something had to go.** Measured
-2026-09-04: the always-on tier stood at 2,584 against the 2,600 cap in
-`tests/budget.test.ts`. The cap was not raised. The index header was repeating
-the `doctrine` tool's own description almost word for word — "the sets tied to
-the files you are editing arrive on their own; before editing in another area,
-pull its set" sits in both and is paid twice on every turn — so the duplicate
-half went and the one sentence the tool description does not carry, "go to the
-running system first", stayed. The header also lost the words "with the
-doctrine tool": the tool's own entry carries them, and they mean nothing on an
-install where the tool is not wired. Always-on tier 2,594 after, index 700
-against its own ceiling of 900.
-
-**The cap is a ratchet on doctrine growth, not the machine limit, and that is
-the part worth writing down.** Measured the same day: the always-on tier plus
-the largest single branch — `law`, 2,603 characters — is 5,197 against a 9,800
-budget, so nothing was near being dropped. 2,600 exists to make adding a line
-cost a deletion. That is what it did, and the deletion was real rather than a
-shave: a paragraph that said nothing the model was not already told.
