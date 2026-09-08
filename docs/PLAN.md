@@ -3263,7 +3263,7 @@ drift apart.
 | `RUST-DEAD:1` | `#[allow(…)]`, `#[expect(…)]` and `#[cfg_attr(…, allow(…))]` naming `dead_code`, `unused` anything, or `unreachable_code` |
 | `RUST-DEAD:2` | comments, all of them — `//`, `/* */`, `///`, `//!` and `#[doc]` |
 | `RUST-TRUTH:1` | a default born outside the one file that gathers settings — an absence arm that resolves to a value instead of passing the absence on |
-| `RUST-LOG:1` | `println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere |
+| `RUST-LOG:1` | `println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere. A crate's `build.rs` is such a file: cargo compiles and runs it as its own program, and what it writes to stdout is cargo's protocol |
 
 **The boundary rule, which is new and belongs to neither language.**
 
@@ -3284,6 +3284,48 @@ now keyed by the directory above each `src-tauri`, and a file is judged against
 the app it lives under. A file under no app is not judged by this rule at all,
 because a verdict against a guessed app is how the union got written in the first
 place.
+
+**The files a crate owns outside `src/`. Corrected 2026-09-08, from adopter
+issues #185 and #187.** Both were found the same way, by measuring the Rust law
+against a real workspace before pinning it, and both are the same mistake: the
+engine knew two kinds of file and a crate has four. A crate-root `build.rs` was
+not a program root, so `RUST-LOG:1` fired on `println!("cargo:rerun-if-changed=…")`
+— which is not output at all but the protocol cargo reads a build script's stdout
+for, and no logger can carry it. A crate's `tests/` target was not known to be
+one, so `RUST-TRUTH:2` fired on `env!("CARGO_BIN_EXE_<name>")` and
+`env!("CARGO_MANIFEST_DIR")`, which are how an integration test finds the binary
+cargo just built and its own crate on disk.
+
+Both are decided from the file's place on disk rather than its name, because a
+name collides: `src/build.rs` is an ordinary module and still prints under the
+rule. A build script is a `build.rs` sitting beside the `Cargo.toml` it belongs
+to; a cargo test is a file under a `tests/` directory whose parent holds a
+`Cargo.toml`.
+
+Two things got **stricter** rather than looser, and both are the same statement
+read honestly. A build script is a crate root, so it now answers to
+`RUST-ERROR:5` and must appoint its deputies — cargo compiles it as its own
+crate, so the lints it denies are the ones that hold there. And the `env!`
+allowance is the narrowest that closes the report: exactly one string literal
+naming a key in cargo's own set (`CARGO`, `CARGO_BIN_NAME`, `CARGO_CRATE_NAME`,
+`CARGO_MANIFEST_DIR`, `CARGO_MANIFEST_PATH`, `CARGO_TARGET_TMPDIR`,
+`CARGO_BIN_EXE_*`, `CARGO_PKG_*`), only in a cargo test file. `std::env::var`,
+`env!("HOME")`, the two-argument `env!("CARGO_MANIFEST_DIR", "message")` form and
+the same keys anywhere under `src/` all still fire. The alternative the issue
+names — putting the three test files in `[truth] env_files` — would have said
+something untrue about them, that they are settings files allowed to read any
+variable forever.
+
+`tests/rust-outside-src.test.ts` drives the built engine over a crate with all
+four kinds of file.
+
+**What is still blind here, and was before.** `judge_project` walks
+`<member>/src` and nothing else, so on an ordinary `looper law` run a crate's
+`build.rs` and its `tests/` are never handed to the engine at all. The two
+reports came from a caller passing those files explicitly, which the engine's
+`<root> <file>…` form accepts. The verdicts are right now whoever asks; making
+looper itself ask is a separate change with its own new hits, and it is not made
+here.
 
 ### Knowing which stack a project is
 

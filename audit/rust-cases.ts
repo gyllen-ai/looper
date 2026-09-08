@@ -81,6 +81,12 @@ export const RUST_CASES: readonly RustCase[] = [
     code: `pub fn f() -> std::io::Result<std::process::Output> { std::process::Command::new("printenv").output() }` },
   { rule: "RUST-TRUTH:2", name: "running an ordinary program is not reading the environment", expect: "silent",
     code: `pub fn f() -> std::io::Result<std::process::Output> { std::process::Command::new("git").output() }` },
+  { rule: "RUST-TRUTH:2", name: "the same read done at compile time", expect: "fires",
+    code: `pub const HOME: &str = env!("HOME");` },
+  { rule: "RUST-TRUTH:2", name: "a key cargo sets itself is still a setting under src", expect: "fires",
+    code: `pub const HERE: &str = env!("CARGO_MANIFEST_DIR");` },
+  { rule: "RUST-TRUTH:2", name: "and inside a macro argument under src", expect: "fires",
+    code: `pub fn f() -> String { format!("{}", env!("CARGO_PKG_NAME")) }` },
   { rule: "RUST-ERROR:9", name: "a file that is not Rust at all", expect: "fires",
     code: `this is not rust {{{` },
 

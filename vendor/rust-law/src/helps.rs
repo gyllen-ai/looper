@@ -346,7 +346,11 @@ const ENV_OUTSIDE_SANCTUM: &str = concat!(
     "    var_os / vars_os / args / args_os / set_var / remove_var; the `env!` and `option_env!` macros\n",
     "    — the same read done at compile time and baked into the binary, with option_env! resolving\n",
     "    absence to None on top of it; and a string literal naming the procfs `self/environ` or\n",
-    "    `self/cmdline` door, including inside macro tokens.\n",
+    "    `self/cmdline` door, including inside macro tokens. in a crate's tests/ target the `env!`\n",
+    "    and `option_env!` macros may name a key cargo sets itself — CARGO, CARGO_BIN_NAME,\n",
+    "    CARGO_CRATE_NAME, CARGO_MANIFEST_DIR, CARGO_MANIFEST_PATH, CARGO_TARGET_TMPDIR,\n",
+    "    CARGO_BIN_EXE_* and CARGO_PKG_* — because there the compiler is the one saying where\n",
+    "    things are; std::env and every other key stay refused.\n",
     "    why: configuration enters a program in one place or it enters in every place. reading the\n",
     "    environment through the filesystem is still reading the environment, and a grep for `env`\n",
     "    misses it entirely — which is precisely why it gets used.\n",
@@ -372,7 +376,9 @@ const VALUE_IN_MESSAGE: &str = concat!(
 );
 
 const STRAY_PRINT: &str = concat!(
-    "println! / print! / eprintln! / eprint! outside a bin root, or dbg! anywhere.\n",
+    "println! / print! / eprintln! / eprint! outside a bin root, or dbg! anywhere. a crate's\n",
+    "    build.rs IS a bin root: cargo compiles and runs it as its own program, and what it writes\n",
+    "    to stdout is cargo's protocol rather than output.\n",
     "    why: stdout is the program's OUTPUT and it belongs to whoever owns the process. a library\n",
     "    that prints has decided for every future caller, including the one piping your output into\n",
     "    another program. dbg! is a debugging artifact that shipped.\n",

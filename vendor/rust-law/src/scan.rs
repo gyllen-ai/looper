@@ -11,7 +11,7 @@ use crate::lexical;
 use crate::patterns::meta_tokens;
 use crate::provenance::{dependency_names, Provenance};
 use crate::violation::{LawError, Rule, Violation};
-use crate::visitor::Judge;
+use crate::visitor::{FileRole, Judge};
 
 pub fn judge_project(root: &Path) -> Result<Vec<Violation>, LawError> {
     layers::verify_invariants();
@@ -176,15 +176,17 @@ fn judge_one(
     hits.extend(lexical::comment_hits(&rel, &content));
 
     let file_name = file_name_of(&full);
+    let role = role_of(path, &full);
     if file_name == "lib.rs" || file_name == "mod.rs" {
         check_switchboard(&rel, &ast, &mut hits);
     }
-    if file_name == "lib.rs" || file_name == "main.rs" || rel.starts_with("bin/") {
+    if file_name == "lib.rs" || file_name == "main.rs" || rel.starts_with("bin/") || role.build_script
+    {
         check_deputies(cfg, &rel, &ast, &mut hits);
     }
 
     let prov = Provenance::new(&cfg.truth.trace_symbols, deps, &ast, under_src(&full));
-    let mut judge = Judge::new(cfg, &rel, prov, judges_tests(&full));
+    let mut judge = Judge::new(cfg, &rel, prov, role);
     judge.visit_file(&ast);
     layers::check_layer_uses(&cfg.layers, &rel, &judge.uses, &mut hits);
     hits.append(&mut judge.hits);
@@ -211,6 +213,43 @@ fn judges_tests(full: &str) -> bool {
         return false;
     }
     under_src(full)
+}
+
+fn role_of(path: &Path, full: &str) -> FileRole {
+    FileRole {
+        judges_tests: judges_tests(full),
+        build_script: is_build_script(path, full),
+        cargo_test: under_crate_tests(path),
+    }
+}
+
+fn holds_a_manifest(dir: &Path) -> bool {
+    dir.join("Cargo.toml").is_file()
+}
+
+fn is_build_script(path: &Path, full: &str) -> bool {
+    if file_name_of(full) != "build.rs" {
+        return false;
+    }
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    holds_a_manifest(dir)
+}
+
+fn under_crate_tests(path: &Path) -> bool {
+    let mut at = path.parent();
+    while let Some(dir) = at {
+        if dir.file_name().and_then(|name| name.to_str()) == Some("tests") {
+            if let Some(up) = dir.parent() {
+                if holds_a_manifest(up) {
+                    return true;
+                }
+            }
+        }
+        at = dir.parent();
+    }
+    false
 }
 
 fn file_name_of(full: &str) -> &str {

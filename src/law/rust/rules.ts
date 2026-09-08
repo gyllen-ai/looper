@@ -329,7 +329,7 @@ export const RUST_RULES: readonly Rule[] = [
     category: "TRUTH",
     pass: "fast",
     bans:
-      "reading the outside world outside the declared files: `std::env::var`, `vars`, `var_os`, `args`, `args_os`, `set_var`, `remove_var`; the `env!` and `option_env!` macros, which do the same read at build time and bake the answer into the program; and reaching the same door by path, such as `/proc/self/environ`",
+      "reading the outside world outside the declared files: `std::env::var`, `vars`, `var_os`, `args`, `args_os`, `set_var`, `remove_var`; the `env!` and `option_env!` macros, which do the same read at build time and bake the answer into the program; and reaching the same door by path, such as `/proc/self/environ`. In a crate's `tests/` target, `env!` and `option_env!` naming a key cargo sets itself — `CARGO_MANIFEST_DIR`, `CARGO_BIN_EXE_<name>` and the rest of the `CARGO_` set — is the compiler saying where things are, and passes; `std::env` and every other key are refused there as everywhere",
     why:
       "settings enter a program in one place or they enter in every place. Scattered, nobody can answer what the program needs in order to run, a missing one is found by whichever line happens to execute first, and a test cannot hand it anything different",
     instead: [
@@ -342,7 +342,8 @@ export const RUST_RULES: readonly Rule[] = [
     id: "RUST-LOG:1",
     category: "LOG",
     pass: "fast",
-    bans: "`println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere",
+    bans:
+      "`println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere. A crate's `build.rs` is such a file: cargo compiles and runs it as its own program, and what it writes to stdout is cargo's protocol",
     why:
       "what a program prints is its output, and it belongs to whoever ran it. A library that prints has decided for every future caller, including the one piping the output into something else. `dbg!` is the one that reaches production, because it is written to be removed and removing it is a step nobody schedules",
     instead: [

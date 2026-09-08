@@ -242,6 +242,8 @@ const OUR_ENGINE_CHANGES: readonly string[] = [
   "scan_tokens_for_casts",
   "scan_tokens_for_paths",
   "scan_tokens_for_env_calls",
+  "scan_tokens_for_env_macros",
+  "tokens_name_a_cargo_key",
   "path_is_option_none",
   "path_is_fallible_family",
   "expr_is_empty_string",

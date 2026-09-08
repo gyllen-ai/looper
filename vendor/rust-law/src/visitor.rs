@@ -14,9 +14,11 @@ use crate::patterns::{
     pat_contains_wild, pat_is_bare_binding, pat_is_none, pat_mentions_ctor, pat_mentions_fallible,
     path_is_fallible_family,
     path_last, path_segs, scan_tokens_for_banned, scan_tokens_for_calls, scan_tokens_for_environ,
-    scan_tokens_for_casts, scan_tokens_for_env_calls, scan_tokens_for_macros,
+    scan_tokens_for_casts, scan_tokens_for_env_calls, scan_tokens_for_env_macros,
+    scan_tokens_for_macros,
     scan_tokens_for_mangle, scan_tokens_for_names, scan_tokens_for_paths, tail_diverges,
-    tail_is_stub, text_reads_env_door, tokens_contain_fallible_ctor, type_is_guard, vis_is_public,
+    tail_is_stub, text_reads_env_door, tokens_contain_fallible_ctor, tokens_name_a_cargo_key,
+    type_is_guard, vis_is_public,
     wild_under_fallible_ctor,
 };
 use crate::provenance::Provenance;
@@ -69,6 +71,12 @@ const HALF_BUILT_WORDS: &[&str] = &["not implemented", "unimplemented", "not yet
 
 const ENV_PROGRAMS: &[&str] = &["printenv", "env"];
 
+pub struct FileRole {
+    pub judges_tests: bool,
+    pub build_script: bool,
+    pub cargo_test: bool,
+}
+
 pub struct Judge<'c> {
     cfg: &'c LawConfig,
     prov: Provenance<'c>,
@@ -77,6 +85,7 @@ pub struct Judge<'c> {
     is_sanctum: bool,
     env_allowed: bool,
     judges_tests: bool,
+    cargo_keys_allowed: bool,
     generics: Vec<String>,
     in_foreign_contract: bool,
     pub_trait: bool,
@@ -85,13 +94,8 @@ pub struct Judge<'c> {
 }
 
 impl<'c> Judge<'c> {
-    pub fn new(
-        cfg: &'c LawConfig,
-        rel: &str,
-        prov: Provenance<'c>,
-        judges_tests: bool,
-    ) -> Judge<'c> {
-        let is_bin = rel == "main.rs" || rel.starts_with("bin/");
+    pub fn new(cfg: &'c LawConfig, rel: &str, prov: Provenance<'c>, role: FileRole) -> Judge<'c> {
+        let is_bin = role.build_script || rel == "main.rs" || rel.starts_with("bin/");
         let is_sanctum = file_matches(rel, &cfg.truth.sanctum);
         let env_allowed = cfg.truth.env_files.iter().any(|f| file_matches(rel, f));
         Judge {
@@ -101,7 +105,8 @@ impl<'c> Judge<'c> {
             is_bin,
             is_sanctum,
             env_allowed,
-            judges_tests,
+            judges_tests: role.judges_tests,
+            cargo_keys_allowed: role.cargo_test,
             generics: Vec::new(),
             in_foreign_contract: false,
             pub_trait: false,
@@ -357,13 +362,21 @@ impl<'c> Judge<'c> {
         self.hit(Rule::Unfinished, node.path.segments[0].ident.span().start().line);
     }
 
+    fn names_a_cargo_key(&self, node: &syn::Macro) -> bool {
+        self.cargo_keys_allowed && tokens_name_a_cargo_key(node.tokens.clone())
+    }
+
     fn scan_macro_environ(&mut self, node: &syn::Macro) {
         if self.env_allowed {
             return;
         }
         let mut envs = Vec::new();
         scan_tokens_for_environ(node.tokens.clone(), &mut envs);
-        scan_tokens_for_macros(node.tokens.clone(), ENV_MACROS, &mut envs);
+        if self.cargo_keys_allowed {
+            scan_tokens_for_env_macros(node.tokens.clone(), ENV_MACROS, &mut envs);
+        } else {
+            scan_tokens_for_macros(node.tokens.clone(), ENV_MACROS, &mut envs);
+        }
         scan_tokens_for_env_calls(node.tokens.clone(), ENV_FNS, &mut envs);
         for line in envs {
             self.hit(Rule::EnvOutsideSanctum, line);
@@ -692,7 +705,7 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
                     self.hit(Rule::ValueInMessage, at);
                 }
             }
-            "env" | "option_env" if !self.env_allowed => {
+            "env" | "option_env" if !self.env_allowed && !self.names_a_cargo_key(node) => {
                 self.hit(Rule::EnvOutsideSanctum, line);
             }
             _ => {}
