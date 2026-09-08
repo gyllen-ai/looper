@@ -145,6 +145,9 @@ test("no install can arrive able to look at a screen", () => {
 });
 
 const OUR_ENGINE_CHANGES: readonly string[] = [
+  "tail_is_another_route",
+  "tail_of",
+  "ident_is_route",
   "scan_tokens_for_casts",
   "scan_tokens_for_paths",
   "scan_tokens_for_env_calls",
