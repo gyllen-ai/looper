@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
+import { parseDecisions } from "../decisions/store.ts";
 import {
   CSS_SECTION,
+  DECISIONS_PATH,
   ENTRY_SECTION,
   LAW_PATH,
   MAX_LOC_DEFAULT,
@@ -32,6 +34,12 @@ const ALL_RULES = "ALL";
 
 const NAMESPACED = /^[A-Z]+-/;
 
+const ASKED_FIRST: readonly string[] = ["TS-TRUTH:4", "RUST-TRUTH:3"];
+
+export function mustBeAskedFor(ruleId: string): boolean {
+  return ASKED_FIRST.includes(ruleId);
+}
+
 export function withoutLanguage(ruleId: string): string {
   return ruleId.replace(NAMESPACED, "");
 }
@@ -49,6 +57,7 @@ export type Concessions = {
   readonly generated: readonly string[];
   readonly palette: readonly string[];
   readonly zIndexCap: number;
+  readonly backed: readonly string[];
 };
 
 export const CONCEDING_NOTHING: Concessions = {
@@ -64,6 +73,7 @@ export const CONCEDING_NOTHING: Concessions = {
   loggers: [],
   palette: [PALETTE_DEFAULT],
   zIndexCap: Z_INDEX_CAP_DEFAULT,
+  backed: [],
 };
 
 export function isNamed(file: string, names: readonly string[]): boolean {
@@ -101,6 +111,16 @@ function declaredEntries(root: string): readonly string[] {
   return found;
 }
 
+function backedFilesIn(root: string): readonly string[] {
+  const path = join(root, DECISIONS_PATH);
+  if (!existsSync(path)) return [];
+  const found: string[] = [];
+  for (const one of parseDecisions(readFileSync(path, "utf8"))) {
+    for (const file of one.depends) found.push(file);
+  }
+  return found;
+}
+
 function pardonsIn(document: TomlDocument): ReadonlyMap<string, readonly string[]> {
   const table = tableIn(document, EXEMPT_SECTION);
   const pardons = new Map<string, readonly string[]>();
@@ -123,7 +143,12 @@ export function readConcessions(root: string): Concessions {
   const entries = declaredEntries(root);
   const path = join(root, LAW_PATH);
   if (!existsSync(path)) {
-    return { ...CONCEDING_NOTHING, projectRoot: root, entryFiles: entries };
+    return {
+      ...CONCEDING_NOTHING,
+      projectRoot: root,
+      entryFiles: entries,
+      backed: backedFilesIn(root),
+    };
   }
 
   const document = parseToml(readFileSync(path, "utf8"), LAW_PATH);
@@ -149,6 +174,7 @@ export function readConcessions(root: string): Concessions {
     generated: stringsAt(tableIn(document, ROOT_SECTION), "generated", LAW_PATH),
     palette: orElse(oneOrManyAt(css, "palette", LAW_PATH), [PALETTE_DEFAULT]),
     zIndexCap: numberAt(css, "z_max", Z_INDEX_CAP_DEFAULT),
+    backed: backedFilesIn(root),
   };
 }
 
@@ -164,13 +190,23 @@ function pardonedIn(concessions: Concessions, file: string, ruleId: string): boo
 export type Standing =
   | { readonly kind: "stands" }
   | { readonly kind: "disabled" }
+  | { readonly kind: "unbacked" }
   | { readonly kind: "pardoned" };
+
+export function setAside(standing: Standing): boolean {
+  return standing.kind === "disabled" || standing.kind === "pardoned";
+}
 
 export function standingOf(
   concessions: Concessions,
   file: string,
   ruleId: string,
 ): Standing {
+  if (mustBeAskedFor(ruleId)) {
+    if (!pardonedIn(concessions, file, ruleId)) return { kind: "stands" };
+    if (!isNamed(file, concessions.backed)) return { kind: "unbacked" };
+    return { kind: "pardoned" };
+  }
   if (concessions.disabled.includes(ruleId)) return { kind: "disabled" };
   if (pardonedIn(concessions, file, ruleId)) return { kind: "pardoned" };
   return { kind: "stands" };

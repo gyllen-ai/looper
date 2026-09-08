@@ -136,7 +136,7 @@ export const RUST_RULES: readonly Rule[] = [
     instead: [
       "pass it on: `?`, or `return Err(CouldNotRead { path, cause })`",
       "stop: `panic!` or `process::exit` — loud, immediate, and honest about being a dead end",
-      "observe it, then recover: `Err(cause) => { tracing::warn!(?cause, \"cache unreadable, counting again\"); count(source) }`",
+      "observe it, then answer with a named absence: `Err(cause) => { tracing::warn!(?cause, \"cache unreadable\"); Held::Absent }`. Answering by calling a second route is a fallback, which RUST-TRUTH:3 refuses",
     ],
     valve: NO_VALVE,
   },
@@ -337,6 +337,23 @@ export const RUST_RULES: readonly Rule[] = [
       "`let config = Config::from_env()?;` once, at the top",
     ],
     valve: knob("[truth] env_files", "the files allowed to touch the outside world"),
+  },
+  {
+    id: "RUST-TRUTH:3",
+    category: "TRUTH",
+    pass: "fast",
+    bans:
+      "a second route taken because the first one failed or was not there: an `Err` arm whose value comes from calling something else, and a `let \u2026 else` whose else branch calls another route rather than naming the absence",
+    why:
+      "a fallback is a second implementation of the same behaviour, and from the moment it exists nobody can say which one ran. The failure that sent the program down the second path is invisible one line later, so the slow route quietly becomes the normal route and nothing reports it, while the first one rots because it is never the one being read when something looks wrong. It is also the shape that hides an outage: the primary was down for a week and every screen looked fine",
+    instead: [
+      "let the failure travel: `Err(cause) => return Err(CouldNotRead { path, cause })`",
+      "observe it and answer with a named absence, not another route: `Err(cause) => { tracing::warn!(?cause, \"unread\"); Held::Absent }`",
+      "`let Some(row) = table.get(key) else { return Held::Absent };` where the else branch names the absence rather than calling somewhere else",
+      "one route, chosen once where the program is wired up, and passed down",
+      "if the second route is genuinely needed, ask the person whose project this is, say why the first one is not enough, and write the answer down: a `decisions` entry naming the file, what it costs and what would have to be true to take it out again. A pardon here is only honoured while that entry stands",
+    ],
+    valve: knob("[exempt]", "a pardon is honoured only while a decisions entry names the same file; an unbacked pardon is itself a violation"),
   },
   {
     id: "RUST-LOG:1",

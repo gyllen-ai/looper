@@ -1865,6 +1865,70 @@ fields are replaced, the previous file is kept beside it, and init prints what t
 entry was launching and what it launches now, because a repair nobody is told
 about is the same silence as the stale entry.
 
+### The fallback rule: `TS-TRUTH:4` and `RUST-TRUTH:3`
+
+**Added 2026-09-08, asked for directly: a fallback is not allowed, and one that
+is genuinely needed is asked for and explained rather than written.**
+
+A fallback is a second implementation of the same behaviour, reached because the
+first one failed or was not there. Before this rule nothing in any of the five
+languages refused one. Worse, two rules taught it as the approved shape:
+`RUST-ERROR:4` listed "observe it, then recover" as one of three legal doors out
+of an `Err` arm, and `TS-ERROR:3` and `TS-ERROR:4` both spelled the recovery as
+`return count(source)`. All three lines are amended by the same commit, because a
+law that recommends what another rule refuses teaches nothing. `PY-ERROR:2` still
+lists `return fallback.read()` and is left standing, because Python has no
+fallback rule to contradict it.
+
+**What the rule fires on, and what it deliberately does not.** The strictest
+reading that was asked for was measured against this codebase before it was
+built, and three quarters of it turned out to fire on things that are not
+fallbacks:
+
+| candidate | hits | verdict |
+|---|---|---|
+| `#[cfg(windows)]` beside `#[cfg(unix)]` | 60 | **not built.** A target is not a failure. Every hit was a Tauri desktop port |
+| `typeof x === "..."` anywhere | 18 | **narrowed to host objects.** 16 of the 18 were `typeof x === "object"` narrowing a parsed payload at an edge, which is the shape doctrine asks for |
+| a name that confesses: `fallback`, `legacy`, `backup`, `degraded` | about 120 | **not built.** `legacy` was the game's own item table (High External Legacy Gate, Legacy Furnace), `degraded` a health tone, `fallback` a product feature with its own module. A noun detector, not a shape detector |
+| a failure or an absence picks the route | see below | **built** |
+
+So the rule reads a shape, never a word. It fires where a failure or an absence
+selects a second route, and on a capability probe against `window`, `globalThis`,
+`navigator`, `document` or `self`, which is the same thing asked of the host
+instead of the code.
+
+**What it refuses to call a route.** Four exclusions were each added because a
+real hit proved the rule was reading something else: a constructor or associated
+function (`String::from`, `Vec::new`), a conversion (`into_response`, `to_*`,
+`as_*`), a transform on data already in hand (`marks.map(...)`, `collect`), and a
+helper that builds the named absence (`nothing()`, `empty()`). A presence test
+guarding the ordinary path (`if (row !== undefined) return measure(row)`) is not
+an absence test and never fires. In TypeScript a disjunction of two conditions
+(`isA(x) || isB(x)`) is told from a default (`x || slow()`) by whether the left
+side is a place, which is the same test the Rust half has always used.
+
+**Measured on the RustOnTop codebase, 2026-09-08:** 2 hits in 300 TypeScript
+files, 36 hits in 23 Rust files. The largest cluster, 8 hits in
+`crates/rustplus/src/session/socket.rs`, is a decoder for a protobuf with no
+oneof tag, so it probes optional fields in order. That is structurally identical
+to a fallback chain and cannot be told from one by shape. It is the case the
+`decisions` ledger exists for.
+
+**The way through is a person, and it is wired.** Doctrine refuses a barrier that
+is only described, so the concession is not the honour system: a pardon for
+either rule is honoured only while a `decisions` entry names the same file, and a
+pardon without one is itself a violation. That is what makes "ask first" real
+rather than advisory. The entry says what was asked, why the first route is not
+enough, what it costs, and what would have to be true to take it out again.
+
+**Python was left out on purpose** (2026-09-08). The same harm exists there and
+the reader could see it; it was descoped by the person asking, not by
+measurement. Python also still has no rule for a value default at all:
+`cfg.get("size", 20)` and `os.environ.get("SIZE", "20")` are silent where
+`x ?? 20` and `unwrap_or(20)` are refused. That gap is recorded here and not yet
+built.
+
+
 ### What the law defends, and which language answers it
 
 **Added 2026-08-18, from issue #63.** Three languages, sixty-three rules, and
@@ -1888,6 +1952,7 @@ Every rule the engine loads appears exactly once below, and
 | the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
 | the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
 | "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` `TS-TRUTH:3` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
+| a failure or an absence quietly takes a second route | `TS-TRUTH:4` | `RUST-TRUTH:3` | **left out on purpose**, 2026-09-08, measured below | none built | a stylesheet takes no route |
 | output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
 | a log line cannot be asked a question, because the value is inside the sentence | `TS-LOG:3` | `RUST-LOG:3` | `PY-LOG:3` | none built | a stylesheet writes no logs |
 | the shape of the code hides what it does | `TS-DECOMPOSITION:1` `TS-LAYER:2` `TS-LAYER:3` `TS-DEAD:4` | `RUST-DECOMPOSITION:1` `RUST-DECOMPOSITION:2` `RUST-DECOMPOSITION:3` `RUST-LAYER:1` `RUST-LAYER:2` `RUST-LAYER:3` `RUST-DEAD:4` | `PY-LAYER:1`, and **open on purpose** — 500 does not port, measured below | none built | `CSS-LAYER:1` `CSS-TRUTH:2` |

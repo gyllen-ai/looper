@@ -30,6 +30,16 @@ else.
 change is listed here so that whoever copies a newer lawkeeper in knows what to
 put back, and `tests/invariants.test.ts` fails until they do.
 
+`TRUTH:3`, the fallback rule, is ours end to end: the `FallbackRoute` variant in
+`src/violation.rs`, its help in `src/helps.rs`, `tail_of`,
+`tail_is_another_route`, `ident_is_route` and their exclusion lists in
+`src/patterns.rs`, `expr_mentions` in `src/bodies.rs`, and the two places
+`src/visitor.rs` fires it: an `Err` arm whose tail calls another route, and a
+`let ... else` whose else branch does. lawkeeper has no rule about a second
+route, so a newer copy will not carry any of it. `tests/invariants.test.ts`
+fails if `tail_of`, `tail_is_another_route` or `ident_is_route` go missing from
+`patterns.rs`.
+
 One attribute in
 `src/config.rs`: `#[serde(default, deny_unknown_fields)]` on `LawConfig` became
 `#[serde(default)]`. With it, any top-level table the engine does not own — the

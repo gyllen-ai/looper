@@ -81,6 +81,7 @@ pub enum Rule {
     GlobImport,
     ScatteredDefault,
     EnvOutsideSanctum,
+    FallbackRoute,
     StrayPrint,
     StrayHandle,
     ValueInMessage,
@@ -114,6 +115,7 @@ impl Rule {
         Rule::GlobImport,
         Rule::ScatteredDefault,
         Rule::EnvOutsideSanctum,
+        Rule::FallbackRoute,
         Rule::StrayPrint,
         Rule::ValueInMessage,
         Rule::StrayHandle,
@@ -147,6 +149,7 @@ impl Rule {
             Rule::GlobImport => "DEAD:4",
             Rule::ScatteredDefault => "TRUTH:1",
             Rule::EnvOutsideSanctum => "TRUTH:2",
+            Rule::FallbackRoute => "TRUTH:3",
             Rule::StrayPrint => "LOG:1",
             Rule::ValueInMessage => "LOG:3",
             Rule::StrayHandle => "LOG:2",
@@ -174,7 +177,9 @@ impl Rule {
             Rule::DeadSuppression | Rule::Comment | Rule::Unfinished | Rule::GlobImport => {
                 Category::Dead
             }
-            Rule::ScatteredDefault | Rule::EnvOutsideSanctum => Category::Truth,
+            Rule::ScatteredDefault | Rule::EnvOutsideSanctum | Rule::FallbackRoute => {
+                Category::Truth
+            }
             Rule::StrayPrint | Rule::StrayHandle | Rule::ValueInMessage => Category::Log,
             Rule::InlineTest => Category::Tests,
         }

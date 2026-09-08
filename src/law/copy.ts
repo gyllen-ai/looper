@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import { standingOf, type Concessions } from "./concessions.ts";
+import { setAside, standingOf, type Concessions } from "./concessions.ts";
 import type { Rule, Violation } from "./rule.ts";
 
 export const VARIANT_FILE: Rule = {
@@ -75,7 +75,7 @@ export function variantsIn(
 ): readonly Violation[] {
   const found: Violation[] = [];
   for (const path of named) {
-    if (standingOf(concessions, path, VARIANT_FILE.id).kind !== "stands") continue;
+    if (setAside(standingOf(concessions, path, VARIANT_FILE.id))) continue;
     const name = basename(path);
     const stem = originalStemFor(name);
     if (stem.length === 0) continue;

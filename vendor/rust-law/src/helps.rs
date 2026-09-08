@@ -27,6 +27,7 @@ pub fn help_for(rule: Rule) -> &'static str {
         Rule::GlobImport => GLOB_IMPORT,
         Rule::ScatteredDefault => SCATTERED_DEFAULT,
         Rule::EnvOutsideSanctum => ENV_OUTSIDE_SANCTUM,
+        Rule::FallbackRoute => FALLBACK_ROUTE,
         Rule::StrayPrint => STRAY_PRINT,
         Rule::ValueInMessage => VALUE_IN_MESSAGE,
         Rule::StrayHandle => STRAY_HANDLE,
@@ -411,4 +412,21 @@ const INLINE_TEST: &str = concat!(
     "    reach it is the evasion this rule exists to prevent: it widens the public surface forever to\n",
     "    keep a private test.\n",
     "    a file under a tests/ directory, or outside src/ entirely, is never judged by this rule.",
+);
+
+const FALLBACK_ROUTE: &str = concat!(
+    "a second route taken because the first one failed or was not there: an Err arm whose value\n",
+    "    comes from calling something else, or a `let ... else` whose else branch calls another route.\n",
+    "    why: a fallback is a second implementation of the same behaviour, and from the moment it\n",
+    "    exists nobody can say which one ran. the failure that sent the program down the second path\n",
+    "    is invisible one line later, so the slow route quietly becomes the normal route and nothing\n",
+    "    reports it, while the first one rots because it is never the one being read when something\n",
+    "    looks wrong. it is also the shape that hides an outage: the primary was down for a week and\n",
+    "    every screen looked fine.\n",
+    "    legal: `Err(cause) => return Err(CouldNotRead { path, cause })` | `Err(cause) => { warn!(?cause, \"unread\"); Held::Absent }`\n",
+    "    legal: `let Some(row) = table.get(key) else { return Held::Absent };` — a named absence, not a call\n",
+    "    if the second route is genuinely needed, ask the person whose project this is, say why the\n",
+    "    first one is not enough, and write the answer down: a `decisions` entry naming the file, what\n",
+    "    it costs and what would have to be true to take it out again. a pardon in law.toml is honoured\n",
+    "    only while that entry stands.\n",
 );

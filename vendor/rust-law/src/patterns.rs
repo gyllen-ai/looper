@@ -873,3 +873,86 @@ pub fn scan_tokens_for_banned(tokens: TokenStream, banned: &[&str], out: &mut Ve
         }
     }
 }
+
+pub const NOT_A_ROUTE: &[&str] = &[
+    "to_string", "to_owned", "to_vec", "to_path_buf", "clone", "into", "as_str", "as_ref",
+    "as_slice", "as_deref", "iter", "into_iter", "collect", "map", "filter", "len", "is_empty",
+    "join", "chars", "bytes", "trim", "split", "to_lowercase", "to_uppercase",
+];
+
+const A_CONVERSION: &[&str] = &["into_", "to_", "as_", "from_", "try_into", "try_from"];
+
+const A_NAMED_ABSENCE: &[&str] = &[
+    "nothing", "none", "empty", "absent", "missing", "blank", "unknown", "nobody", "no_one",
+    "refused", "refuse", "refusal",
+];
+
+pub fn ident_is_route(name: &str) -> bool {
+    if NOT_A_ROUTE.contains(&name) {
+        return false;
+    }
+    if A_CONVERSION.iter().any(|prefix| name.starts_with(prefix)) {
+        return false;
+    }
+    if A_NAMED_ABSENCE.contains(&name) {
+        return false;
+    }
+    let Some(first) = name.chars().next() else {
+        return false;
+    };
+    first.is_lowercase()
+}
+
+fn names_a_type(segs: &[String]) -> bool {
+    let Some((_last, before)) = segs.split_last() else {
+        return false;
+    };
+    before.iter().any(|seg| match seg.chars().next() {
+        Some(first) => first.is_uppercase(),
+        None => false,
+    })
+}
+
+pub fn tail_of(expr: &syn::Expr) -> &syn::Expr {
+    match expr {
+        syn::Expr::Block(b) => match b.block.stmts.last() {
+            Some(syn::Stmt::Expr(inner, None)) => tail_of(inner),
+            Some(syn::Stmt::Expr(inner, Some(_semi))) if leaves_the_block(inner) => tail_of(inner),
+            _ => expr,
+        },
+        syn::Expr::Return(r) => match &r.expr {
+            Some(inner) => tail_of(inner),
+            None => expr,
+        },
+        syn::Expr::Paren(p) => tail_of(&p.expr),
+        syn::Expr::Group(g) => tail_of(&g.expr),
+        syn::Expr::Await(a) => tail_of(&a.base),
+        syn::Expr::Try(t) => tail_of(&t.expr),
+        _ => expr,
+    }
+}
+
+fn leaves_the_block(expr: &syn::Expr) -> bool {
+    matches!(
+        expr,
+        syn::Expr::Return(_) | syn::Expr::Break(_) | syn::Expr::Continue(_)
+    )
+}
+
+fn call_is_route(c: &syn::ExprCall) -> bool {
+    let syn::Expr::Path(p) = &*c.func else {
+        return false;
+    };
+    if names_a_type(&path_segs(&p.path)) {
+        return false;
+    }
+    ident_is_route(&path_last(&p.path))
+}
+
+pub fn tail_is_another_route(expr: &syn::Expr) -> bool {
+    match tail_of(expr) {
+        syn::Expr::MethodCall(m) => ident_is_route(&m.method.to_string()),
+        syn::Expr::Call(c) => call_is_route(c),
+        _ => false,
+    }
+}

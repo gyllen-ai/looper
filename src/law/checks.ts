@@ -20,6 +20,7 @@ import { outsideWorldCheck } from "./ts/outside-world.ts";
 import { strayPrintCheck } from "./ts/stray-print.ts";
 import { valueInMessageCheck } from "./ts/value-in-message.ts";
 import { bornDefaultCheck } from "./ts/born-default.ts";
+import { fallbackRouteCheck } from "./ts/fallback-route.ts";
 import { stubValueCheck } from "./ts/stub-value.ts";
 import { unreadableFileCheck } from "./ts/unreadable.ts";
 import { conjuredCodeCheck } from "./ts/conjured-code.ts";
@@ -41,6 +42,7 @@ import type { Check } from "./engine.ts";
 
 export const CHECKS: readonly Check[] = [
   bornDefaultCheck,
+  fallbackRouteCheck,
   unreadableFileCheck,
   stubValueCheck,
   vanishedErrorCheck,
