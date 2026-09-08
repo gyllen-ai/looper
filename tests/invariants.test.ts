@@ -10,8 +10,7 @@ import { scanText } from "../src/secrets/capability.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
-import { ourFiles, sourceFiles } from "./our-files.ts";
-
+import { ourFiles } from "./our-files.ts";
 
 const SPAWN_CAPABLE = "node:child_process";
 
@@ -52,15 +51,11 @@ function installedPackages(): readonly string[] {
   return found;
 }
 
-
-
-
 const MAY_SPAWN: readonly string[] = [
   SPAWN_SANCTUM,
   "law/rust/drive.ts",
   "law/python/drive.ts",
   "law/csharp/drive.ts",
-  "seer/drive.ts",
   "loop/run.ts",
 ];
 
@@ -88,42 +83,11 @@ test("the loop runner starts only what this project declared, and never on a hoo
   );
 });
 
-test("the seer starts a shell, and only ever hands it looper's own script", () => {
-  const text = readFileSync(join(ROOT, "src", "seer", "drive.ts"), "utf8");
-  assert.ok(
-    text.includes("captureWith(WINDOWS_SHELL,") && text.includes("standingWith(WINDOWS_SHELL,"),
-    "the seer reaches its capturer through PowerShell since 2026-08-19, because the shim that used to sit between them lost the difference between a consent window that is closed and a window that is not ticked. WINDOWS_SHELL is the only program it ever passes",
-  );
-  const reached = ourFiles().filter((file) => {
-    if (file.endsWith("seer/drive.ts")) return false;
-    const held = readFileSync(file, "utf8");
-    return held.includes("captureWith(") || held.includes("standingWith(");
-  });
-  assert.deepEqual(
-    reached,
-    [],
-    "captureWith and standingWith take the program to run as an argument, which exists so a test can hand them a fake. Nothing in looper may call them: the only callers are capture and standing, in the same file, and they pass WINDOWS_SHELL",
-  );
-  assert.ok(
-    text.includes("scriptFor(looperRoot)"),
-    "whatever PowerShell is handed must come from seerAt, under looper's own directory. A window title is data and never reaches the command line as anything else",
-  );
-  assert.ok(
-    !text.includes("shell: true") && !text.includes("execSync("),
-    "a shell that parses its own string is how a window title becomes a command",
-  );
-  assert.ok(
-    text.includes('execFileSync("wslpath"'),
-    "the only other program it starts is wslpath, handed looper's own path so a Windows PowerShell can find a script that lives inside WSL",
-  );
-});
-
 test("the files that may start a process start only what they were allowed to", () => {
   const starts: Record<string, string> = {
     [SPAWN_SANCTUM]: '"git"',
     "law/rust/drive.ts": '"cargo"',
     "law/csharp/drive.ts": '"dotnet"',
-    "seer/drive.ts": '"wslpath"',
   };
   for (const [file, expected] of Object.entries(starts)) {
     const text = readFileSync(join(ROOT, "src", file), "utf8");
@@ -163,15 +127,11 @@ test("no dependency runs code at install time", () => {
 });
 
 test("no install can arrive able to look at a screen", () => {
-  const tracked = execFileSync("git", ["ls-files", "vendor/seer"], { cwd: ROOT, encoding: "utf8" });
+  const tracked = execFileSync("git", ["ls-files", "*seer*"], { cwd: ROOT, encoding: "utf8" });
   assert.equal(
     tracked.trim(),
     "",
-    "a capture program is committed. Nothing that can photograph somebody's screen may travel with looper: it is installed deliberately, on the machine whose screen it is, and vendor/seer/ is ignored so it cannot be committed by accident.",
-  );
-  assert.ok(
-    readFileSync(join(ROOT, ".gitignore"), "utf8").includes("vendor/seer/"),
-    "vendor/seer/ is not ignored, so an installed capture program can be committed by a careless git add -A",
+    "a capture program is committed. looper carried one until 2026-09-08 and it was removed whole; nothing that can photograph somebody's screen travels with looper, and this is what keeps it from coming back by accident.",
   );
 
   const shipped = manifestAt(join(ROOT, "package.json"))["files"];
@@ -181,60 +141,6 @@ test("no install can arrive able to look at a screen", () => {
       !String(part).includes("seer"),
       `the package ships ${String(part)}, which would carry a capture program to every machine that installs looper`,
     );
-  }
-});
-
-const NAMES_A_WINDOW = 'writeFileSync(ask, window, "utf8")';
-const ONLY_THE_EXCHANGE = "mkdirSync(exchangeAt(), { recursive: true })";
-
-function callsTo(text: string, named: string): readonly string[] {
-  const found: string[] = [];
-  let at = text.indexOf(`${named}(`);
-  while (at !== -1) {
-    let depth = 0;
-    let end = at + named.length;
-    for (; end < text.length; end += 1) {
-      const here = text[end];
-      if (here === "(") depth += 1;
-      if (here === ")") {
-        depth -= 1;
-        if (depth === 0) {
-          end += 1;
-          break;
-        }
-      }
-    }
-    found.push(text.slice(at, end));
-    at = text.indexOf(`${named}(`, end);
-  }
-  return found;
-}
-
-test("looper cannot record consent, because consent is not its to record", () => {
-  for (const file of sourceFiles(join(ROOT, "src", "seer"))) {
-    const text = readFileSync(file, "utf8");
-    for (const written of ["writeAtomically", "appendFileSync"]) {
-      assert.ok(
-        !text.includes(written),
-        `${file} keeps something on disk. Whether a window may be looked at is decided by the person at the machine, in a process looper does not own — anything looper can write, whoever is talking to the agent can have it write, and anything it can add to it can be grown into a record.`,
-      );
-    }
-
-    for (const call of callsTo(text, "mkdirSync")) {
-      assert.equal(
-        call,
-        ONLY_THE_EXCHANGE,
-        `${file} makes ${call}. The only folder the seer may make is the one the live capturer trades through; a name is a place to put data too.`,
-      );
-    }
-
-    for (const call of callsTo(text, "writeFileSync")) {
-      assert.equal(
-        call,
-        NAMES_A_WINDOW,
-        `${file} writes ${call}. The seer may write one thing: the name of a window, into the file the live capturer reads, and nothing else. A request names a subject and decides nothing — the consent window is still asked on every capture — but a seer that can write anything else can be made to write a record of permission it was never given.`,
-      );
-    }
   }
 });
 
