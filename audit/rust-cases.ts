@@ -144,4 +144,6 @@ export const RUST_CASES: readonly RustCase[] = [
     code: `pub struct Marks;\npub fn read(seen: Option<u8>) -> Marks { let Some(_n) = seen else { return nothing(); }; Marks }\nfn nothing() -> Marks { Marks }` },
   { rule: "RUST-TRUTH:3", name: "cfg twin bodies are a port, not a fallback", expect: "silent",
     code: `#[cfg(windows)]\npub fn now() -> u8 { 1 }\n#[cfg(unix)]\npub fn now() -> u8 { 2 }` },
+  { rule: "RUST-TRUTH:3", name: "an Err arm answered by a helper that names the refusal", expect: "silent",
+    code: `pub struct Refusal;\npub fn read(p: &str) -> Result<u8, Refusal> { match fast(p) { Ok(n) => Ok(n), Err(cause) => { tracing::warn!(?cause, "unread"); refused("the reader did not answer") } } }\nfn refused(_why: &str) -> Result<u8, Refusal> { Err(Refusal) }\nfn fast(_p: &str) -> Result<u8, Refusal> { Ok(1) }` },
 ];

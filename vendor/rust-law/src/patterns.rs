@@ -884,6 +884,7 @@ const A_CONVERSION: &[&str] = &["into_", "to_", "as_", "from_", "try_into", "try
 
 const A_NAMED_ABSENCE: &[&str] = &[
     "nothing", "none", "empty", "absent", "missing", "blank", "unknown", "nobody", "no_one",
+    "refused", "refuse", "refusal",
 ];
 
 pub fn ident_is_route(name: &str) -> bool {
