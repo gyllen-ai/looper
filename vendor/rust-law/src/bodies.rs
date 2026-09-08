@@ -154,3 +154,23 @@ impl<'ast> Visit<'ast> for DropScan {
         syn::visit::visit_pat(self, node);
     }
 }
+
+pub fn expr_mentions(expr: &syn::Expr, names: &[String]) -> bool {
+    let mut scan = MentionScan { names, found: false };
+    scan.visit_expr(expr);
+    scan.found
+}
+
+struct MentionScan<'c> {
+    names: &'c [String],
+    found: bool,
+}
+
+impl<'ast, 'c> Visit<'ast> for MentionScan<'c> {
+    fn visit_ident(&mut self, node: &'ast proc_macro2::Ident) {
+        if self.names.contains(&node.to_string()) {
+            self.found = true;
+        }
+        syn::visit::visit_ident(self, node);
+    }
+}

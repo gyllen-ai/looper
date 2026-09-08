@@ -16,7 +16,7 @@ export const VANISHED_ERROR: Rule = {
   instead: [
     "catch (cause) { throw new CouldNotRead(path, cause) }",
     "catch (cause) { return { kind: 'unreadable', detail: String(cause) } }",
-    "catch (cause) { logger.warn({ cause }, 'cache unreadable, counting again'); return count(source) }",
+    "catch (cause) { logger.warn({ cause }, 'cache unreadable'); return { kind: 'absent' } }, which observes it and answers with a named absence. Answering by calling a second route is a fallback, which TS-TRUTH:4 refuses",
     ".catch((cause) => { throw new CouldNotSave(id, cause) })",
   ],
   valve: {
@@ -47,7 +47,7 @@ function mentions(value: unknown, carrying: ReadonlySet<string>): boolean {
   return found;
 }
 
-function convertsOnly(callee: unknown): boolean {
+export function convertsOnly(callee: unknown): boolean {
   const name = fieldAt(callee, "name");
   if (typeof name === "string" && PURE_CONVERSIONS.includes(name)) return true;
   const property = fieldAt(fieldAt(callee, "property"), "name");

@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { PYTHON_EXTENSION, RUST_EXTENSION, CSHARP_EXTENSIONS } from "../config.ts";
 import { reasonFrom } from "../fields.ts";
 import { required } from "../present.ts";
-import { readConcessions, standingOf } from "./concessions.ts";
+import { readConcessions, setAside, standingOf } from "./concessions.ts";
 import { judgeCsharp } from "./csharp/drive.ts";
 import { csharpRuleFor } from "./csharp/rules.ts";
 import { judgePython } from "./python/drive.ts";
@@ -158,7 +158,7 @@ export function judgePythonIn(root: string, files: readonly string[]): PythonSai
       continue;
     }
     const named = relative(root, hit.file);
-    if (standingOf(concessions, named, known.id).kind !== "stands") continue;
+    if (setAside(standingOf(concessions, named, known.id))) continue;
     violations.push({ rule: known, file: named, line: hit.line });
   }
   return { violations, unreadable, unjudged: said.unreadable.length };
@@ -193,7 +193,7 @@ export function judgeCsharpIn(root: string, files: readonly string[]): PythonSai
       unreadable.push(`the C# half reported ${hit.rule}, which looper has no words for`);
       continue;
     }
-    if (standingOf(concessions, hit.file, known.rule.id).kind !== "stands") continue;
+    if (setAside(standingOf(concessions, hit.file, known.rule.id))) continue;
     violations.push({ rule: known.rule, file: hit.file, line: hit.line });
   }
   return { violations, unreadable, unjudged: said.unreadable.length };

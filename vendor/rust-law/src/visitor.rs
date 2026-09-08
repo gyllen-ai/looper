@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use crate::bodies::{arm_facts, drop_body_lines, ArmFacts};
+use crate::bodies::{arm_facts, drop_body_lines, expr_mentions, ArmFacts};
 use crate::config::{file_matches, LawConfig};
 use crate::shapes::{
     collect_results, erased_error_carrier, shape_of_type, sig_option_lines, type_holds_callable,
@@ -17,8 +17,8 @@ use crate::patterns::{
     scan_tokens_for_casts, scan_tokens_for_env_calls, scan_tokens_for_env_macros,
     scan_tokens_for_macros,
     scan_tokens_for_mangle, scan_tokens_for_names, scan_tokens_for_paths, tail_diverges,
-    tail_is_stub, text_reads_env_door, tokens_contain_fallible_ctor, tokens_name_a_cargo_key,
-    type_is_guard, vis_is_public,
+    tail_is_another_route, tail_is_stub, tail_of, text_reads_env_door,
+    tokens_contain_fallible_ctor, tokens_name_a_cargo_key, type_is_guard, vis_is_public,
     wild_under_fallible_ctor,
 };
 use crate::provenance::Provenance;
@@ -483,6 +483,9 @@ impl<'c> Judge<'c> {
         if !facts.propagates && !facts.has_crash && !observed {
             self.hit(Rule::VanishedError, line);
         }
+        if takes_another_route(&arm.body, &bindings) {
+            self.hit(Rule::FallbackRoute, line);
+        }
     }
 
     fn judge_none_arm(&mut self, arm: &syn::Arm, line: usize) {
@@ -495,6 +498,22 @@ impl<'c> Judge<'c> {
 
     fn arm_facts(&self, arm: &syn::Arm, bindings: &[String]) -> ArmFacts {
         arm_facts(&self.prov, arm, bindings)
+    }
+
+    fn judge_let_else(&mut self, node: &syn::Local, line: usize) {
+        let Some(init) = &node.init else {
+            return;
+        };
+        let Some((_else_token, otherwise)) = &init.diverge else {
+            return;
+        };
+        if !pat_mentions_fallible(&node.pat) {
+            return;
+        }
+        if !tail_is_another_route(otherwise) {
+            return;
+        }
+        self.hit(Rule::FallbackRoute, line);
     }
 }
 
@@ -727,6 +746,7 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
             self.hit(Rule::SilentOp, line);
         }
         self.local_binding_check(node, line);
+        self.judge_let_else(node, line);
         syn::visit::visit_local(self, node);
     }
 
@@ -775,3 +795,10 @@ fn last_banned(segs: &[String]) -> bool {
     BANNED_METHODS.iter().any(|m| m == last)
 }
 
+
+fn takes_another_route(body: &syn::Expr, bindings: &[String]) -> bool {
+    if !tail_is_another_route(body) {
+        return false;
+    }
+    !expr_mentions(tail_of(body), bindings)
+}

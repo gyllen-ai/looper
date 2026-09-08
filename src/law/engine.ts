@@ -1,5 +1,5 @@
 import { RuleOnTheWrongPass } from "../errors.ts";
-import { standingOf, type Concessions } from "./concessions.ts";
+import { setAside, standingOf, type Concessions } from "./concessions.ts";
 import type { Pass, Role, Rule, Violation } from "./rule.ts";
 
 export type Subject = {
@@ -42,7 +42,7 @@ export function judge(
     if (!applies(check, pass)) continue;
     if (!belongsHere(check.rule, subject.role)) continue;
     const standing = standingOf(concessions, subject.file, check.rule.id);
-    if (standing.kind !== "stands") {
+    if (setAside(standing)) {
       conceded.push(`${check.rule.id} (${standing.kind})`);
       continue;
     }

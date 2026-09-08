@@ -15,7 +15,7 @@ export const STUB_VALUE: Rule = {
   instead: [
     "throw new NotFound(id)",
     "catch (cause) { throw new CouldNotRead(path, cause) }",
-    "catch (cause) { logger.warn({ cause }, 'cache unreadable, counting again'); return count(source) }",
+    "catch (cause) { logger.warn({ cause }, 'cache unreadable'); return { kind: 'absent' } }, which observes it and answers with a named absence. Answering by calling a second route is a fallback, which TS-TRUTH:4 refuses",
     "if the handler's answer is one the `try` already returns, return it from inside the `try` too — a check before the `try` does not count, because the value has to stand on the success path for a reader to see it is the answer rather than a patch over the failure",
   ],
   valve: { kind: "none" },
