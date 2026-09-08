@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 import type { HookSpec } from "./types.ts";
 
@@ -168,44 +168,6 @@ export const STACK_PATH = "CURRENTSTACK.md";
 export const HOOK_TIMEOUT_SECONDS = 30;
 
 export const COMMIT_GATE_TIMEOUT_SECONDS = 300;
-
-export const SEER_DIR = "vendor/seer";
-
-export const SEER_CAPTURE = "windows/capture.ps1";
-
-export const SEER_CONSENT = "windows/consent.ps1";
-
-export const SEER_EXCHANGE_DIR = ".looper-seer";
-
-export const SEER_ASK = "ask.txt";
-
-export const SEER_SAID = "said.json";
-
-export const SEER_LIVE_WAIT_MS = 400;
-
-export const SEER_STARTING_WAIT_MS = 12000;
-
-export const WINDOWS_SHELL = "powershell.exe";
-
-const KERNEL_NAMED = "/proc/version";
-
-const WSL_DISTRO = "WSL_DISTRO_NAME";
-
-export function underWsl(): boolean {
-  if (process.platform !== "linux") return false;
-  const named = process.env[WSL_DISTRO];
-  if (named !== undefined && named.length > 0) return true;
-  if (!existsSync(KERNEL_NAMED)) return false;
-  return readFileSync(KERNEL_NAMED, "utf8").toLowerCase().includes("microsoft");
-}
-
-export const SEER_TOOL = "see";
-
-export const SEER_TIMEOUT_MS = 20_000;
-
-export const SEER_MAX_OUTPUT = 64_000_000;
-
-export const SEER_NAME_LIMIT = 200;
 
 export const REPORT_PATH = ".looper/report.md";
 

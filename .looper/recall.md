@@ -9,15 +9,6 @@ Delete an entry the moment it stops being true.
 ## 2026-08-20 — A Claude Code hook may write at most 10,000 bytes to stdout, newline included
 Measured 2026-08-20 against Claude Code 2.1.236 by emitting exactly N characters from a UserPromptSubmit hook with a sentinel at each end and asking the agent to quote the last thirty. 9,999 and 10,000 arrive whole. 10,001 is written to a file and replaced with a 2,000-character preview and a path, so crossing the line loses almost everything rather than the tail. The limit counts every byte the hook writes: 9,999 characters plus a newline is 10,000 and arrives, 10,000 plus a newline does not. A hook that prints with echo spends one of the ten thousand on the newline. This is why INJECTION_BUDGET is 9,800 and why src/allocator.ts cuts to the ceiling rather than letting anything past it.
 
-## 2026-08-20 — Windows PowerShell 5.1 breaks three ways when scripts live on a WSL path
-All three found on 2026-08-20 building the seer's live capturer, each costing a debugging round.
-
-.NET refuses to load an assembly from a \\wsl.localhost path: "Operation is not supported. (Exception from HRESULT: 0x80131515)". It counts as a remote assembly. So compiling a P/Invoke helper once with -OutputAssembly and loading it with Add-Type -Path does not work while the tree lives in WSL, and the 170ms Add-Type compile cannot be cached that way.
-
-Set-Content cannot create a new file on a UNC path, giving GetContentWriterFileNotFoundError. [System.IO.File]::WriteAllText can. Move-Item -Force works where [System.IO.File]::Move($a,$b,$true) does not, because the three-argument overload is .NET Core only and 5.1 has .NET Framework's two-argument one.
-
-Get-Content -Raw decodes as ANSI, not UTF-8. A window title containing an em dash read back mangled, never matched what the consent window had ticked, and every capture came back refused — which reads exactly like a consent bug and is not one. [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) is the fix.
-
 ## 2026-08-20 — The MCP server holds the code it started with, so its answers can be older than the tree
 The hooks in .claude/settings.json run as commands, so every prompt and every tool call is a fresh process on current code. looper serve is one long-lived process that reads its modules once. Upgrading mid-session leaves the two halves disagreeing, and the stale half is the one that explains rather than the one that enforces.
 

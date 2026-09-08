@@ -578,13 +578,13 @@ ever read is the same failure with more steps**, and nothing refuses it. A
 diagnostic written into a process on an end user's machine, reaching no collector
 and no operator, is a swallowed exception that took longer and looked responsible.
 
-### 5. Looking without touching
+### 5. Looking at all
 
-The seer can see a window and cannot act in it. An agent that needs one control
-toggled to distinguish two hypotheses must ask a person and wait, and the round
-trip costs more than the observation was worth. Whether the answer is letting it
-act is a consent question this document is not ready to settle; the asymmetry is
-recorded because it is paid for regularly.
+looper cannot see a running interface. It had a seer from 2026-08-18 until
+2026-09-08 — a tool that photographed one ticked window — and it was removed, so
+"done means it was demonstrated actually working" is prose again for anything
+with a screen. What replaces it is a question this document is not ready to
+settle, and the gap is recorded because it is paid for on every interface change.
 
 ## The canon is a tree, and the tree is how it scales
 
@@ -1768,14 +1768,12 @@ Working inside this repository is unaffected: the `dev` invocation still runs
 `node ./src/main.ts` straight from the checkout, where type stripping works.
 
 **Which machines this runs on, and which claim is not yet evidence.** Nothing
-platform-specific ships: the only place `process.platform` appears in `src/` is
-the seer's path lookup, which on a Mac finds no capture program and therefore
-offers no `see` tool — the correct answer rather than a failure. The git hooks
-init writes are `#!/bin/sh`, and `wslpath` and `powershell.exe` live only under
-`seer/`, which is not in the package. So macOS should work — and *should* was the word that did not belong here, since
-it had never been run there. **It has now: the suite passes on macOS in CI,
-2026-08-18, alongside Linux on Node 22.18.0, 24 and 26.** What a Mac does not get
-is the seer, which has no macOS pair.
+platform-specific ships: since the seer was removed on 2026-09-08, `src/` does
+not name `process.platform` at all, and nothing here starts PowerShell or
+`wslpath`. The git hooks init writes are `#!/bin/sh`. So macOS should work — and
+*should* was the word that did not belong here, since it had never been run
+there. **It has now: the suite passes on macOS in CI, 2026-08-18, alongside Linux
+on Node 22.18.0, 24 and 26.**
 
 **Which Node versions this was run on, 2026-08-18.** The suite passes on 22.23.2,
 24.19.0 and 26.7.0 — 333 tests, three times. A packed install wires a project and
@@ -2341,133 +2339,29 @@ anyone in work they did not ask for. That machinery already exists and adoption
 gets it for free — which also means a wrongly adopted rule costs a deletion
 rather than a crisis.
 
-## The seer: an agent that can look, and cannot look at anything it was not shown
+## The seer was removed, and looper cannot look at a screen at all
 
-Proposed by an adopting agent as issue #10, and taken on 2026-08-18. The canon
-says done means the thing was demonstrated actually working, and for anything
-with an interface that sentence is prose today — an agent with no eyes reports
-what it believes. The failures it named are the ordinary ones: a screen called
-working from a rig that could not have rendered it, an error overlay left up
-because a compiler was happy.
+Taken on 2026-08-18 from adopting issue #10 and removed on 2026-09-08 at the
+owner's decision. It was an MCP tool, `see`, that photographed one window on the
+machine — only a window the person had ticked in a consent program looper did not
+own — so that "it works" could be something an agent saw rather than something it
+believed.
 
-**The whole design is one sentence: looper never decides whether a capture may
-happen.** It cannot be trusted to, and not because of any defect in it — whoever
-writes the prompt chooses what the agent asks for, so a decision made inside
-looper is a decision made by whoever last talked to the agent. The decision lives
-in a consent process the person at the machine controls, and the capture program
-asks that process before every capture. looper drives the program and reads its
-answer, exactly the way it drives the Rust engine.
+What went with it: `src/seer/`, the two PowerShell programs under `seer/`, the
+twelve `SEER_*` settings, `WINDOWS_SHELL` and `underWsl()` in `src/config.ts`,
+`tests/seer.test.ts`, and the three guards in `tests/invariants.test.ts` that
+held it — that it started only PowerShell with looper's own script, that it wrote
+nothing but a window name, and that no capture program was ever committed. The
+last of those is kept in a narrower form: nothing under a path naming a seer may
+be tracked, and the package may not ship one, so it cannot come back by accident.
 
-**The seam, exit codes as protocol.** `looper-seer` is run with an argument list,
-never a shell line, and answers on stdout with one JSON object:
+`src/` no longer names `process.platform` anywhere, and nothing in looper starts
+PowerShell.
 
-| exit | means |
-|---|---|
-| 0 | `{"images":[{"label","media","base64","state"}],"missing":[…]}` — `missing` is named, never silently dropped, and `state` is `rendering`, `minimised` or `blank` |
-| 3 | there is no window by that name |
-| 5 | disarmed: the person has not armed this target |
-| anything else | unavailable, and looper says so rather than guessing |
-
-**The ceiling on one answer, 64 MB.** The picture crosses that seam as base64
-inside the JSON, and Node's default buffer for a child process is 1 MB: past it
-the child is killed and the answer is discarded, which reads as the seer being
-broken rather than the pipe being too narrow. Measured 2026-08-18 on WSL, one
-1433x1254 window: 3,060,240 bytes of JSON carrying a 2,295,098 byte PNG, which is
-an ordinary window on an ordinary display and three times over the default. A 4K
-window is roughly four times that again, so the ceiling is 64 MB — past any real
-screen, still short of a runaway. `tests/seer.test.ts` holds it with an answer the
-default would have thrown away.
-
-**A branch name is a file stem, not a path, 2026-08-18.** The `doctrine` tool
-takes a name from the agent and the project half joined it straight onto the
-doctrine directory, so `../../notes` read a file beside the project and
-`../../../elsewhere` read one outside it entirely. Any `.md` file the process
-could open was reachable by asking for it. The canon half was never exposed: it
-checks the name against a fixed list first. Names are now file stems
-(`^[A-Za-z0-9][A-Za-z0-9._-]*$`, no `..`), which is what `listBranches` can
-produce anyway, and `tests/mcp.test.ts` holds it. The seer had the property
-already, for the same reason it was designed with: what the agent supplies is one
-title, and nothing it names selects a path.
-
-**Off unless somebody built it.** No capture program ships in the package —
-`files` in `package.json` carries none, and a test refuses the suite if one
-appears. With no program on disk the `see` tool is not offered at all, and every
-call refuses in words. Installing looper therefore cannot gain the ability to
-look at anything, which is the property that had to be mechanical rather than
-promised.
-
-**What no prompt can reach, and why each is a control rather than a claim.**
-
-- **Nothing off this machine.** looper cannot open a socket and a test refuses any
-  import that could, so there is no remote caller to defend against — the
-  invariant the whole product already rests on is what makes this one hold.
-- **Nothing looper can arm.** There is no arm tool, no arm command, and no
-  consent state that looper reads or writes. Exit code 5 is a fact produced by
-  another process, and a refusal cannot be argued with by asking again.
-- **Nothing the agent names selects the program.** The path is fixed in code,
-  inside looper's own tree. What the agent supplies is one window name, crossing
-  as one argument with a length cap, and no shell ever sees it.
-- **Nothing invented.** A refusal never becomes an image. There is no default
-  target, no "closest match", and a capture that did not happen is reported as one
-  that did not happen.
-
-**Run against a real screen, 2026-08-18.** A capture program and a consent
-process were written outside the tree and driven through the real MCP server, on
-this machine, against Windows windows reachable from WSL. Three runs, in order:
-with no consent process running, the answer was words and no picture; with one
-running that had a different window armed, the same; with the asked-for window
-armed, a 1038×808 PNG came back through the tool. The refusal in the middle case
-came out of the consent process, not out of looper — its own log recorded the
-question and its `no`. Both halves were deleted afterwards and the suite
-re-run: the tool is gone from the tool list again, because there is no program on
-disk.
-
-**The trap that run exposed, and the first thing the platform stage owes.** The
-picture was a real capture of that window and it showed the application's splash
-art rather than its content, because `PrintWindow` on a window that is minimised
-or composited on the GPU returns what the window last drew. A capture that is
-honest and useless is worse than a refusal: an agent will reason from it. So the
-capture program has to report the window's state — minimised, occluded, not
-rendering — beside the image, and looper has to say it, or the seer will produce
-exactly the confident wrong answers it exists to prevent.
-
-**The two programs, built 2026-08-18 for WSL-with-Windows.** `seer/windows/consent.ps1`
-is the person's: an always-on-top window listing what is open, a tick box per
-window, and a local pipe that answers `yes` only for what is ticked. Closing it
-disarms everything. `seer/windows/capture.ps1` asks that pipe before it captures
-anything and stops at exit code 5 when the answer is not yes, so the program that
-can see is never the program that decides. `seer/linux/looper-seer` is the shim
-looper runs from inside WSL, and it passes the title through and nothing else.
-
-**They are source, and installing them is a deliberate act on the machine whose
-screen it is.** The package does not ship `seer/`, `vendor/seer/` is ignored so an
-installed one cannot be committed by accident, and a test reads `git ls-files` to
-prove nothing under it is tracked. This is the one place where a command somebody
-has to type is the right answer: the canon's rule against that is about
-governance, which must not be optional, and this is an eye, which must be.
-
-**Run against a real desktop, 2026-08-18, and what it cost to get right.** The
-first consent window rebuilt its list every two seconds, which wiped a tick the
-moment it was made, and docked its panels in an order that hid the first row —
-unusable, and found by the person trying to use it rather than by any test. The
-second one keeps the armed set as the truth and rebuilds the list only when the
-open windows actually change. With one window ticked and one request made through
-the real MCP server, the answer came back with the picture and the words *was
-minimised, so this is what it last drew rather than what it shows now* — the trap
-from the earlier run, now caught and said out loud. One defect on the way: the
-window's title came back mangled through the shim until both ends were pinned to
-UTF-8.
-
-**Every window on the desktop, asked for at once, 2026-08-18.** Ten open windows,
-one request each through the real MCP server, three of them ticked in the consent
-window: three pictures back — 1550x830 `rendering`, 620x460 `rendering`, and
-159x27 `minimised` with the warning attached — and seven refusals. The seven were
-decided by the consent process, not by looper, which is the only division of
-labour that survives an agent being told what to ask for.
-
-**What is still not built:** a Linux desktop pair and a macOS pair. Until a
-platform has both halves it has no seer, and a capture program without a consent
-window is precisely what this design exists to refuse.
+Sections below this one that are dated before 2026-09-08 and mention the seer are
+history and were left as they were written: what a frame cost, why only a live
+process made it cheap, and the four findings that came out of building it. They
+record what happened. They do not describe anything looper has.
 
 ## The return path: every adopter's agent is a rule tester
 

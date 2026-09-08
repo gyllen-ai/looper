@@ -11,25 +11,6 @@ last read it, so this document is never trusted to be current: looper recomputes
 them and says which entries the code has moved out from under. It never edits the
 prose, because what an entry says is a judgement and no tool refreshes a judgement.
 
-## 2026-08-20 — The seer may write a window's name, sharpening the guard that let it write nothing
-kind: security
-depends: src/seer/drive.ts, tests/invariants.test.ts, seer/windows/capture.ps1
-checked: 2026-08-20  e3c1693ca4a7
-
-tests/invariants.test.ts said no file under src/seer may write to disk at all, and gave the reason: anything looper can write, whoever is talking to the agent can have it write. The threat is real. If an injected agent could make looper write the record that says a window may be photographed, it would have granted itself somebody's screen.
-
-What was asked: a frame in tens of milliseconds rather than half a second, so an agent can change a page, hot-reload, look, and look again. Measured 2026-08-20 on one workstation: 429-485ms a frame one-shot, because every frame started a PowerShell, compiled a P/Invoke helper at 170ms and enumerated every process at 47-117ms. A capturer that stays alive pays that once: 79-83ms a frame, 875ms for the first.
-
-The live capturer has to be told which window to photograph, and the synchronous tool boundary cannot hold a conversation with a living child over stdio. So looper writes the name of a window into one file that the capturer reads.
-
-What it breaks: the guard as written. What was built instead of removing it: the guard now names the one shape allowed, writeFileSync(ask, window, "utf8"), and mkdirSync of the exchange folder, and refuses every other write and every other folder. It is stricter than it was in one way, because the old one only listed function names and never looked at what was written. It was falsified three ways before being trusted: writing "yes" into a granted file, making a folder named after a window, and writing "yes" into the ask file itself are all refused.
-
-Why the property survives. A request names a subject and decides nothing. The consent window is asked over its pipe on every single capture, so unticking a window hides it immediately, and the capturer exits when that window closes. An agent under injection could already ask for any title through the see tool, so the file grants it nothing it did not have.
-
-What it costs. A captured frame now lands in a file under the person's home for the moment between the capturer writing it and looper reading it, where before it travelled through a pipe and never touched disk. looper deletes it immediately and the exchange was empty after five captures, but the window exists. The exchange is outside the repository so a picture of a screen can never be committed, and a test holds that.
-
-What has to be true for this to come out: a channel the synchronous boundary can complete in one step that is not a file. Until then this trade stands.
-
 ## 2026-08-21 — Doctrine branches are droppable, reversing the rule that they must always arrive
 kind: law
 depends: src/router.ts, src/allocator.ts
