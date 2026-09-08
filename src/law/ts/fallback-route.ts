@@ -10,7 +10,7 @@ export const FALLBACK_ROUTE: Rule = {
   category: "TRUTH",
   pass: "fast",
   bans:
-    "a second route taken because the first one failed or was not there: a `catch` or a `.catch()` handler that answers by calling something else, `x || other()` and `x ?? other()` where the right side is a call, an absence check whose branch returns a call, and a capability probe on `window`, `globalThis`, `navigator`, `document` or `self`",
+    "a second route taken because the first one failed or was not there: a `catch` or a `.catch()` handler that answers by calling something else, `x || other()` and `x ?? other()` where the right side is a call, an absence check whose branch returns a call, and a capability probe on `window`, `globalThis`, `navigator`, `document` or `self`. Three shapes are not a second route and never fire: a call that answers a question rather than supplying a value (`x || names.has(n)`, and the same for `includes`, `startsWith`, `endsWith`, `test`, `some` and `every`), a function calling itself again, and a test on `length` or `size`, because an empty collection is a value and not an absence",
   why:
     "a fallback is a second implementation of the same behaviour, and from the moment it exists nobody can say which one ran. The failure that sent the program down the second path is invisible one line later, so the slow route quietly becomes the normal route and nothing reports it, while the first one rots because it is never the one being read when something looks wrong. It is also the shape that hides an outage: the primary was down for a week and every screen looked fine",
   instead: [
@@ -47,6 +47,18 @@ const A_TRANSFORM: readonly string[] = [
   "sort",
 ];
 
+const A_QUESTION: readonly string[] = [
+  "includes",
+  "has",
+  "startsWith",
+  "endsWith",
+  "test",
+  "some",
+  "every",
+];
+
+const A_COUNT: readonly string[] = ["length", "size"];
+
 const A_FUNCTION: readonly string[] = [
   "FunctionDeclaration",
   "FunctionExpression",
@@ -81,12 +93,26 @@ function transformsInPlace(callee: unknown): boolean {
   return typeof property === "string" && A_TRANSFORM.includes(property);
 }
 
-function isARoute(value: unknown): boolean {
+function answersAQuestion(callee: unknown): boolean {
+  const property = fieldAt(fieldAt(callee, "property"), "name");
+  return typeof property === "string" && A_QUESTION.includes(property);
+}
+
+function countsRather(value: unknown): boolean {
+  const held = unwrapped(value);
+  if (!isNode(held)) return false;
+  if (held.type !== "MemberExpression" && held.type !== "OptionalMemberExpression") return false;
+  const property = fieldAt(held["property"], "name");
+  return typeof property === "string" && A_COUNT.includes(property);
+}
+
+function isARoute(value: unknown, itself: ReadonlySet<Node>): boolean {
   const held = unwrapped(value);
   if (!isNode(held)) return false;
   if (held.type !== "CallExpression" && held.type !== "OptionalCallExpression") return false;
+  if (itself.has(held)) return false;
   const callee = held["callee"];
-  return !convertsOnly(callee) && !transformsInPlace(callee);
+  return !convertsOnly(callee) && !transformsInPlace(callee) && !answersAQuestion(callee);
 }
 
 function isAPlace(value: unknown): boolean {
@@ -127,13 +153,13 @@ function walkShallow(root: Node, visit: (node: Node) => void): void {
   }
 }
 
-function routeReturnedIn(body: Node, carrying: string): Node | null {
+function routeReturnedIn(body: Node, carrying: string, itself: ReadonlySet<Node>): Node | null {
   let found: Node | null = null;
   walkShallow(body, (node) => {
     if (found !== null) return;
     if (node.type !== "ReturnStatement") return;
     const answer = node["argument"];
-    if (!isARoute(answer)) return;
+    if (!isARoute(answer, itself)) return;
     if (carrying.length > 0 && mentions(answer, carrying)) return;
     found = node;
   });
@@ -168,21 +194,23 @@ function handlerName(handler: Node): string {
   return typeof name === "string" ? name : "";
 }
 
-function handlerTakesARoute(handler: Node): boolean {
+function handlerTakesARoute(handler: Node, itself: ReadonlySet<Node>): boolean {
   const carrying = handlerName(handler);
   const body = handler["body"];
   if (!isNode(body)) return false;
   if (body.type !== "BlockStatement") {
-    if (!isARoute(body)) return false;
+    if (!isARoute(body, itself)) return false;
     return carrying.length === 0 || !mentions(body, carrying);
   }
-  return routeReturnedIn(body, carrying) !== null;
+  return routeReturnedIn(body, carrying, itself) !== null;
 }
 
 function absenceTested(test: unknown): boolean {
   const held = unwrapped(test);
   if (!isNode(held)) return false;
-  if (held.type === "UnaryExpression" && held["operator"] === "!") return isAPlace(held["argument"]);
+  if (held.type === "UnaryExpression" && held["operator"] === "!") {
+    return isAPlace(held["argument"]) && !countsRather(held["argument"]);
+  }
   if (held.type === "LogicalExpression") {
     if (!absenceTested(held["left"])) return false;
     return absenceTested(held["right"]);
@@ -193,6 +221,31 @@ function absenceTested(test: unknown): boolean {
   if (isAbsent(held["right"])) return isAPlace(held["left"]);
   if (isAbsent(held["left"])) return isAPlace(held["right"]);
   return false;
+}
+
+function nameOfFunction(node: Node): string {
+  const id = node["id"];
+  if (!isNode(id) || id.type !== "Identifier") return "";
+  const name = fieldAt(id, "name");
+  return typeof name === "string" ? name : "";
+}
+
+function markSelfCalls(root: Node): ReadonlySet<Node> {
+  const found = new Set<Node>();
+  walk(root, (node) => {
+    if (!A_FUNCTION.includes(node.type)) return;
+    const named = nameOfFunction(node);
+    if (named.length === 0) return;
+    const body = node["body"];
+    if (!isNode(body)) return;
+    walkShallow(body, (inner) => {
+      if (inner.type !== "CallExpression") return;
+      if (fieldAt(inner["callee"], "type") !== "Identifier") return;
+      if (fieldAt(inner["callee"], "name") !== named) return;
+      found.add(inner);
+    });
+  });
+  return found;
 }
 
 function reachesAHost(value: unknown): boolean {
@@ -251,25 +304,25 @@ function markTests(root: Node): ReadonlySet<Node> {
 
 const DEFAULTING: readonly string[] = ["||", "??"];
 
-function judgeCatch(node: Node, found: Finding[]): void {
+function judgeCatch(node: Node, found: Finding[], itself: ReadonlySet<Node>): void {
   const body = node["body"];
   if (!isNode(body)) return;
-  if (routeReturnedIn(body, caughtName(node)) === null) return;
+  if (routeReturnedIn(body, caughtName(node), itself) === null) return;
   found.push({ line: lineOfNode(node), said: "the catch answers by calling another route" });
 }
 
-function judgeCall(node: Node, found: Finding[]): void {
+function judgeCall(node: Node, found: Finding[], itself: ReadonlySet<Node>): void {
   const handler = inlineCatchHandler(node);
   if (handler === null) return;
-  if (!handlerTakesARoute(handler)) return;
+  if (!handlerTakesARoute(handler, itself)) return;
   found.push({ line: lineOfNode(handler), said: "the catch handler answers by calling another route" });
 }
 
-function judgeAbsence(node: Node, found: Finding[]): void {
+function judgeAbsence(node: Node, found: Finding[], itself: ReadonlySet<Node>): void {
   if (!absenceTested(node["test"])) return;
   const consequent = node["consequent"];
   if (!isNode(consequent)) return;
-  if (routeReturnedIn(consequent, "") === null) return;
+  if (routeReturnedIn(consequent, "", itself) === null) return;
   found.push({ line: lineOfNode(node), said: "an absence sends the program down a second route" });
 }
 
@@ -281,19 +334,20 @@ export const fallbackRouteCheck: Check = {
     if (parsed.kind === "unreadable") return [];
 
     const tests = markTests(parsed.root);
+    const itself = markSelfCalls(parsed.root);
     const found: Finding[] = [];
 
     walk(parsed.root, (node) => {
       if (node.type === "CatchClause") {
-        judgeCatch(node, found);
+        judgeCatch(node, found, itself);
         return;
       }
       if (node.type === "CallExpression") {
-        judgeCall(node, found);
+        judgeCall(node, found, itself);
         return;
       }
       if (node.type === "IfStatement") {
-        judgeAbsence(node, found);
+        judgeAbsence(node, found, itself);
         return;
       }
       if (probesAHost(node)) {
@@ -304,7 +358,7 @@ export const fallbackRouteCheck: Check = {
       const operator = node["operator"];
       if (typeof operator !== "string" || !DEFAULTING.includes(operator)) return;
       if (tests.has(node)) return;
-      if (!isAPlace(node["left"]) || !isARoute(node["right"])) return;
+      if (!isAPlace(node["left"]) || !isARoute(node["right"], itself)) return;
       found.push({ line: lineOfNode(node), said: "an absence falls through to another route" });
     });
 

@@ -1907,12 +1907,48 @@ an absence test and never fires. In TypeScript a disjunction of two conditions
 (`isA(x) || isB(x)`) is told from a default (`x || slow()`) by whether the left
 side is a place, which is the same test the Rust half has always used.
 
-**Measured on the RustOnTop codebase, 2026-09-08:** 2 hits in 300 TypeScript
-files, 36 hits in 23 Rust files. The largest cluster, 8 hits in
-`crates/rustplus/src/session/socket.rs`, is a decoder for a protobuf with no
-oneof tag, so it probes optional fields in order. That is structurally identical
-to a fallback chain and cannot be told from one by shape. It is the case the
-`decisions` ledger exists for.
+**Three more exclusions, and the day the rule fired on looper itself.** Corrected
+2026-09-08, hours after the rule landed. `looper loop` came back `ok=3 broken=1`:
+`TS-TRUTH:4` fired on `src/law/ts/guessed-wait.ts:117`, which is
+`const deeper = inALoop || A_LOOP.includes(node.type)`. That is a boolean
+parameter or-ed with a question asked of something else — no value is being
+defaulted and there is no second implementation — but `inALoop` is a place, so
+the left-side test read it as a default. A rule with no compliant path for
+correct code is blunt rather than strict, so it was sharpened:
+
+| what it now refuses to call a route | earned by |
+|---|---|
+| a call that answers a question rather than supplying a value: `includes`, `has`, `startsWith`, `endsWith`, `test`, `some`, `every` | looper's own line, and `isPath \|\| typeList.has(...)` and `node.isWorkspace \|\| node.fsChildren?.has(n)` in npm |
+| a function calling itself again | `if (!backwardExhausted) { ...; return iterator() }` inside `function iterator()`, in `diff` |
+| a test on `length` or `size`, because an empty collection is a value and not an absence | `if (!keys.length)`, `if (!versions.length)`, `if (!argv.length)` and eight more in npm |
+
+**Measured on 1,265 files of somebody else's JavaScript and TypeScript** — the
+machine's global `node_modules`, npm and its dependencies — before and after:
+**375 hits down to 358. Seventeen removed, none added.** All seventeen were read
+by hand and every one is a false positive: eleven empty-collection tests, three
+the same recursive iterator in three builds of `diff`, and three disjunctions of
+two questions.
+
+Forty-four hits were read by hand before the change, twenty-two from each of the
+two arms. Twenty of the twenty-two `x || call()` hits were genuine defaults
+(`startTime || Date.now()`, `env.cpu || cpu()`, `left ?? this.parseBindingAtom()`)
+and thirteen of the twenty-two absence checks were genuine
+(`if (!placeholder)`, `if (range == null)`, `if (!destStat)`). Those all still
+fire.
+
+**One known false positive is left, and it is named rather than hidden.** A test
+on a boolean flag — `if (!this.state.containsEsc) { ... return this.tsParse...() }`
+in a bundled Babel parser — is indistinguishable by shape from `if (!row)`, and
+the only separator is the name, which this rule already refused to read. Dropping
+the bare `!` test entirely would have taken 72 of the 86 absence hits in the
+corpus with it, so the arm would have been removed rather than sharpened. The
+remaining case is in generated code, which `[generated]` already answers.
+
+**Measured on an adopting project, 2026-09-08:** 2 hits in 300 TypeScript files,
+36 hits in 23 Rust files. The largest cluster, 8 hits in one crate's socket
+decoder, is a decoder for a protobuf with no oneof tag, so it probes optional
+fields in order. That is structurally identical to a fallback chain and cannot be
+told from one by shape. It is the case the `decisions` ledger exists for.
 
 **The way through is a person, and it is wired.** Doctrine refuses a barrier that
 is only described, so the concession is not the honour system: a pardon for
@@ -2846,8 +2882,9 @@ named pipe refused to connect, which exits 5, which reads as "not armed". A
 closed consent window and an unticked window were the same sentence. They are now
 exit 6 and exit 5, and the agent is told which.
 
-**The title was wrong and nothing said so.** The window was `RustOnTop (Ubuntu)`,
-because WSLg appends the distro, and the agent asked for `RustOnTop`. The refusal
+**The title was wrong and nothing said so.** The window carried ` (Ubuntu)` on
+the end because WSLg appends the distro, and the agent asked for the bare name.
+The refusal
 named neither the titles that are open nor the ones that are ticked, so the only
 way through was to read the PowerShell source, which is what the adopter did.
 
@@ -7142,7 +7179,7 @@ nine repositories, counted again on purpose so its number stands alone.
 
 | corpus | files | `TS-TRUTH:3` | in files | `TS-LAYER:3` | in files |
 |---|---|---|---|---|---|
-| this project's own code (RustOnTop) | 956 | 103 | 27 | 41 | 12 |
+| the adopting project's own code | 956 | 103 | 27 | 41 | 12 |
 | its installed packages | 8,809 | 454 | 72 | 26 | 10 |
 | nine other repositories on the machine, packages included | 20,612 | 3,748 | 444 | 1,924 | 244 |
 | the old app's checkout on the Windows drive | 16,224 | 2,806 | 350 | 1,179 | 120 |
@@ -7230,7 +7267,7 @@ binary instead of waiting for the build*. `npm test`: 655 pass, 0 fail.
 
 ## The design registry: everything visible is tagged — 2026-08-30
 
-Born in RustOnTop the night a designed screen shipped wrong from memory:
+Born in an adopting project the night a designed screen shipped wrong from memory:
 rounded corners an app whose radius is zero, a truncated button, two buttons
 on two rows, a backdrop crushed to black, while the approved artboard sat
 unopened beside the work. Every mechanical dimension of that session had a
@@ -7281,7 +7318,7 @@ Two siblings ride with this feature: that provenance rule for the CSS law,
 and a stall shape — "ui edited, never rendered" — for the detector, because
 the same evening showed thirteen generic stall reports where one specific
 sentence would have stopped the failure. The working prototype is
-RustOnTop's `loop.client.look`: both pages rendered in one run, the artboard
+that project's own look command: both pages rendered in one run, the artboard
 as a live template, every design value fetched at run time, proven by
 planting a corner radius and watching the layer refuse it against the
 artboard's zero.
