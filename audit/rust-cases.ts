@@ -122,7 +122,7 @@ export const RUST_CASES: readonly RustCase[] = [
     code: `pub fn read(p: &str) -> u8 { match fast(p) { Ok(n) => n, Err(cause) => { tracing::warn!(?cause, "unread"); slow(p) } } }\nfn fast(_p: &str) -> Result<u8, u8> { Ok(1) }\nfn slow(_p: &str) -> u8 { 2 }` },
   { rule: "RUST-TRUTH:3", name: "an Err arm that calls a method route", expect: "fires",
     code: `pub struct S;\nimpl S { pub fn read(&self, p: &str) -> u8 { match fast(p) { Ok(n) => n, Err(cause) => { tracing::warn!(?cause, "unread"); self.slow(p) } } }\n fn slow(&self, _p: &str) -> u8 { 2 } }\nfn fast(_p: &str) -> Result<u8, u8> { Ok(1) }` },
-  { rule: "RUST-TRUTH:3", name: "a let else that calls a second route", expect: "fires",
+  { rule: "RUST-TRUTH:3", name: "a let else that calls a second route is an absence with an answer", expect: "silent",
     code: `pub fn read(fast: Option<u8>) -> u8 { let Some(n) = fast else { return slow(); }; n }\nfn slow() -> u8 { 2 }` },
   { rule: "RUST-TRUTH:3", name: "an Err arm that propagates is the shape the rule wants", expect: "silent",
     code: `pub struct Cause;\npub fn read(p: &str) -> Result<u8, Cause> { match fast(p) { Ok(n) => Ok(n), Err(cause) => Err(cause) } }\nfn fast(_p: &str) -> Result<u8, Cause> { Ok(1) }` },

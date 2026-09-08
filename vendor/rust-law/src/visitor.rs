@@ -500,21 +500,6 @@ impl<'c> Judge<'c> {
         arm_facts(&self.prov, arm, bindings)
     }
 
-    fn judge_let_else(&mut self, node: &syn::Local, line: usize) {
-        let Some(init) = &node.init else {
-            return;
-        };
-        let Some((_else_token, otherwise)) = &init.diverge else {
-            return;
-        };
-        if !pat_mentions_fallible(&node.pat) {
-            return;
-        }
-        if !tail_is_another_route(otherwise) {
-            return;
-        }
-        self.hit(Rule::FallbackRoute, line);
-    }
 }
 
 impl<'ast, 'c> Visit<'ast> for Judge<'c> {
@@ -746,7 +731,6 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
             self.hit(Rule::SilentOp, line);
         }
         self.local_binding_check(node, line);
-        self.judge_let_else(node, line);
         syn::visit::visit_local(self, node);
     }
 
