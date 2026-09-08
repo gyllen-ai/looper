@@ -1910,7 +1910,7 @@ side is a place, which is the same test the Rust half has always used.
 
 **Narrowed the same day it shipped, on evidence.** The first cut also read an
 absence as a fallback: `let ... else` and `if (x === undefined) return other()`
-in TypeScript. Measured on the RustOnTop codebase that produced 36 hits, and
+in TypeScript. Measured on the adopting codebase that produced 36 hits, and
 reading all of them, **25 of the 34 Rust hits came from the `let ... else`
 clause and almost none were fallbacks**: a name read across a roster change,
 Bearer against Basic credential parsing, get-or-create, a bridge-versus-poll
@@ -2864,8 +2864,9 @@ named pipe refused to connect, which exits 5, which reads as "not armed". A
 closed consent window and an unticked window were the same sentence. They are now
 exit 6 and exit 5, and the agent is told which.
 
-**The title was wrong and nothing said so.** The window was `RustOnTop (Ubuntu)`,
-because WSLg appends the distro, and the agent asked for `RustOnTop`. The refusal
+**The title was wrong and nothing said so.** The window carried ` (Ubuntu)` on
+the end because WSLg appends the distro, and the agent asked for the bare name.
+The refusal
 named neither the titles that are open nor the ones that are ticked, so the only
 way through was to read the PowerShell source, which is what the adopter did.
 
@@ -7160,7 +7161,7 @@ nine repositories, counted again on purpose so its number stands alone.
 
 | corpus | files | `TS-TRUTH:3` | in files | `TS-LAYER:3` | in files |
 |---|---|---|---|---|---|
-| this project's own code (RustOnTop) | 956 | 103 | 27 | 41 | 12 |
+| the adopting project's own code | 956 | 103 | 27 | 41 | 12 |
 | its installed packages | 8,809 | 454 | 72 | 26 | 10 |
 | nine other repositories on the machine, packages included | 20,612 | 3,748 | 444 | 1,924 | 244 |
 | the old app's checkout on the Windows drive | 16,224 | 2,806 | 350 | 1,179 | 120 |
@@ -7248,7 +7249,7 @@ binary instead of waiting for the build*. `npm test`: 655 pass, 0 fail.
 
 ## The design registry: everything visible is tagged — 2026-08-30
 
-Born in RustOnTop the night a designed screen shipped wrong from memory:
+Born in an adopting project the night a designed screen shipped wrong from memory:
 rounded corners an app whose radius is zero, a truncated button, two buttons
 on two rows, a backdrop crushed to black, while the approved artboard sat
 unopened beside the work. Every mechanical dimension of that session had a
@@ -7299,7 +7300,7 @@ Two siblings ride with this feature: that provenance rule for the CSS law,
 and a stall shape — "ui edited, never rendered" — for the detector, because
 the same evening showed thirteen generic stall reports where one specific
 sentence would have stopped the failure. The working prototype is
-RustOnTop's `loop.client.look`: both pages rendered in one run, the artboard
+that project's own look command: both pages rendered in one run, the artboard
 as a live template, every design value fetched at run time, proven by
 planting a corner radius and watching the layer refuse it against the
 artboard's zero.
