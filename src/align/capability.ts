@@ -12,10 +12,10 @@ import type {
 } from "../capability.ts";
 import { pathsInHand } from "../git.ts";
 import { driftAcross } from "./across.ts";
-import { readFrame } from "./frame.ts";
+import { readFrame } from "../frame/frame.ts";
 import { judgeFrame, unmoved } from "./judge.ts";
-import { PROBE, PROBE_NAME } from "./probe.ts";
-import { forget, heldIn, keep, newestLook, staleAgainst } from "./store.ts";
+import { PROBE, PROBE_NAME } from "../frame/probe.ts";
+import { forget, heldIn, keep, newestLook, staleAgainst } from "../frame/store.ts";
 import {
   NOTHING_CAPTURED,
   detailOf,

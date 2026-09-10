@@ -1,7 +1,7 @@
 import { ALONE_SHOWN, UNMOVED_SHOWN } from "../config.ts";
 import type { Drift } from "./across.ts";
 import type { Alone, Unmoved, Verdict } from "./judge.ts";
-import type { Stale, Unreadable } from "./store.ts";
+import type { Stale, Unreadable } from "../frame/store.ts";
 
 function axisLetter(alone: Alone): string {
   return alone.axis === "down" ? "x" : "y";

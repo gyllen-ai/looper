@@ -1,5 +1,5 @@
 import { NEAR_MISS_PX, SAME_LINE_PX } from "../config.ts";
-import type { Frame, Mark } from "./frame.ts";
+import type { Frame, Mark } from "../frame/frame.ts";
 import { linesOf, onAxis, type Axis, type Line } from "./lines.ts";
 
 export type Miss = { readonly at: number; readonly by: number; readonly sharedWith: string };

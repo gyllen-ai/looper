@@ -1,16 +1,20 @@
-import type { Box, Mark } from "../src/align/frame.ts";
+import type { Box, Mark } from "../src/frame/frame.ts";
+
+const NOTHING_WORN: ReadonlyMap<string, string> = new Map();
 
 export function box(left: number, top: number, right: number, bottom: number): Box {
   return { left, top, right, bottom };
 }
 
 export function ghost(at: string, held: Box): Mark {
-  return { at, box: held, sides: [], ink: null, inner: null, baseline: null };
+  return { at, kind: at, look: NOTHING_WORN, box: held, sides: [], ink: null, inner: null, baseline: null };
 }
 
 export function painted(at: string, held: Box): Mark {
   return {
     at,
+    kind: at,
+    look: NOTHING_WORN,
     box: held,
     sides: ["left", "top", "right", "bottom"],
     ink: null,
@@ -22,6 +26,8 @@ export function painted(at: string, held: Box): Mark {
 export function bordered(at: string, held: Box, width: number): Mark {
   return {
     at,
+    kind: at,
+    look: NOTHING_WORN,
     box: held,
     sides: ["left", "top", "right", "bottom"],
     ink: null,
@@ -36,11 +42,11 @@ export function bordered(at: string, held: Box, width: number): Mark {
 }
 
 export function drawn(at: string, held: Box, ink: Box): Mark {
-  return { at, box: held, sides: [], ink, inner: null, baseline: null };
+  return { at, kind: at, look: NOTHING_WORN, box: held, sides: [], ink, inner: null, baseline: null };
 }
 
 export function lettered(at: string, held: Box, ink: Box, baseline: number): Mark {
-  return { at, box: held, sides: [], ink, inner: null, baseline };
+  return { at, kind: at, look: NOTHING_WORN, box: held, sides: [], ink, inner: null, baseline };
 }
 
 export function frameOf(marks: readonly Mark[]): string {
@@ -50,6 +56,7 @@ export function frameOf(marks: readonly Mark[]): string {
     captured: new Date().toISOString(),
     width: 1000,
     height: 800,
+    initial: {},
     marks,
     switches: [],
   });

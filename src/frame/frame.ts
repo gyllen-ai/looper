@@ -1,4 +1,5 @@
 import { fieldAt } from "../fields.ts";
+import { lookAt, looseLookAt, type Look } from "./look.ts";
 
 export type Side = "left" | "right" | "top" | "bottom";
 
@@ -13,6 +14,8 @@ export type Box = {
 
 export type Mark = {
   readonly at: string;
+  readonly kind: string;
+  readonly look: Look;
   readonly box: Box;
   readonly sides: readonly Side[];
   readonly ink: Box | null;
@@ -30,6 +33,7 @@ export type Frame = {
   readonly page: string;
   readonly state: string;
   readonly captured: string;
+  readonly asShipped: Look;
   readonly width: number;
   readonly height: number;
   readonly marks: readonly Mark[];
@@ -97,6 +101,10 @@ function markAt(raw: unknown, index: number): Mark | string {
   const where = `mark ${index}`;
   const missing = stringAt(raw, "at", where);
   if (missing.length > 0) return missing;
+  const nameless = stringAt(raw, "kind", where);
+  if (nameless.length > 0) return nameless;
+  const look = lookAt(raw, where);
+  if (typeof look === "string") return look;
   const box = boxAt(raw, "box", where);
   if (typeof box === "string") return box;
   const sides = sidesAt(raw, where);
@@ -121,10 +129,10 @@ function markAt(raw: unknown, index: number): Mark | string {
   const baseline = rawBase === null ? null : rawBase;
   const rawInk = fieldAt(raw, "ink");
   if (rawInk === undefined) return `${where} does not say whether it draws ink; say null if it draws none`;
-  if (rawInk === null) return { at: textIn(raw, "at"), box, sides, ink: null, inner, baseline };
+  if (rawInk === null) return { at: textIn(raw, "at"), kind: textIn(raw, "kind"), look, box, sides, ink: null, inner, baseline };
   const ink = boxAt(raw, "ink", where);
   if (typeof ink === "string") return ink;
-  return { at: textIn(raw, "at"), box, sides, ink, inner, baseline };
+  return { at: textIn(raw, "at"), kind: textIn(raw, "kind"), look, box, sides, ink, inner, baseline };
 }
 
 function switchAt(raw: unknown, index: number): Switch | string {
@@ -164,6 +172,9 @@ export function readFrame(source: string): Reading {
     return { kind: "unreadable", why: `the frame has no "captured" time looper can read` };
   }
 
+  const asShipped = looseLookAt(raw, "initial");
+  if (typeof asShipped === "string") return { kind: "unreadable", why: asShipped };
+
   const width = numberAt(raw, "width", "the frame");
   if (typeof width === "string") return { kind: "unreadable", why: width };
   const height = numberAt(raw, "height", "the frame");
@@ -189,5 +200,8 @@ export function readFrame(source: string): Reading {
     switches.push(held);
   }
 
-  return { kind: "frame", frame: { page, state, captured, width, height, marks, switches } };
+  return {
+    kind: "frame",
+    frame: { page, state, captured, asShipped, width, height, marks, switches },
+  };
 }

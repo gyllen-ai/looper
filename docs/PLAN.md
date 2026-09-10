@@ -7583,3 +7583,140 @@ blunt rather than strict. The narrow one is decidable and it is now an
 invariant: `config.ts` is a table of settings, nothing in it reads its own
 entries, so an entry no file names is a leftover. It reports zero on this tree
 and was proven by planting one.
+
+## One kind wears one look, everywhere — 2026-09-10
+
+Asked for by the owner the same day as the alignment tool, and for the same
+reason he gave in one word: consistency. *"It should not happen that we have two
+fonts in a table, and different colors on things in a table."* Then, over
+several messages: paddings, gaps, sizes, weights, text case, and contrast on
+everything down to an input field — and *"what I wrote to you is just a few
+things, we need to check it all."*
+
+### The autopsy, because this ground was already planned
+
+The design registry section above proposed a curated per-project registry seeded
+by a `looper design init`, where every visible element must trace to an entry.
+**What it did:** made the look a fetched fact with generated checks. **Why that
+shape is wrong here:** it can say nothing until somebody writes and maintains the
+registry, and it needs a command, which this project's constitution refuses.
+**What this does instead:** no registry — the page is its own authority. **What
+it refuses:** it can never say a look is *wrong*, only that it disagrees with
+itself. A uniformly ugly screen passes. That is the price of needing no setup,
+and the registry stays in this document as not built.
+
+### The shape: one capture, two tools
+
+The frame the alignment tool already captures now carries, for every mark, its
+**kind** and its **look**. Nothing else was added to the capture, and the probe
+is still one expression the project's own browser runs. `looper align` asks
+whether the lines connect; `looper look` asks whether everything of a kind wears
+the same look. One capture answers both.
+
+A **kind** is what a thing is and what state it is in: its tag, every class it
+carries, and every aria or data state on it. This is the whole precision of the
+rule. A caps heading and a sentence-case value in one table are two kinds and
+are never compared — which is what the owner asked for when he sent a header row
+and said *"having CAPS and then Sentence case is fine, we should not destroy
+looks"*. An active tab and an inactive one are two kinds as well. But a button
+that is CAPS in one place must be CAPS in the other, because that is one kind.
+
+A **look** is not a list somebody chose. It is **every computed property whose
+value is not the browser's initial value for it**, which is the mechanical way
+to say "everything the page actually decided". Three things are taken out, each
+for a stated reason: the geometry content decides rather than the author (width,
+height, insets, grid tracks), the vendor-prefixed and logical duplicates of
+properties already recorded, and any `-color` property whose value is simply the
+element's own `color` inherited through `currentColor`. On a real page that is
+23 properties per mark rather than 340.
+
+### What it refuses, and what it deliberately does not
+
+**One kind must wear one look.** Every property, in every frame, at that width.
+
+**Never across viewport widths.** A layout is allowed to answer the width, so a
+narrow frame is never compared with a wide one — the same rule the drift check
+already holds.
+
+**Not a stripe.** Two values alternating down the page are a pattern, and are
+left alone.
+
+**Not a thing that was still moving.** The probe records which marks had a
+running animation, and those are judged for nothing rather than reported for the
+value they were passing through.
+
+**Nothing reads as the word "unset".** The frame carries the browser's own
+initial values, so a property the page never set resolves to what the browser
+ships and is compared as that.
+
+### Contrast, which is the one part with an outside authority
+
+Every piece of text is measured against what is really behind it — the ancestor
+backgrounds composited down — at WCAG 2.1's 4.5:1, or 3:1 where the text is
+large (24px, or 18.66px when bold). Every painted border is measured at 3:1,
+which is what puts an input field's outline in scope. A fully transparent border
+is not a faint border and is not measured.
+
+**Where the ground cannot be worked out, it says so and judges nothing.** looper
+reads no pixels, so a texture or a picture behind the text makes the answer
+unknowable, and an unknowable answer is reported as its own list rather than
+counted as a pass.
+
+### The census, which is the number the owner actually asked about
+
+Alongside the failures, `looper look` reports how many different values the whole
+capture draws with, widest first, and names every value used exactly once. That
+is where "we have too many colours" becomes a number instead of a feeling. It
+carries no verdict, and the report says so.
+
+### Measured, 2026-09-10
+
+Two corpora, both an adopting project's, neither written here: a public site
+built and served from its own output, and an operator console signed in against
+its own dev database. The console is the harder case, because its classes are
+utility classes rather than semantic ones — the risk was that every element
+would be its own kind and the check would find nothing. It is not: **1,492 marks
+fell into 114 kinds, and 92 of those kinds hold more than one member, covering
+1,470 of the 1,492 marks.**
+
+| corpus | frames | kinds that disagree | measured for contrast | too faint | from pairs | unknowable |
+| --- | --- | --- | --- | --- | --- | --- |
+| the public site | 4 | 21 | 312 | 34 | 1 | 152 |
+| the console, seven tabs | 7 | 23 | 890 | 42 | 6 | 208 |
+
+Every finding on the console was read by hand. Five kinds of false positive came
+out of it, and each was fixed in the model rather than filtered from the report:
+
+1. **Computed grid tracks**, which are pixel values content decides, read as a
+   look. Added to the geometry the capture ignores.
+2. **The same element at two widths**, whose responsive padding is correct.
+   Frames of different widths are no longer compared.
+3. **A value read mid-transition** — an opacity of 0.609978 against a settled
+   0.35. The probe now records that a mark was animating and those are skipped.
+4. **The word "unset" appearing as if it were a value**, when it meant the page
+   had not set the property. The frame now carries the browser's own defaults.
+5. **A transparent border measured for contrast** at 1.11:1. A border nobody can
+   see is not a border with poor contrast.
+
+One defect was found by tracing why over half the text could not be judged. A
+translucent bar's background computed to a `color(srgb …)` value and the colour
+reader only understood `rgb()`, so every colour written the modern way was
+silently lost. That is not only a contrast problem: the alignment tool asks the
+same reader whether a box paints anything, so it had been over-reporting lines
+on any page using a wide-gamut or `oklch` colour. Both readers now take
+`color(srgb …)`, and the alignment verdict on the same frames changed with it.
+
+The remaining unknowable grounds are honest: a repeating texture sits behind
+that page's text, and no amount of reading computed values will say what colour
+is under a given word. looper does not look at pixels, so it says so.
+
+### The doctrine did not get a branch, and that is the plan working
+
+`ui/look` would have cost six characters in the always-on branch index, which
+was already at its cap of 2,600 exactly. The instruction in this document is
+that the answer to a full budget is not a larger budget — it is moving what
+matters down into the law or out of the problem. This rule is enforced
+mechanically by a tool and announced by a per-turn notice, so it needs no
+level-three prose of its own. `ui/line` grew from the edges of a screen to the
+edges and what everything on them wears, inside its existing ceiling, and the
+index is unchanged.
