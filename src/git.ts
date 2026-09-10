@@ -122,6 +122,10 @@ export function additionsAgainst(root: string, revision: string): Added {
   return additionsIn(root, ["diff", "-U0", "--no-color", `${revision}...HEAD`]);
 }
 
+export function additionsInHand(root: string, revision: string): Added {
+  return additionsIn(root, ["diff", "-U0", "--no-color", revision]);
+}
+
 function additionsIn(root: string, args: readonly string[]): Added {
   try {
     const diff = ask(root, args);

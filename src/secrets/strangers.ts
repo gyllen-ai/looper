@@ -1,4 +1,9 @@
-import { additionsAgainst, everyWordAt, whatTheRemoteAlreadyHas } from "../git.ts";
+import {
+  additionsAgainst,
+  additionsInHand,
+  everyWordAt,
+  whatTheRemoteAlreadyHas,
+} from "../git.ts";
 import { A_WRITTEN_TOKEN } from "../config.ts";
 import { readConcessions } from "../law/concessions.ts";
 
@@ -21,20 +26,35 @@ export function tokensIn(text: string): ReadonlySet<string> {
   return new Set(found === null ? [] : found);
 }
 
+export type Reach = "leaving" | "in-hand";
+
 export function strangersLeaving(root: string): Sweep {
   const against = whatTheRemoteAlreadyHas(root);
   if (against.kind === "cannot-tell") return { kind: "cannot-tell", why: against.why };
-  return strangersAgainst(root, against.revision);
+  return sweep(root, against.revision, "leaving");
+}
+
+export function strangersInHand(root: string): Sweep {
+  const against = whatTheRemoteAlreadyHas(root);
+  if (against.kind === "cannot-tell") return { kind: "cannot-tell", why: against.why };
+  return sweep(root, against.revision, "in-hand");
 }
 
 export function strangersAgainst(root: string, revision: string): Sweep {
+  return sweep(root, revision, "in-hand");
+}
+
+function sweep(root: string, revision: string, reach: Reach): Sweep {
   const against = { revision };
   const unwritten = [...NOBODY_ELSE_WROTE_THESE, ...readConcessions(root).generated];
 
   const known = everyWordAt(root, against.revision, unwritten);
   if (known.kind === "cannot-tell") return { kind: "cannot-tell", why: known.why };
 
-  const going = additionsAgainst(root, against.revision);
+  const going =
+    reach === "leaving"
+      ? additionsAgainst(root, against.revision)
+      : additionsInHand(root, against.revision);
   if (going.kind === "unavailable") return { kind: "cannot-tell", why: going.why };
 
   const seen = new Set<string>();

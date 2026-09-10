@@ -9,7 +9,12 @@ import { dispatchHook } from "../src/registry.ts";
 import { intentOf } from "../src/law/commit-command.ts";
 import { everyWordAt } from "../src/git.ts";
 import { strangers } from "../src/commands/strangers.ts";
-import { saidAboutStrangers, strangersLeaving, tokensIn } from "../src/secrets/strangers.ts";
+import {
+  saidAboutStrangers,
+  strangersInHand,
+  strangersLeaving,
+  tokensIn,
+} from "../src/secrets/strangers.ts";
 import { gitIn as git } from "./helpers.ts";
 
 function repoWithARemote(): string {
@@ -20,7 +25,7 @@ function repoWithARemote(): string {
   git(root, "init", "-q");
   git(root, "config", "user.email", "t@example.com");
   git(root, "config", "user.name", "t");
-  writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text.\n");
+  writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one of them.\n");
   git(root, "add", "-A");
   git(root, "commit", "-qm", "first");
   git(root, "remote", "add", "origin", bare);
@@ -110,7 +115,7 @@ test("a branch with no upstream still has something to compare against", () => {
     git(root, "init", "-q");
     git(root, "config", "user.email", "t@example.com");
     git(root, "config", "user.name", "t");
-    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text.\n");
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one of them.\n");
     git(root, "add", "-A");
     git(root, "commit", "-qm", "first");
     git(root, "remote", "add", "origin", bare);
@@ -151,7 +156,7 @@ test("the command names a stranger, its file and its line", () => {
     git(root, "init", "-q");
     git(root, "config", "user.email", "t@example.com");
     git(root, "config", "user.name", "t");
-    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text.\n");
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one of them.\n");
     git(root, "add", "-A");
     git(root, "commit", "-qm", "first");
     git(root, "remote", "add", "origin", bare);
@@ -267,6 +272,57 @@ test("a name whose every half is an ordinary word is still a stranger, because i
       sweep.strangers.map((one) => one.word),
       ["span.seek-mark"],
       "every half of this name was already in the repository, which is how it got out on 2026-09-10",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a word that is only staged is still a word in this change, or the sweep answers about the last commit", () => {
+  const root = repoWithARemote();
+  try {
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one Zephyrine.\n");
+    git(root, "add", "-A");
+
+    const sweep = strangersInHand(root);
+    assert.equal(sweep.kind, "swept");
+    if (sweep.kind !== "swept") return;
+    assert.deepEqual(
+      sweep.strangers.map((one) => one.word),
+      ["Zephyrine"],
+      "the sweep read HEAD instead of what is in hand, so a name staged and not yet committed left the machine unread twice on 2026-09-10",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a word not written down at all is still in hand, because nothing has been staged is not nothing has changed", () => {
+  const root = repoWithARemote();
+  try {
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one Quillfeather.\n");
+
+    const sweep = strangersInHand(root);
+    assert.equal(sweep.kind, "swept");
+    if (sweep.kind !== "swept") return;
+    assert.deepEqual(sweep.strangers.map((one) => one.word), ["Quillfeather"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the push gate still reads only what will leave, because the working tree is not being pushed", () => {
+  const root = repoWithARemote();
+  try {
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads the staged text and one Marrowvane.\n");
+
+    const sweep = strangersLeaving(root);
+    assert.equal(sweep.kind, "swept");
+    if (sweep.kind !== "swept") return;
+    assert.deepEqual(
+      sweep.strangers.map((one) => one.word),
+      [],
+      "an uncommitted word was reported as leaving, and a push does not carry it",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
