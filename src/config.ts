@@ -189,6 +189,24 @@ export const RECALL_TOOL = "recall";
 
 export const RECALL_PRIORITY = 30;
 
+export const ALIGN_TOOL = "align";
+
+export const ALIGN_PRIORITY = 30;
+
+export const FRAMES_DIR = ".looper/frames";
+
+export const SAME_LINE_PX = 0.5;
+
+export const NEAR_MISS_PX = 4;
+
+export const ALONE_SHOWN = 40;
+
+export const SPINE_MARKS = 3;
+
+export const DRIFT_PX = 24;
+
+export const UNMOVED_SHOWN = 12;
+
 export const SECRETS_ALLOW_PATH = ".looper/secrets.allow";
 
 export const ALLOW_MARKER = "looper:allow-secret";

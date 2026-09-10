@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { USAGE } from "./announce.ts";
 import { adopt } from "./commands/adopt.ts";
+import { align } from "./commands/align.ts";
 import { hook } from "./commands/hook.ts";
 import { init } from "./commands/init.ts";
 import { inject } from "./commands/inject.ts";
@@ -32,6 +33,7 @@ function run(argv: readonly string[]): number {
   if (command === "law") return law(rest, out);
   if (command === "loop") return loop(rest, out);
   if (command === "adopt") return adopt(rest, out);
+  if (command === "align") return align(out);
   if (command === "report") return report(rest, out);
   if (command === "strangers") return strangers(rest, out);
   usage();

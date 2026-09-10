@@ -1,3 +1,4 @@
+import { Align } from "./align/capability.ts";
 import { Decisions } from "./decisions/capability.ts";
 import { Law } from "./law/capability.ts";
 import { Recall } from "./recall/capability.ts";
@@ -38,6 +39,7 @@ export function registry(): readonly Capability[] {
     new Secrets(),
     new Recall(),
     new Decisions(),
+    new Align(),
     new Loop(whereTheUserLives()),
     new Pins(),
     new Stall(),

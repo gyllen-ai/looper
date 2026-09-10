@@ -7308,3 +7308,243 @@ artboard's zero.
 Build order: the registry format and `looper design init`; the walker and
 the generated per-screen check; the untagged-element and collision
 failures; state forcing; the provenance rule; the stall shape.
+
+## A line that connects to nothing — 2026-09-10
+
+Asked for by the owner on 2026-09-10, from the Ghost CSS extension: switch it on
+and every box on the page is outlined, so you can see which edges run into each
+other and which stop dead. The complaint it answers is one thing — **a line that
+connects to nothing.** A vertical edge in the header should be the same x as an
+edge in the sidebar, which should be the same x as an edge in the content. When
+one is three pixels off, nobody can name why the screen looks wrong.
+
+An outline extension cannot answer it, for two reasons the owner named.
+
+**It outlines boxes, and a box is not a line.** A `<div>` with no background and
+no border has four edges in the DOM and none on the screen. Outlining it invents
+a line nobody can see, and the alignment it reports is imaginary. The opposite
+also happens: a card with a background has four edges you *can* see, and taking
+the background away deletes all four while the box stays exactly where it was.
+**Only what is painted is a line.**
+
+**And a mark with no box is judged by the wrong line.** The owner's case: an org
+dropdown's chevron and the `+` button beneath it. Outline them and the boxes
+disagree, because the `+` is drawn larger. Look at the screen and they line up
+perfectly, because what a person follows down the page is the *centre* of each
+mark, not the edge of the box it sits in. The extension reported a break that is
+not there.
+
+### The shape: marks, true lines, columns
+
+A **frame** is one page in one state, captured from a live DOM: a list of
+**marks**, each a box in viewport coordinates plus what that mark actually
+paints. Nothing else. No image, no pixels, no screen — looper has not been able
+to look at one since 2026-09-08 and this does not give it back.
+
+A mark declares its painting in two fields, and both may be absent:
+
+- `sides` — the border-box edges that are painted: a border with width, a style
+  that is not `none`, and a colour that is not transparent; or a background that
+  differs from what is painted behind it, which paints all four. Absent means
+  this box is invisible.
+- `ink` — the rectangle the mark actually draws inside its box: the glyphs of a
+  text run, the geometry of an icon, the pixels of an image. Absent means the
+  mark draws nothing of its own.
+
+A mark with neither contributes nothing and is judged for nothing. That is the
+layout `<div>`, and it is the first half of the owner's complaint answered.
+
+From those two fields come the **true lines**, and only these:
+
+| from | gives | kind |
+| --- | --- | --- |
+| each painted side | one line, at that box edge | `edge` |
+| `ink` | four lines, at the ink's own bounds | `ink` |
+| `ink` | two lines, at the ink's centre on each axis | `axis` |
+
+A **column** is a set of true lines at the same coordinate, and *the same* means
+within `SAME_LINE_PX`. A line is **connected** when its column holds a line from
+another mark. Two edges of the same mark are not a connection; that is a box
+agreeing with itself.
+
+### What it refuses
+
+**A painted edge must connect, on its own.** All four sides of a card are
+visible and each one has to run into something. There is no centre to fall back
+on, because a box has no centre a person follows.
+
+**A mark that draws ink must connect on each axis, by any of its own lines.**
+Ink bounds or centre, either satisfies it. This is the chevron: its box edges
+land nowhere, its centre lands on the `+` below it, and the frame passes —
+because on the screen, it does. A text run passes the same way, usually on the
+left bound where a column of labels lines up.
+
+**A near miss is a separate, worse finding.** A line further than `SAME_LINE_PX`
+from a populated column but within `NEAR_MISS_PX` of it is not standing alone —
+it is *trying to align and failing*, which is the thing that makes a screen look
+broken rather than deliberate. It is reported with the column it missed and one
+mark already in it, so the fix is one number.
+
+**A state nobody captured is reported, never assumed.** The frame also carries
+every control on the page that declares a state — `aria-expanded`,
+`aria-selected`, `aria-checked`, `data-state`, `open`, a checked input — and the
+value it held. An accordion captured only closed is a page half judged, and
+`looper align` says which controls were never moved rather than passing quietly.
+Judging a state is level 2; knowing the states exist is level 1, because the
+page declares them; being told to go and capture them is level 3, and that is
+the honest split.
+
+**A frame older than the styling it covers is refused, not passed.** A green
+verdict from before the last CSS edit is a lie, and a lie about a check is worse
+than no check.
+
+### Where the geometry comes from, since looper cannot see
+
+looper hands over a **probe**: one self-contained expression, no build step, no
+dependency, that runs in the page and returns the frame. The project's own
+browser runs it — its Playwright, its dev tools, whatever it already has.
+looper never starts it, never talks to it, and gains no way to reach a screen;
+it reads the JSON that comes back and judges it. The seer is not returning: this
+tool cannot photograph anything, and the invariant that refuses a capture
+program in the tree still stands.
+
+The tool is `align`, on the MCP server, so the whole thing is a sentence:
+ask for the probe, hand back what it printed, get the verdict. Frames land in
+`.looper/frames/` and `looper align` rejudges every one of them, so the loop can
+declare it and a commit is not blind to it.
+
+### The numbers, and where they came from
+
+`SAME_LINE_PX` is 0.5. A CSS pixel is the smallest unit a browser will place an
+edge on at 1x, so two lines closer than half of one cannot be told apart on any
+display and calling them different columns would report a break nobody can see.
+
+`NEAR_MISS_PX` is 4, and it is a judgement rather than a measurement: past four
+pixels a line reads as its own thing rather than as one that failed to meet
+another. On the corpus below, 4 caught every gap a person would call wrong and
+the findings past it were all lines standing genuinely alone.
+
+### Across pages, because a column is learned once and expected everywhere
+
+Asked for by the owner the same day, in his own words: clicking from one tab of
+a page to another, the cards have different margins, so they start in different
+places. One frame cannot see that. So frames of the **same viewport width**
+are also compared with each other.
+
+A **spine** is a line at least `SPINE_MARKS` (3) different marks stand on: the
+column that holds a page up. A spine in one frame that no line in another frame
+of the same width sits on, with a spine of that frame within `DRIFT_PX` (24)
+instead, is a **drift** — the same column, standing somewhere else.
+
+The precision comes from what has to match. Two spines are the same spine only
+when the same element's same edge is on both: the same card's own painted left edge
+at 312 here and at 320 there. Without that, a page that simply has
+different content reports drift on every band, and the first run said exactly
+that — see the false positives below. Pages of different widths are never
+compared, because the layout is meant to differ.
+
+### Measured, 2026-09-10
+
+The corpus is an adopting project's public site, built and served from its own
+output folder, driven by its own Playwright — code nobody here wrote. Five
+frames: two pages at 1440 and at 390, and one screen of its app. looper started
+nothing: the project's harness ran the probe and the JSON came back.
+
+| frame | marks | true lines | connect to nothing |
+| --- | --- | --- | --- |
+| its first page · 1440 | 158 | 919 | 83 |
+| its first page · 390 | 160 | 927 | 120 |
+| its second page · 1440 | 36 | 217 | 40 |
+| its second page · 390 | 38 | 225 | 44 |
+| one screen of its app | 4 | 25 | 7 |
+
+The drift check was proven against a known change rather than a hope: the same
+page captured twice, the second with eight pixels of left margin added to one
+section in the browser. It reported two drifted spines and nothing else, both
+8 away, each naming the element that moved and the edge of it that moved.
+
+**Every one of the 50 near misses on home · 1440 was read by hand.** Four kinds
+of false positive came out of it, and each was fixed in the model rather than
+filtered out of the report:
+
+1. **One gap reported twice**, once from each side. Two lines whose only near
+   neighbour is each other are now one finding, said as one.
+2. **A one-pixel border read as a one-pixel misalignment.** A bordered box's
+   outer edge and the child sitting against the inside of that border are two
+   real lines a pixel apart, and that is a border rather than a mistake. The
+   inside of a painted border is now a line of its own — one that can satisfy
+   another line and carries no obligation itself. Three of the fifty.
+3. **Text of two sizes on one baseline, called unaligned** because their cap
+   heights cannot match. The baseline is now a true line, measured through the
+   canvas font metrics rather than the line box, and it is the line reported
+   when a text run fails on the vertical axis.
+4. **A drift between the same element's different edges** — a header's bottom on
+   one page against its top on another, one pixel apart. Both of the two drift
+   findings on the corpus were this, and keying a spine on the edge rather than
+   the element removed both, leaving zero.
+
+One defect was found by watching the numbers rather than the findings. Adding
+those extra lines *raised* some counts, because the first grouping was a sweep
+that partitioned lines into columns, and a partition depends on which lines
+exist and in what order they arrive: a new line between two others could split a
+pair that had been together. There is no need for a partition at all — the
+question is only ever "is another mark's line within half a pixel of mine", so
+grouping was replaced by a neighbourhood query over the sorted lines. The answer
+no longer depends on what else is on the page.
+
+**There is no baseline, and that is deliberate.** looper's other rules let a
+project record what it owed before the rule arrived. This one does not: a line
+that connects to nothing is a defect the day it is captured. The compliant path
+is to fix it or to not yet declare `looper align` in `.looper/loop.toml` — the
+tool answers on an ordinary turn either way, which is what it was asked for.
+
+### Measured again, on a signed-in console — 2026-09-10
+
+The site above is a public page. The screens this was asked for are an operator
+console, and the same day it was run against one: an adopting project's own dev
+stack on this machine, signed in with a session minted from its database the
+way its own browser checks do, at 1440 wide. Nineteen frames — twelve routes
+and states, then the seven tabs of one detail page, clicked rather than guessed
+at from the query string, because the tabs turned out not to be routes at all.
+
+| frame | marks | true lines | connect to nothing |
+| --- | --- | --- | --- |
+| the landing screen | 56 | 333 | 20 |
+| a menu open on it | 59 | 352 | 20 |
+| a detail page, tab one | 61 | 360 | 35 |
+| the same page, tab two | 52 | 300 | 34 |
+| the same page, tab three | 65 | 367 | 43 |
+| the same page, tab five | 81 | 466 | 36 |
+| the same page, last tab | 117 | 735 | 92 |
+| a second top-level page | 129 | 770 | 28 |
+
+What it found that a person had been living with:
+
+- **The tab strip.** Every tab button's right edge is two pixels from the next
+  one's left edge, and neither is on a line anything else shares. Five of them
+  in a row, said as five mutual pairs.
+- **A search mark that moves between tabs.** One icon stands at x 342.75 on one
+  tab and at x 325.75 on another — seventeen pixels, the same element, and the
+  only thing in nineteen frames that moved.
+- **Fifty-four controls declaring a state that was only ever captured one way**,
+  named rather than counted, because an accordion captured shut is a page half
+  judged.
+
+And two things it deliberately did not report, both checked by hand:
+
+- A disclosure heading whose left edge is at 317 where the column is at 316.
+  Two other marks have the *inside of a one-pixel border* at 317, so it is on a
+  real line and the pixel is a border. The model already knew this.
+- One kind of mark at x 335 on one tab and a different kind at x 333 on
+  another. Different elements, so it is not the same thing standing somewhere
+  else. The first is still reported on its own page — 2.54 from the column its
+  neighbours sit on — which is the finding, at the place it can be fixed.
+
+**What the drift rule became, and why.** It began as "a line at least three
+marks stand on, standing elsewhere". On this console that found nothing, while
+a card really had moved: the moved thing was one element, not a crowd. The
+threshold was doing the job that precision should do, so it is gone. A drift is
+now **the same element's same edge, at a different x, in another frame of the
+same width** — which cannot fire on two pages that merely hold different things.
+Only the horizontal axis is compared: what is above an element legitimately
+differs from page to page, and what is to the left of it does not.
