@@ -10,7 +10,8 @@ import { scanText } from "../src/secrets/capability.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
-import { ourFiles } from "./our-files.ts";
+import { ourFiles, sourceFiles } from "./our-files.ts";
+import { required } from "../src/present.ts";
 
 const SPAWN_CAPABLE = "node:child_process";
 
@@ -356,5 +357,33 @@ test("every injection says whether the work raised it, because a missing word re
     silent,
     [],
     `${silent.join(", ")} builds an injection without saying whether it is required. Nothing type-checks this repository, so the missing word reads as "no" and the contribution becomes droppable — which is how adopter PR #124 counted a project's own doctrine going over the side 32 times in one session.`,
+  );
+});
+
+test("a setting nothing reads is not a setting, it is a leftover", () => {
+  const CONFIG = join(ROOT, "src", "config.ts");
+  const A_SETTING = /^export const ([A-Z][A-Z0-9_]*)\b/gm;
+  const body = readFileSync(CONFIG, "utf8");
+  const elsewhere = [...ourFiles(), ...sourceFiles(join(ROOT, "tests")), ...sourceFiles(join(ROOT, "audit"))]
+    .filter((path) => path !== CONFIG)
+    .map((path) => readFileSync(path, "utf8"))
+    .join("\n");
+
+  const unread: string[] = [];
+  A_SETTING.lastIndex = 0;
+  let held = A_SETTING.exec(body);
+  while (held !== null) {
+    const name = required(held[1], "the name of a setting");
+    const word = new RegExp(`\\b${name}\\b`, "g");
+    const here = body.match(word);
+    const there = elsewhere.match(word);
+    if ((here === null ? 0 : here.length) <= 1 && there === null) unread.push(name);
+    held = A_SETTING.exec(body);
+  }
+
+  assert.deepEqual(
+    unread,
+    [],
+    `${unread.join(", ")} is declared in src/config.ts and no file reads it. config.ts is a table of settings and nothing in it uses its own entries, so an entry nobody names is a number left behind by a change that moved on — which is what SPINE_MARKS was on 2026-09-10, one rewrite after the rule that read it. noUnusedLocals cannot see an export, so nothing else catches this.`,
   );
 });

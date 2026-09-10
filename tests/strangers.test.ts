@@ -9,7 +9,7 @@ import { dispatchHook } from "../src/registry.ts";
 import { intentOf } from "../src/law/commit-command.ts";
 import { everyWordAt } from "../src/git.ts";
 import { strangers } from "../src/commands/strangers.ts";
-import { saidAboutStrangers, strangersLeaving } from "../src/secrets/strangers.ts";
+import { saidAboutStrangers, strangersLeaving, tokensIn } from "../src/secrets/strangers.ts";
 import { gitIn as git } from "./helpers.ts";
 
 function repoWithARemote(): string {
@@ -211,4 +211,64 @@ test("a scan that ran out of time says what it was doing and what would fix it",
     /law\.toml/,
     "an adopter told only 'spawnSync git ETIMEDOUT' has no way to reach the fix; the sentence has to name what timed out and where to say so",
   );
+});
+
+test("a hyphenated name is one word, so a class name is not read as the common words in it", () => {
+  const held = tokensIn("span.seek-mark > svg");
+  assert.ok(held.has("span.seek-mark"), `read as ${[...held].join(", ")}`);
+  assert.equal(held.has("seek"), false, "the halves of a class name were read as separate words");
+  assert.equal(held.has("mark"), false, "the halves of a class name were read as separate words");
+});
+
+test("both sides of the comparison read a written name the same way, or the check answers about nothing", () => {
+  const root = repoWithARemote();
+  try {
+    writeFileSync(join(root, "docs/plan.md"), "The gate reads a data-panel and a wrap.cell here.\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "second");
+    git(root, "push", "-q", "origin", "HEAD");
+
+    const known = everyWordAt(root, "HEAD", []);
+    assert.equal(known.kind, "words");
+    if (known.kind !== "words") return;
+    for (const word of tokensIn("a data-panel and a wrap.cell")) {
+      assert.ok(
+        known.words.has(word),
+        `the change side read ${word} and the repository side never produced it, so every compound name would be a stranger forever`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a name whose every half is an ordinary word is still a stranger, because it is the name that got out", () => {
+  const root = repoWithARemote();
+  try {
+    writeFileSync(
+      join(root, "docs/plan.md"),
+      "The gate reads the staged text. The seek and the mark and the span and the svg was measured.\n",
+    );
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "second");
+    git(root, "push", "-q", "origin", "HEAD");
+
+    writeFileSync(
+      join(root, "docs/plan.md"),
+      "The gate reads the staged text. A span.seek-mark > svg was measured.\n",
+    );
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "third");
+
+    const sweep = strangersLeaving(root);
+    assert.equal(sweep.kind, "swept");
+    if (sweep.kind !== "swept") return;
+    assert.deepEqual(
+      sweep.strangers.map((one) => one.word),
+      ["span.seek-mark"],
+      "every half of this name was already in the repository, which is how it got out on 2026-09-10",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

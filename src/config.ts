@@ -87,6 +87,10 @@ export const STYLESHEET_EXTENSIONS: readonly string[] = [".css", ".scss", ".sass
 
 export const PAGE_EXTENSIONS: readonly string[] = [".html", ".htm", ".razor"];
 
+export const A_NAME_IN_CODE = "[A-Za-z_$][A-Za-z0-9_$]{2,}";
+
+export const A_WRITTEN_TOKEN = `${A_NAME_IN_CODE}([-.][A-Za-z0-9_$]+)*`;
+
 export const JUDGED_EXTENSIONS: readonly string[] = [
   ".ts",
   ".tsx",
@@ -200,8 +204,6 @@ export const SAME_LINE_PX = 0.5;
 export const NEAR_MISS_PX = 4;
 
 export const ALONE_SHOWN = 40;
-
-export const SPINE_MARKS = 3;
 
 export const DRIFT_PX = 24;
 

@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { A_READER_MAY_ANSWER_WITH, GIT_TIMEOUT_MS } from "./config.ts";
+import { A_READER_MAY_ANSWER_WITH, A_WRITTEN_TOKEN, GIT_TIMEOUT_MS } from "./config.ts";
 import { reasonFrom } from "./fields.ts";
 
 const IN_HAND: readonly (readonly string[])[] = [
@@ -235,8 +235,6 @@ export type Vocabulary =
   | { readonly kind: "cannot-tell"; readonly why: string }
   | { readonly kind: "words"; readonly words: ReadonlySet<string> };
 
-const A_WORD = "[A-Za-z_$][A-Za-z0-9_$]{2,}";
-
 export function everyWordAt(
   root: string,
   revision: string,
@@ -248,7 +246,7 @@ export function everyWordAt(
       "-h",
       "-o",
       "-E",
-      A_WORD,
+      A_WRITTEN_TOKEN,
       revision,
       "--",
       ...ignoring.map((one) => `:!${one}`),

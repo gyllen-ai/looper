@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 
 import { writeAtomically } from "../atomic.ts";
-import { REPORT_DEPTH, REPORT_PATH, SERVER_VERSION } from "../config.ts";
+import { A_NAME_IN_CODE, REPORT_DEPTH, REPORT_PATH, SERVER_VERSION } from "../config.ts";
 import { SKELETON_WORDS, render, shapeFor } from "./skeleton.ts";
 import { judgedFiles } from "../law/project.ts";
 import { looperRoot } from "../law/readers.ts";
 import { reasonFrom } from "../fields.ts";
 
-const WORD = /[A-Za-z_$][A-Za-z0-9_$]{2,}/g;
+const WORD = new RegExp(A_NAME_IN_CODE, "g");
 
 const SAYABLE: ReadonlySet<string> = new Set([
   ...SKELETON_WORDS,
