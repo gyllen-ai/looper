@@ -23,6 +23,7 @@ export const USAGE: readonly string[] = [
   "  looper serve            the MCP server, on stdin and stdout",
   "  looper law [path...]    judge every file, or only what is under these paths",
   "  looper loop [--terse]   run this project's checks, one verdict each",
+  "  looper align            judge every captured page: does every line connect",
   "  looper adopt            propose a rule this project should follow",
   "  looper report           say a looper rule is wrong, without sending anything",
 ];

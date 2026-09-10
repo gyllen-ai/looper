@@ -17,7 +17,7 @@ const BRANCH_NAMES: readonly string[] = ["law", "process",
   "contract/versioning", "contract/serialization",
   "observe/logging", "observe/health",
   "secure/secrets", "secure/identity", "secure/input",
-  "ui/state", "ui/assets", "ui/motion", "ui/reach",
+  "ui/state", "ui/assets", "ui/motion", "ui/reach", "ui/line",
   "work/testing", "work/deploy", "work/config",
 ];
 
@@ -103,6 +103,7 @@ export function canonGoverns(): ReadonlyMap<string, readonly string[]> {
     ["ui/assets", PICTURES],
     ["ui/motion", MOVING],
     ["ui/reach", DRAWN],
+    ["ui/line", LOOKED_AT],
     ["work/testing", PROVEN],
     ["work/deploy", SHIPPED],
     ["work/config", SETTINGS],
