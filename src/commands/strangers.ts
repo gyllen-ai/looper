@@ -1,12 +1,12 @@
 import type { Out } from "../out.ts";
 import { valueAfter } from "./args.ts";
 import { here } from "../session.ts";
-import { strangersAgainst, strangersLeaving } from "../secrets/strangers.ts";
+import { strangersAgainst, strangersInHand } from "../secrets/strangers.ts";
 
 export function strangers(args: readonly string[], out: Out): number {
   const asked = valueAfter(args, "--against");
   const root = here();
-  const sweep = asked.kind === "given" ? strangersAgainst(root, asked.value) : strangersLeaving(root);
+  const sweep = asked.kind === "given" ? strangersAgainst(root, asked.value) : strangersInHand(root);
 
   if (sweep.kind === "cannot-tell") {
     out.warn(

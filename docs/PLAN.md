@@ -7720,3 +7720,25 @@ mechanically by a tool and announced by a per-turn notice, so it needs no
 level-three prose of its own. `ui/line` grew from the edges of a screen to the
 edges and what everything on them wears, inside its existing ceiling, and the
 index is unchanged.
+
+## The stranger sweep answered about the last commit — 2026-09-10
+
+The third check in one day to watch the wrong thing, and the one that let the
+same mistake through twice.
+
+`looper strangers` asked git for `origin/main...HEAD`, which is the merge base
+against the **last commit**. Run before committing — which is the only moment it
+is useful, because it exists to be read before the words leave — it saw nothing
+staged and nothing unsaved, and answered *"every word in this change already
+appears somewhere in this repository"*. On 2026-09-10 an adopting project's
+class name sat staged in this document while the sweep said that, twice in one
+session. Both times it was caught by reading the diff by hand.
+
+The sweep on the push gate was right all along: at a push the work is committed
+and `...HEAD` is exactly what will leave. So there are two questions and they
+are not the same one. `strangersLeaving` keeps the old reading. The command now
+asks `strangersInHand`, which diffs the revision against the working tree and so
+covers committed, staged and unsaved together. `tests/strangers.test.ts` holds
+all three: a staged word is found, an unsaved word is found, and a word that
+exists only in the working tree is *not* reported as leaving, because a push
+does not carry it.
