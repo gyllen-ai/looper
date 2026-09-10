@@ -1,6 +1,6 @@
 import { additionsAgainst, everyWordAt, whatTheRemoteAlreadyHas } from "../git.ts";
+import { A_WRITTEN_TOKEN } from "../config.ts";
 import { readConcessions } from "../law/concessions.ts";
-import { wordsIn } from "../report/write.ts";
 
 export type Stranger = {
   readonly word: string;
@@ -13,6 +13,13 @@ export type Sweep =
   | { readonly kind: "swept"; readonly against: string; readonly strangers: readonly Stranger[] };
 
 const NOBODY_ELSE_WROTE_THESE: readonly string[] = ["vendor", "package-lock.json"];
+
+const A_TOKEN = new RegExp(A_WRITTEN_TOKEN, "g");
+
+export function tokensIn(text: string): ReadonlySet<string> {
+  const found = text.match(A_TOKEN);
+  return new Set(found === null ? [] : found);
+}
 
 export function strangersLeaving(root: string): Sweep {
   const against = whatTheRemoteAlreadyHas(root);
@@ -35,7 +42,7 @@ export function strangersAgainst(root: string, revision: string): Sweep {
   for (const added of going.added) {
     if (unwritten.some((part) => added.file.split("/").includes(part))) continue;
     if (unwritten.includes(added.file)) continue;
-    for (const word of wordsIn(added.text)) {
+    for (const word of tokensIn(added.text)) {
       if (known.words.has(word) || seen.has(word)) continue;
       seen.add(word);
       strangers.push({ word, file: added.file, line: added.line });

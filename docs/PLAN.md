@@ -7431,17 +7431,18 @@ a page to another, the cards have different margins, so they start in different
 places. One frame cannot see that. So frames of the **same viewport width**
 are also compared with each other.
 
-A **spine** is a line at least `SPINE_MARKS` (3) different marks stand on: the
-column that holds a page up. A spine in one frame that no line in another frame
-of the same width sits on, with a spine of that frame within `DRIFT_PX` (24)
-instead, is a **drift** — the same column, standing somewhere else.
+A **drift** is the same element's same edge, at a different x, in another frame
+of the same width: the card's own painted left edge at 312 here and at 320
+there, no line of the other frame within `SAME_LINE_PX` of 312, and the two
+within `DRIFT_PX` (24) of each other.
 
-The precision comes from what has to match. Two spines are the same spine only
-when the same element's same edge is on both: the same card's own painted left edge
-at 312 here and at 320 there. Without that, a page that simply has
-different content reports drift on every band, and the first run said exactly
-that — see the false positives below. Pages of different widths are never
-compared, because the layout is meant to differ.
+The precision is in what has to match, and it is the element and the edge. A
+page that simply holds different things cannot fire it, and neither can one
+element's own two edges. Only the horizontal axis is compared: what is above an
+element legitimately differs from page to page, and what is to its left does
+not. Pages of different widths are never compared either, because the layout is
+meant to differ. What this rule was first, and what the console showed it, is
+below.
 
 ### Measured, 2026-09-10
 
@@ -7548,3 +7549,37 @@ now **the same element's same edge, at a different x, in another frame of the
 same width** — which cannot fire on two pages that merely hold different things.
 Only the horizontal axis is compared: what is above an element legitimately
 differs from page to page, and what is to the left of it does not.
+
+## Two checks that watched the wrong thing — 2026-09-10
+
+Both were found by the alignment work above getting past them, in the same
+session that wrote it.
+
+**The stranger sweep read a class name as the ordinary words in it.** Adopter
+markup went into this document — a selector of the shape `x.a-b > c` — and the
+sweep said every word already appeared here, because its pattern stopped at the
+hyphen and both halves were common English. The pattern was also written twice,
+once as a regular expression for the change side and once as a string for
+`git grep` on the repository side, so the two could drift apart and nothing
+would say so.
+
+They were never one fact, though, which is why they read differently and both
+were right about their own question. The report's redaction wants every name
+*inside* a compound, so a leaked identifier buried in `a.b` is still caught.
+The sweep wants the compound *as written*, because that is the thing that gets
+out. So `config.ts` now holds both, named for the question each answers —
+`A_NAME_IN_CODE` and `A_WRITTEN_TOKEN` — and the sweep no longer borrows the
+report's splitter. `tests/strangers.test.ts` holds the escape itself: a name
+whose every half is already in the repository is still named.
+
+**A setting nothing reads is not caught by anything.** `noUnusedLocals` cannot
+see an export, and the law judges one file at a time, so a constant added to
+`src/config.ts` and then orphaned by the next rewrite is invisible. That is
+exactly what happened to a threshold here, one rewrite after the rule that read
+it. The general version of this check is not built: run it over every export in
+`src/` and it reports 160, nearly all of them types and rule declarations that
+are the public shape of their file, and a rule with that many false positives is
+blunt rather than strict. The narrow one is decidable and it is now an
+invariant: `config.ts` is a table of settings, nothing in it reads its own
+entries, so an entry no file names is a leftover. It reports zero on this tree
+and was proven by planting one.
