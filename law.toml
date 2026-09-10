@@ -19,3 +19,9 @@ files = ["src/main.ts", "bin/looper.js", "audit/evasion.ts", "audit/dup-scan.ts"
 # is written down on purpose: the colour in a case is the shape the rule must
 # fire on, and the test that proves the palette knob holds a colour too.
 "audit/css-cases.ts" = ["TS-TRUTH:3"]
+
+# The same reason, for the contrast checker: a ratio is arithmetic over two
+# colours, so the cases for it are colours and there is no honest spelling
+# without them. This file is a corpus and paints nothing, which is why the
+# colours live here and not in the test that reads them.
+"audit/look-cases.ts" = ["TS-TRUTH:3"]

@@ -1,5 +1,5 @@
 import { DRIFT_PX, SAME_LINE_PX } from "../config.ts";
-import type { Frame } from "./frame.ts";
+import type { Frame } from "../frame/frame.ts";
 import { linesOf, onAxis, type Line } from "./lines.ts";
 
 export type Stand = {

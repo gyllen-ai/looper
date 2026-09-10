@@ -1,4 +1,4 @@
-import type { Box, Mark, Side } from "./frame.ts";
+import type { Box, Mark, Side } from "../frame/frame.ts";
 
 export type Axis = "down" | "across";
 

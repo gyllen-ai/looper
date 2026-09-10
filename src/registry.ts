@@ -7,6 +7,7 @@ import { Secrets } from "./secrets/capability.ts";
 import type { Capability, HookContext, Outcome } from "./capability.ts";
 import { reasonFrom } from "./fields.ts";
 import { whereTheUserLives } from "./config.ts";
+import { Look } from "./look/capability.ts";
 import { Loop } from "./loop/capability.ts";
 import { Pins } from "./pins/capability.ts";
 import { Stall } from "./stall/capability.ts";
@@ -40,6 +41,7 @@ export function registry(): readonly Capability[] {
     new Recall(),
     new Decisions(),
     new Align(),
+    new Look(),
     new Loop(whereTheUserLives()),
     new Pins(),
     new Stall(),

@@ -10,11 +10,20 @@ export const PROBE: string = String.raw`
 
   function rgba(text) {
     if (!text || text === "transparent") return [0, 0, 0, 0];
-    const held = /^rgba?\(([^)]+)\)$/.exec(text.trim());
-    if (!held) return null;
-    const parts = held[1].split(/[\s,\/]+/).filter((p) => p.length > 0).map(Number);
-    if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return null;
-    return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+    const said = text.trim();
+    const held = /^rgba?\(([^)]+)\)$/.exec(said);
+    if (held) {
+      const parts = held[1].split(/[\s,\/]+/).filter((p) => p.length > 0).map(Number);
+      if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return null;
+      return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+    }
+    const wide = /^color\(srgb ([^)]+)\)$/.exec(said);
+    if (wide) {
+      const parts = wide[1].split(/[\s\/]+/).filter((p) => p.length > 0).map(Number);
+      if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return null;
+      return [parts[0] * 255, parts[1] * 255, parts[2] * 255, parts.length > 3 ? parts[3] : 1];
+    }
+    return null;
   }
 
   function over(top, bottom) {
@@ -153,6 +162,87 @@ export const PROBE: string = String.raw`
     return box;
   }
 
+  const CONTENT_DECIDES = new Set([
+    "width", "height", "inline-size", "block-size", "min-width", "min-height",
+    "max-width", "max-height", "min-inline-size", "min-block-size",
+    "max-inline-size", "max-block-size", "top", "right", "bottom", "left",
+    "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end",
+    "perspective-origin", "transform-origin", "x", "y", "cx", "cy", "r", "rx", "ry", "d",
+    "grid-template-columns", "grid-template-rows", "grid-template-areas", "flex-basis",
+  ]);
+
+  const initial = (() => {
+    const el = document.createElement("div");
+    el.setAttribute("style", "all:initial;position:absolute;left:-9999px;top:-9999px");
+    document.body.append(el);
+    const style = getComputedStyle(el);
+    const held = new Map();
+    for (const property of style) held.set(property, style.getPropertyValue(property));
+    el.remove();
+    return held;
+  })();
+
+  const A_LOGICAL_EDGE = /(^|-)(inline|block)-(start|end)(-|$)|^border-(start|end)-(start|end)-/;
+
+  function whatIsWorn(style, ground) {
+    const worn = {};
+    const ink = style.getPropertyValue("color");
+    const sideways = style.direction === "ltr" && style.writingMode === "horizontal-tb";
+    for (const property of style) {
+      if (property.startsWith("-webkit-") || property.startsWith("-moz-")) continue;
+      if (property.startsWith("-ms-") || property.startsWith("--")) continue;
+      if (CONTENT_DECIDES.has(property)) continue;
+      if (sideways && A_LOGICAL_EDGE.test(property)) continue;
+      const value = style.getPropertyValue(property);
+      if (value === initial.get(property)) continue;
+      if (property !== "color" && property.endsWith("-color") && value === ink) continue;
+      worn[property] = value;
+    }
+    if (ground !== null) worn["-looper-behind"] = "rgb(" + ground.map(Math.round).join(", ") + ")";
+    return worn;
+  }
+
+  const CASE_TELLING = /\p{L}/u;
+
+  function caseOf(text) {
+    const said = text.trim();
+    if (!CASE_TELLING.test(said)) return "no letters";
+    if (said === said.toUpperCase()) return "UPPER";
+    if (said === said.toLowerCase()) return "lower";
+    const words = said.split(/\s+/).filter((one) => CASE_TELLING.test(one));
+    const capped = words.filter((one) => one[0] === one[0].toUpperCase());
+    if (capped.length === words.length && words.length > 1) return "Title Case";
+    return "Sentence case";
+  }
+
+  function withCase(worn, said) {
+    if (said === "no letters") return worn;
+    return { ...worn, "-looper-text-case": said };
+  }
+
+  const STATEFUL = ["aria-expanded", "aria-selected", "aria-checked", "aria-pressed",
+    "aria-current", "aria-disabled", "data-state", "disabled", "open", "readonly"];
+
+  function kindOf(el) {
+    const parts = [el.tagName.toLowerCase()];
+    const classes = typeof el.className === "string" ? el.className.trim().split(/\s+/) : [];
+    for (const one of classes.filter((c) => c.length > 0).sort()) parts.push("." + one);
+    for (const name of STATEFUL) {
+      const held = el.getAttribute(name);
+      if (held !== null) parts.push("[" + name + "=" + held + "]");
+    }
+    return parts.join("");
+  }
+
+  function groundUnder(el, style) {
+    const behind = backdropOf(el);
+    if (behind === null) return null;
+    if (style.backgroundImage !== "none") return null;
+    const own = rgba(style.backgroundColor);
+    if (own === null) return null;
+    return over(own, behind).slice(0, 3);
+  }
+
   function nameOf(el) {
     let said = el.tagName.toLowerCase();
     if (el.id.length > 0) return said + "#" + el.id;
@@ -185,6 +275,11 @@ export const PROBE: string = String.raw`
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 && rect.height <= 0) continue;
 
+      const ground = groundUnder(el, style);
+      const worn = whatIsWorn(style, ground);
+      if (el.getAnimations !== undefined && el.getAnimations().length > 0) {
+        worn["-looper-moving"] = "yes";
+      }
       const sides = paintedSides(el, style);
       let ink = null;
       if (el.namespaceURI === "http://www.w3.org/2000/svg" && el.tagName.toLowerCase() === "svg") {
@@ -198,6 +293,8 @@ export const PROBE: string = String.raw`
         );
         marks.push({
           at: pathTo(el),
+          kind: kindOf(el),
+          look: worn,
           box: boxOf(rect),
           sides,
           ink,
@@ -212,6 +309,8 @@ export const PROBE: string = String.raw`
         if (drawn === null) continue;
         marks.push({
           at: pathTo(el) + ' "' + said(node.data) + '"',
+          kind: kindOf(el) + " (text)",
+          look: withCase(worn, caseOf(node.data)),
           box: boxOf(rect),
           sides: [],
           ink: drawn.box,
@@ -241,12 +340,19 @@ export const PROBE: string = String.raw`
       switches.push({ at: pathTo(el), kind: "checked", value: el.checked ? "true" : "false" });
     }
 
+    const asShipped = {};
+    for (const [property, value] of initial) {
+      if (property.startsWith("-") || CONTENT_DECIDES.has(property)) continue;
+      asShipped[property] = value;
+    }
+
     return JSON.stringify({
       page,
       state,
       captured: new Date().toISOString(),
       width: window.innerWidth,
       height: window.innerHeight,
+      initial: asShipped,
       marks,
       switches,
     });

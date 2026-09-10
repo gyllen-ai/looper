@@ -209,6 +209,20 @@ export const DRIFT_PX = 24;
 
 export const UNMOVED_SHOWN = 12;
 
+export const TEXT_RATIO = 4.5;
+
+export const THING_RATIO = 3;
+
+export const LARGE_TEXT_PX = 24;
+
+export const LARGE_WHEN_BOLD_PX = 18.66;
+
+export const WORN_SHOWN = 25;
+
+export const LOOK_TOOL = "look";
+
+export const LOOK_PRIORITY = 30;
+
 export const SECRETS_ALLOW_PATH = ".looper/secrets.allow";
 
 export const ALLOW_MARKER = "looper:allow-secret";

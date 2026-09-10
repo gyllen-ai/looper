@@ -6,9 +6,9 @@ import { join } from "node:path";
 
 import { NEAR_MISS_PX, SAME_LINE_PX } from "../src/config.ts";
 import { driftAcross } from "../src/align/across.ts";
-import { readFrame, type Frame } from "../src/align/frame.ts";
+import { readFrame, type Frame } from "../src/frame/frame.ts";
 import { judgeFrame, unmoved, type Alone } from "../src/align/judge.ts";
-import { heldIn, keep, newestLook, staleAgainst } from "../src/align/store.ts";
+import { heldIn, keep, newestLook, staleAgainst } from "../src/frame/store.ts";
 import { standingVerdict } from "../src/align/capability.ts";
 import {
   bordered,
