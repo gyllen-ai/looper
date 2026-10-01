@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 619 cases · 734 tests
+90 rules · 5 languages · 619 cases · 735 tests
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
