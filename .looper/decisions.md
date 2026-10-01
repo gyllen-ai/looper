@@ -14,7 +14,7 @@ prose, because what an entry says is a judgement and no tool refreshes a judgeme
 ## 2026-08-21 — Doctrine branches are droppable, reversing the rule that they must always arrive
 kind: law
 depends: src/router.ts, src/allocator.ts
-checked: 2026-08-21  68e98133a1ae
+checked: 2026-10-01  077b9107db61
 
 tests/rules-that-never-arrived.test.ts states the opposite, and states it with evidence: adopter PR #124 counted doctrine:frontend going over the side 32 times in one session while interface work was being done, and a rule that never arrived is indistinguishable from a rule that was followed. Branches were made required for that reason. This entry is the departure from it, in the open.
 

@@ -1,9 +1,41 @@
 import type { Out } from "../out.ts";
 import { readFileSync } from "node:fs";
-import { isHookEvent, type Payload } from "../capability.ts";
-import { dispatchHook, registry } from "../registry.ts";
+import { isHookEvent, type HookEvent, type Payload } from "../capability.ts";
+import { dispatchHook, registry, type Dispatch } from "../registry.ts";
 import { reasonFrom } from "../fields.ts";
+import { couldNotJudge } from "../report/say.ts";
 import { here, remember } from "../session.ts";
+
+const THE_AGENT_IS_LISTENING_ON: readonly HookEvent[] = ["PreToolUse", "PostToolUse"];
+
+export type Answer = {
+  readonly code: number;
+  readonly said: readonly string[];
+  readonly warned: readonly string[];
+};
+
+export function answerTo(event: HookEvent, result: Dispatch): Answer {
+  const warned = result.complaints.map(
+    (held) => `looper: ${held.capability} could not reach a verdict (${held.detail}); passing`,
+  );
+  if (result.refusals.length > 0) {
+    return { code: 2, said: [], warned: [...warned, ...result.refusals.map((held) => held.reason)] };
+  }
+  const failed = THE_AGENT_IS_LISTENING_ON.includes(event)
+    ? result.complaints.map((held) => couldNotJudge(held.capability, held.detail))
+    : [];
+  const context = [...result.mentions.map((held) => held.note), ...failed];
+  if (context.length === 0) return { code: 0, said: [], warned };
+  return {
+    code: 0,
+    said: [
+      JSON.stringify({
+        hookSpecificOutput: { hookEventName: event, additionalContext: context.join("\n\n") },
+      }),
+    ],
+    warned,
+  };
+}
 
 function readPayload(out: Out): Payload {
   try {
@@ -28,31 +60,17 @@ export function hook(args: readonly string[], out: Out): number {
     return 0;
   }
   remember(name, out);
-  const result = dispatchHook(registry(), {
-    root: here(),
-    event: name,
-    payload: name === "CommitMessage" ? readMessage(args[1], out) : readPayload(out),
-  });
-  for (const complaint of result.complaints) {
-    out.warn(
-      `looper: ${complaint.capability} could not reach a verdict (${complaint.detail}); passing`,
-    );
-  }
-  if (result.refusals.length > 0) {
-    for (const refusal of result.refusals) out.warn(refusal.reason);
-    return 2;
-  }
-  for (const mention of result.mentions) {
-    out.say(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: name,
-          additionalContext: mention.note,
-        },
-      }),
-    );
-  }
-  return 0;
+  const answer = answerTo(
+    name,
+    dispatchHook(registry(), {
+      root: here(),
+      event: name,
+      payload: name === "CommitMessage" ? readMessage(args[1], out) : readPayload(out),
+    }),
+  );
+  for (const line of answer.warned) out.warn(line);
+  for (const line of answer.said) out.say(line);
+  return answer.code;
 }
 
 function readMessage(path: string | undefined, out: Out): Payload {

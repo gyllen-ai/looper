@@ -5,6 +5,7 @@ import {
   type Rule,
   type Violation,
 } from "./rule.ts";
+import { A_FAULT_IN_LOOPER } from "../report/say.ts";
 
 const WHOLE_FILE = 0;
 
@@ -82,8 +83,8 @@ export function formatReport(violations: readonly Violation[], standing: Standin
       `  ${swallowed} problem(s) were found and could not be printed, because their`,
       `  category is not one this report knows: ${strangers.join(", ")}.`,
       `  A rule that fires and is never shown is worse than a rule that does not exist.`,
-      `  Add the category to CATEGORY_ORDER in src/law/rule.ts, and please open an`,
-      `  issue at github.com/gyllen-ai/looper — this is our bug, not yours.`,
+      `  The category is missing from CATEGORY_ORDER in src/law/rule.ts.`,
+      `  ${A_FAULT_IN_LOOPER}`,
     );
   }
 

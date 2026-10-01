@@ -47,6 +47,7 @@ import { checksAdoptedIn } from "./adopted.ts";
 import type { Violation } from "./rule.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
 import { aCommandIsAboutToRun, whenTheCommandStarted, writtenSince } from "../watching.ts";
+import { IF_THE_RULE_IS_WRONG } from "../report/say.ts";
 
 const EVERYTHING: readonly string[] = [];
 
@@ -157,7 +158,7 @@ function judgeWhatTheCommandWrote(root: string): Outcome {
   if (yours.length > 0) {
     return {
       kind: "block",
-      reason: `${formatReport(yours, "some-new")}${alsoHere(older)}${couldNotStat}`,
+      reason: `${formatReport(yours, "some-new")}${alsoHere(older)}${couldNotStat}\n\n${IF_THE_RULE_IS_WRONG}`,
     };
   }
   if (older.length > 0 || couldNotStat.length > 0) {
@@ -388,7 +389,10 @@ export class Law implements Capability {
     const split = judgeOneFile(context.root, target);
     if (split.yours.length === 0 && split.older.length === 0) return { kind: "pass" };
     if (split.yours.length > 0) {
-      return { kind: "block", reason: `${formatReport(split.yours, "some-new")}${alsoHere(split.older)}` };
+      return {
+        kind: "block",
+        reason: `${formatReport(split.yours, "some-new")}${alsoHere(split.older)}\n\n${IF_THE_RULE_IS_WRONG}`,
+      };
     }
     return { kind: "mention", note: invitation(target.relative, split.older) };
   }

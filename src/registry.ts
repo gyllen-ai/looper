@@ -10,6 +10,7 @@ import { whereTheUserLives } from "./config.ts";
 import { Look } from "./look/capability.ts";
 import { Loop } from "./loop/capability.ts";
 import { Pins } from "./pins/capability.ts";
+import { Report } from "./report/capability.ts";
 import { Stall } from "./stall/capability.ts";
 
 export type Refusal = {
@@ -45,6 +46,7 @@ export function registry(): readonly Capability[] {
     new Loop(whereTheUserLives()),
     new Pins(),
     new Stall(),
+    new Report(whereTheUserLives()),
   ];
 }
 

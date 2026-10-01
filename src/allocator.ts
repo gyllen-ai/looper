@@ -1,6 +1,7 @@
 import { HOOK_OUTPUT_CEILING, HOOK_PREVIEW_CHARS, INJECTION_SEPARATOR } from "./config.ts";
 import type { Capability, InjectContext, Injection } from "./capability.ts";
 import { reasonFrom } from "./fields.ts";
+import { couldNotSpeak } from "./report/say.ts";
 import { heardBefore, noteSaid } from "./said.ts";
 
 export type Weighed = {
@@ -159,14 +160,16 @@ export function allocate(
   if (dropped.length > 0) parts.push(droppedMarker(dropped));
   if (requiredAlone) parts.push(overBudgetMarker(used, context.budget));
 
-  const text = clamp(parts.join(INJECTION_SEPARATOR));
+  const spoken = parts.join(INJECTION_SEPARATOR);
+  const failed = complaints.map((held) => couldNotSpeak(held.capability, held.detail));
+  const text = clamp([...(spoken.length === 0 ? [] : [spoken]), ...failed].join(INJECTION_SEPARATOR));
   return {
     allocation: {
       text,
       contributors,
       weighed,
       dropped,
-      overflowed: requiredAlone || text.length > context.budget,
+      overflowed: requiredAlone || spoken.length > context.budget,
       chars: text.length,
     },
     complaints,

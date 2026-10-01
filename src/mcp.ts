@@ -7,6 +7,7 @@ import {
 import type { Capability, ToolResult } from "./capability.ts";
 import { ageOfOurCode, agingSaid, type Age } from "./code-age.ts";
 import { reasonFrom } from "./fields.ts";
+import { A_FAULT_IN_LOOPER } from "./report/say.ts";
 
 export type Request = {
   readonly id: string | number | null;
@@ -35,6 +36,7 @@ function stringArgs(value: unknown): ReadonlyMap<string, string> {
   if (record === null) return found;
   for (const [key, held] of Object.entries(record)) {
     if (typeof held === "string") found.set(key, held);
+    if (typeof held === "number") found.set(key, String(held));
   }
   return found;
 }
@@ -133,7 +135,19 @@ function invoke(
   }
   for (const capability of capabilities) {
     if (!capability.tools().some((tool) => tool.name === asked)) continue;
-    return content(capability.call({ root, tool: asked, args: request.args }), agingSaid(loaded));
+    try {
+      return content(capability.call({ root, tool: asked, args: request.args }), agingSaid(loaded));
+    } catch (cause) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `looper's ${asked} tool failed (${reasonFrom(cause)}), so it did nothing. ${A_FAULT_IN_LOOPER}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   }
   return content({ kind: "unknown-tool", asked }, agingSaid(loaded));
 }

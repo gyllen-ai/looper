@@ -2032,6 +2032,17 @@ for, so a Python docstring is a string rather than a comment and prose inside on
 still counts. That is the deliberate limit, and it is the same one the adopter's
 own suggestion of "identifiers and string literals" would have drawn.
 
+**The project's words are not read at all. Replaced 2026-10-01.** Everything in
+the three paragraphs above was a way of deciding which of the project's words
+count. A sentence is now refused for how a word is *written* — a capital or a
+digit inside it, an underscore, a capital in the middle of a sentence, a path,
+an address — unless looper's own shipped files use that word. So no comment, no
+string and no unreadable file can decide anything, `withoutComments`,
+`everyWordInProject` and the "could not be sure" refusal are gone, and a name
+that lived only in a README or in somebody's head is stopped like any other.
+The measurement that chose this is under "looper can be told it is wrong by a
+sentence", at the end of this document.
+
 **Every judging path asks what the file is first. Corrected 2026-08-18, issue
 #56, finding 102.** The commit gate was the one path that judged without a role,
 so a rule scoped to the backend half of a project applied to an interface file
@@ -2596,11 +2607,28 @@ and the guard that checks for a leak is the one guard, so a language cannot be
 added to the law and left out of the report. That is what "one report across both
 languages" above has always claimed, and finding 92 is the day it became true.
 
+**It was true of three readers and there are five. Corrected 2026-10-01.** A C#,
+Razor, CSS or HTML file has no reader that draws a shape, and `shapeFor` handed
+every one of them to the TypeScript parser, which answered that the file could
+not be read as TypeScript. So thirteen of ninety rules could not be argued with
+at all. A report about one of them is now written without a shape and says that
+looper has no reader for that kind of file. `tests/report-tool.test.ts` holds it.
+
 3. **Adopters install, they do not fork.** The canon is compiled in precisely so
    it "cannot drift into N copies", and fifty adopter forks are N copies: a fix
    argued against rules we did not ship, from a version we cannot identify. Forks
    are for the few people changing looper itself. Every report therefore names
    the exact version it came from.
+   **It named 0.1.0, which had not moved in two hundred commits. Built
+   2026-10-01.** A report now carries the commit and a hash of looper's own
+   shipped files. The commit comes from looper's own tree, never the project's:
+   `src/built-from` holds a mark that a git archive replaces with the commit
+   (measured 2026-10-01 on another repository's tarball from the same host, and
+   npm 11.19's own source fetches a hosted dependency as that tarball), and a
+   real checkout asks git. It asks git only when looper's own folder holds
+   `.git`: asked from inside `node_modules`, git answers with the commit of the
+   project around it (measured 2026-10-01), which is somebody else's
+   repository printed as looper's own. Anything else says "commit not known".
 4. **The report is a file, and how it travels is not ours to decide.** looper
    writes a report and says what it is for. Whether it becomes a GitHub pull
    request, a GitLab merge request, a ticket, or a message pasted to someone is
@@ -2608,12 +2636,20 @@ languages" above has always claimed, and finding 92 is the day it became true.
    name of a hosting provider, and nothing should: the whole engine speaks plain
    git — `diff`, `show`, `ls-files`, `diff-tree` — which is identical on every
    host and works in a repository with no remote at all.
+   **One line knew a host until 2026-10-01.** The "looper is broken" block in
+   `src/law/report.ts` told its reader to open an issue at a named address. It
+   names the `report` tool now.
 5. **What the agent is told is doctrine, not code.** The canon gains the rule:
    when a looper rule blocks you and no legal spelling discharges it, that is
    looper's defect and not yours — do not edit looper, do not disable the rule,
    produce a report. Installed in `node_modules`, looper is already effectively
    read-only, so the instruction that carries weight is the positive one, and it
    belongs in the canon because it is true for every governed project.
+   **The canon line reached one language. Widened 2026-10-01.** It lives in the
+   `law` rule set, which arrives with TypeScript and JavaScript files, so a
+   Rust, Python, C# or CSS refusal named no way to argue. Every refusal of an
+   edit and of a commit now ends with the route, and so does every failure of
+   looper's own that reaches the agent.
 
 **What this is really buying.** Not bug reports — a rule set with a supply of
 real bypasses, which is the only thing the "never speculatively" bar will accept.
@@ -3025,6 +3061,11 @@ reported.
 agent produces a report naming the version, the rule and a minimal reproduction,
 a human reads the file before it leaves the machine, and nothing in it came from
 the adopter's own source.
+
+**Widened 2026-10-01**, and the first half of it is under "looper can be told it
+is wrong by a sentence": the report is a tool an agent reaches on an ordinary
+turn, it covers a fault that is not a rule on a line, and looper's own failures
+reach the agent that can report them. What is still not built is said there.
 
 ### Chunk 7 — named so it is not mistaken for forgotten
 
@@ -3889,7 +3930,9 @@ is the whole of the remaining work.
 | the return path | adopter agents report rules they cannot discharge; that is where the evidence for reactive rules comes from |
 | git, never a git host | looper runs `diff`, `show`, `ls-files` and `diff-tree` and knows no hosting provider's name. GitLab, Bitbucket, Gitea, a bare repo with no remote: all identical. The return path produces a file; how it travels is the adopter's |
 | who transports it | never looper, which stays socket-incapable; the adopter's agent, which already has network access and is already watched |
-| what a report may carry | a minimal synthetic reproduction and the version, never the adopter's source, identifiers or paths; unminimisable means unsent |
+| what a report may carry | a minimal synthetic reproduction and the version, never the adopter's source, identifiers or paths; unminimisable means unsent. **Restated 2026-10-01:** the shape, the commit, and two sentences of 600 characters each, refused for any word written the way a name is written; a fault with no shape is still a report |
+| how a report is reached | a sentence: the `report` tool, on the server every project already runs. The command stays for a person in a shell |
+| where a report is kept | under the user's home, never in the project: a file there raises a rule set every turn and is one `git add -A` from being published |
 | adopters install, never fork | a fork is N copies of a canon compiled in precisely so it cannot drift; forks are for people changing looper itself |
 | written as if public | from now, whatever the repo's setting: it costs nothing, removes the retrofit, and reasoning aimed at a skeptical outsider is sharper |
 | opening the repo | decided: it goes public, one repo, plan and scar log included. The case is verifiability — a tool hooked into every edit and commit should be auditable — and nothing in the plan is a moat. The switch waits for the law engine; the writing discipline does not |
@@ -3941,6 +3984,10 @@ would change a decision above rather than merely a detail:
   resolved. A warning that waits to be asked for is not a warning. This is worse
   in npm than it would have been in Cargo, because a project can pin an old
   version in its lockfile and never notice.
+  **It printed nothing of the kind until 2026-10-01.** `looper status` now
+  says the version, the commit and the hash of looper's own files, from the
+  same function a report uses. The pushed line about a stale build is still
+  only the MCP server's (`src/code-age.ts`).
 - **Never put `npx` in a hook command.** It re-resolves on every invocation and
   would dwarf the entire measured budget. Hooks point at a resolved binary path.
 - **The no-network invariant is harder in npm and must be enforced, not audited.**
@@ -7742,3 +7789,127 @@ covers committed, staged and unsaved together. `tests/strangers.test.ts` holds
 all three: a staged word is found, an unsaved word is found, and a word that
 exists only in the working tree is *not* reported as leaving, because a push
 does not carry it.
+
+## looper can be told it is wrong by a sentence — 2026-10-01
+
+The owner asked for one line telling every session that it may report looper's
+own faults, so that looper improves from many users' sessions. "The return path"
+above already designs that, so the first thing measured was whether it runs.
+
+**Measured on GitHub, 2026-10-01: 61 issues and 138 pull requests, every one
+from one account.** No fork and no pull request from another repository. An
+"adopter issue" in this document has always been an agent working in an adopting
+project under the maintainer's own account. No stranger has ever used the route,
+and three things explain that without needing a fourth.
+
+- **It was a command.** Four flags, named by a sentence that arrives only with
+  TypeScript files in hand and by a refusal that arrives only at a commit. This
+  repo's constitution says the only input is a sentence.
+- **It covered one kind of fault.** A rule that fired on a line. A hook that
+  fails, an answer that is untrue, a rule that stayed silent and a thing looper
+  should do had no route, and neither did thirteen of the ninety rules, whose
+  languages have no reader that draws a shape.
+- **The faults most worth hearing never reached the witness.** A capability that
+  throws was announced on stderr at exit 0. The agent's host documents that,
+  read 2026-10-01: "Stderr from a hook that exits 0 goes to the debug log only,
+  never the transcript, and Claude never sees it." The same page says two lines
+  that each parse as JSON are a parse failure, and `src/commands/hook.ts` printed
+  one object per mention, so whenever two capabilities spoke on one hook both
+  were lost. Read, not run: no test here can drive that host.
+
+This section is the first of two changes. It makes a report something an agent
+reaches by a sentence and makes looper's failures visible to it. The line the
+owner asked for, and the one question a person answers before anything leaves,
+are the second, and are not built.
+
+### What was built
+
+**The `report` tool**, on the server every project already runs. It takes a
+kind (`rule`, `missed`, `failed`, `untrue`, `idea`), what it is about, and two
+sentences: what looper did, and what was tried or what it should have done. A
+file and a line are optional and add the shape. `looper report` keeps its flags
+and is the same builder, for a person in a shell.
+
+**What it is about is one of looper's own names** — a rule id, a rule set, a
+tool, a hook, a command, a capability, or looper for the whole of it. The old
+command printed the rule id it was handed without checking it and then excused
+that word in the sentence, so any name could ride in as the rule. A rule the
+project adopted for itself is refused as its own. `tests/report-tool.test.ts`
+holds the list to the code, so a part that exists can always be named.
+
+**looper's own failures reach the agent.** A capability that throws on a tool
+hook is put in that hook's context, and one that throws while a turn is built
+becomes a part of the turn, each ending with the route. The hook prints one
+object. The Stop hook is left as it was: context there continues the
+conversation, so a failure that repeats would never let a session end.
+
+**Every refusal names the route**, in every language. The commit refusal no
+longer points at `CONTRIBUTING.md`, which an install does not carry.
+
+**A report is kept under the user's home, not in the project.** Measured
+2026-10-01: an untracked `.looper/report.md` raises the `evidence` rule set, and
+a turn with nothing else in hand went from 3,162 to 3,777 characters until the
+file was committed or deleted. It was also one `git add -A` from being published
+in the adopter's own repository. Beside each report looper keeps what became of
+it — written, sent, kept — so a fault a person has answered is not raised again.
+The same rule on the same shape is one report, however many sessions find it; a
+fault with no shape is identified by its two sentences, which no two sessions
+write alike, and nothing here claims otherwise.
+
+### The check on the two sentences, measured before it was pinned
+
+The old check asked whether a word was in the project's code and looked like a
+name. Three versions were run over the prose of the 61 issue bodies, 2026-10-01,
+with npm's own source standing in for a project nobody here wrote.
+
+| check | bodies with a refused word |
+|---|---|
+| a name-shaped word found in the project's code (the old rule) | 31 of 61, and 29 of those only over words looper itself uses |
+| any identifier in the project, unless looper uses the word | 61 of 61: `currently`, `requires`, `therefore` |
+| a name-shaped word wherever it came from, unless looper uses the word | 33 of 61 |
+
+The middle row is the design finding 61 already recorded as blunt, proposed
+again and refused again by its own numbers. The last row is what was built, and
+it never reads the project: a word is refused for how it is written, so a name
+that lives only in a README, a string or somebody's head is stopped like any
+other, and no file that could not be read can decide anything.
+
+**Every refused word was read by hand, twice.** Over those 61 bodies the shipped
+check stops 73 of 1,668 sentences (4.4%) on 56 distinct words: 23 names of
+products and systems, 14 pieces of code or paths, 8 commit ids, 3 of looper's
+own documents that an install does not carry, and 8 that are neither — two
+ordinary capitalised words, five abbreviations looper never writes, and one pair
+of words joined by a slash. Over sixty issue bodies written to another checker's
+public tracker it stops 241 of 844 sentences (28.6%) on 131 distinct words, and
+17 of those are plain writing; the rest are that project's own product, rule and
+people's names, addresses and commit ids, which is the thing a report must not
+carry. Eight kinds of false refusal came out of the first reading — a number in
+brackets, `I'd`, `e.g.`, an issue reference, a size with a sign, a version with
+a plus, a file looper ships, words joined by hyphens — and each was fixed in the
+check, with a case in `audit/report-cases.ts`, rather than excused.
+
+**What it does not guarantee, said in every report.** A name spelled as plain
+words passes. So does a vendor looper itself happens to name. The tool answers
+with the words in the two sentences that are not looper's own, because a person
+who cannot judge a report can still say whether one of twenty words is theirs.
+
+### What it refuses
+
+- **A list of allowed words.** Finding 61, and the middle row above.
+- **Reading the project to decide.** A check that depends on which files it
+  could read is a check with a hole the size of every file it could not.
+- **Asking git from inside an install.** It answers, and the answer is the
+  adopter's commit.
+- **Putting a failure in front of the agent at Stop.**
+- **A report with no person in it.** looper writes the file and cannot send it.
+
+### Not built, and said so
+
+- **The line.** No session is told unasked that looper can be wrong. Every
+  refusal and every failure says it; a turn in which nothing went wrong does not.
+- **The yes.** The tool ends as the command did: looper cannot send it, and what
+  happens to the file is the person's to decide.
+- **A switch** for a project that never wants the offer.
+- **A stall cluster as a proposal**, from "The return path" above.
+- **An install's commit, on a real install.** The mark is filled on a tarball
+  and npm fetches one; nobody here has yet installed this branch and read it.

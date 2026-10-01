@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildReport, leaksInShape, wordsIn, withoutComments } from "../src/report/write.ts";
+import { buildReport, leaksInShape, wordsIn, type Written } from "../src/report/write.ts";
+import { reportsIn } from "../src/report/store.ts";
 import { render, shapeAt } from "../src/report/skeleton.ts";
 import { WITHOUT_THE_RUST_ENGINE } from "./rust-engine.ts";
 
@@ -30,6 +31,12 @@ const SECRETS: readonly string[] = [
   "settle",
 ];
 
+const HOME = mkdtempSync(join(tmpdir(), "looper-report-home-"));
+
+process.on("exit", () => rmSync(HOME, { recursive: true, force: true }));
+
+const IT_FIRED = "The rule fired on this line and the code is fine.";
+
 function project(): string {
   const root = mkdtempSync(join(tmpdir(), "looper-report-"));
   mkdirSync(join(root, "src"), { recursive: true });
@@ -37,10 +44,30 @@ function project(): string {
   return root;
 }
 
+type Fired = {
+  readonly root: string;
+  readonly ruleId: string;
+  readonly file: string;
+  readonly line: number;
+  readonly tried: string;
+};
+
+function fired(asked: Fired): Written {
+  return buildReport({
+    root: asked.root,
+    home: HOME,
+    kind: "rule",
+    about: asked.ruleId,
+    wrong: IT_FIRED,
+    instead: asked.tried,
+    where: { kind: "line", file: asked.file, line: asked.line },
+  });
+}
+
 test("the report carries the shape and nothing from the project", () => {
   const root = project();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-ERROR:3",
       file: "src/billing.ts",
@@ -66,7 +93,7 @@ test("the report carries the shape and nothing from the project", () => {
 test("a leak through the free text refuses the whole report", () => {
   const root = project();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-ERROR:3",
       file: "src/billing.ts",
@@ -76,8 +103,9 @@ test("a leak through the free text refuses the whole report", () => {
 
     assert.equal(written.kind, "would-leak");
     if (written.kind !== "would-leak") return;
-    assert.ok(written.leaks.some((one) => one.word === "acmeBillingGateway"));
-    assert.ok(!existsSync(join(root, ".looper/report.md")), "and nothing is written");
+    assert.ok(written.leaks.some((one) => one.word.includes("acmeBillingGateway")));
+    assert.ok(!existsSync(reportsIn(root, HOME)), "and nothing is written");
+    assert.deepEqual(readdirSync(root).sort(), ["src"], "least of all inside the project");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -111,7 +139,7 @@ test("the same name twice gets the same placeholder, so the shape stays readable
 test("a line with nothing on it is refused rather than guessed at", () => {
   const root = project();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-ERROR:3",
       file: "src/billing.ts",
@@ -141,7 +169,7 @@ test("the shape may carry only words looper itself can write", () => {
 test("the report says looper cannot send it, because it cannot", () => {
   const root = project();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-ERROR:3",
       file: "src/billing.ts",
@@ -157,11 +185,11 @@ test("the report says looper cannot send it, because it cannot", () => {
   }
 });
 
-test("a name from any other file in the project is caught too", () => {
+test("a name from any other file in the project is caught too, without that file being read", () => {
   const root = project();
   try {
     writeFileSync(join(root, "src/config.ts"), "export const acmeTenantId = 1;\n");
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-ERROR:3",
       file: "src/billing.ts",
@@ -172,7 +200,7 @@ test("a name from any other file in the project is caught too", () => {
     assert.equal(
       written.kind,
       "would-leak",
-      "the check reads the whole project, not only the file the rule fired in",
+      "a name is stopped for being written like a name, so it does not matter which file it came from or whether looper could read that file",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -225,7 +253,7 @@ function rustProject(): string {
 test("a Rust file gets a report, because the Rust half is judged by rules that can be wrong too", WITHOUT_THE_RUST_ENGINE, () => {
   const root = rustProject();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "RUST-TYPE:4",
       file: "src/ledger.rs",
@@ -256,7 +284,7 @@ test("a Python file gets a report too, for the same reason", () => {
     mkdirSync(join(root, "src"), { recursive: true });
     writeFileSync(join(root, "src/ledger.py"), PRIVATE_PYTHON);
 
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "PY-ERROR:1",
       file: "src/ledger.py",
@@ -277,7 +305,7 @@ test("a Python file gets a report too, for the same reason", () => {
 test("a line with nothing on it is refused in Rust as well, rather than guessed at", () => {
   const root = rustProject();
   try {
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "RUST-TYPE:4",
       file: "src/ledger.rs",
@@ -311,7 +339,7 @@ test("every Python construct that names its node in lower case still gets a repo
     writeFileSync(join(root, "src/every.py"), EVERY_PYTHON_SHAPE);
 
     for (const line of [1, 2, 5, 6, 7, 8, 9, 10, 11]) {
-      const written = buildReport({
+      const written = fired({
         root,
         ruleId: "PY-ERROR:1",
         file: "src/every.py",
@@ -335,26 +363,28 @@ test("every Python construct that names its node in lower case still gets a repo
 
 
 
-test("a word that only appears in a comment is not a name from the code", () => {
-  assert.equal(
-    withoutComments("src/note.py", "# THE BUCKET IS THE TRUTH about it\nx = 1\n").includes("TRUTH"),
-    false,
-    "an ordinary English word somebody wrote in a comment becomes a word nobody may use when arguing with a rule",
-  );
-  assert.equal(
-    withoutComments("src/one.ts", "// the CACHE_KEY is stale\nconst CACHE_KEY = 1;\n").includes("CACHE_KEY"),
-    true,
-    "the name is still declared in the code, so it stays in the corpus",
-  );
-  assert.equal(
-    withoutComments("src/one.ts", 'const marker = "# not a comment";\n').includes("not"),
-    true,
-    "a comment marker inside a string is not a comment",
-  );
-  assert.equal(
-    withoutComments("src/one.ts", "/* SWEPT away */\nconst kept = 1;\n").includes("SWEPT"),
-    false,
-  );
+test("a word from a comment in the project is free to use, because the project is never what a sentence is checked against", () => {
+  const root = mkdtempSync(join(tmpdir(), "looper-report-comment-"));
+  try {
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/one.ts"), "// the bucket holds the cache and is the truth about it\nexport const n = rows.get(k) ?? 0;\n");
+
+    const written = fired({
+      root,
+      ruleId: "TS-TRUTH:1",
+      file: "src/one.ts",
+      line: 2,
+      tried: "the bucket holds the cache, so a default here is the truth about it",
+    });
+
+    assert.equal(
+      written.kind,
+      "written",
+      `issue #60 was an ordinary word in a comment becoming a word nobody could use while arguing with a rule. Nothing reads the project's words now, so no comment can do that: ${JSON.stringify(written)}`,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("arguing with a rule may use the rule's own name", () => {
@@ -364,7 +394,7 @@ test("arguing with a rule may use the rule's own name", () => {
     writeFileSync(join(root, "src/one.ts"), "export const n = rows.get(k) ?? 0;\n");
     writeFileSync(join(root, "src/note.py"), "# THE BUCKET IS THE TRUTH about it\nx = 1\n");
 
-    const written = buildReport({
+    const written = fired({
       root,
       ruleId: "TS-TRUTH:1",
       file: "src/one.ts",

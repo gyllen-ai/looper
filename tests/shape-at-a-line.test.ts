@@ -10,6 +10,10 @@ import { WITHOUT_THE_RUST_ENGINE } from "./rust-engine.ts";
 
 const LOOPER = join(import.meta.dirname, "..");
 
+const HOME = mkdtempSync(join(tmpdir(), "looper-shape-home-"));
+
+process.on("exit", () => rmSync(HOME, { recursive: true, force: true }));
+
 const SPREAD_OVER_LINES = `export function totals(rows: readonly Row[]): number {
   return rows
     .filter((row) => row.live)
@@ -62,10 +66,12 @@ test("a Python line that starts no statement is reported against the statement a
 
     const written = buildReport({
       root,
-      ruleId: "PY-TRUTH:1",
-      file: "src/totals.py",
-      line: 4,
-      tried: "the rule named a line that begins nothing",
+      home: HOME,
+      kind: "rule",
+      about: "PY-TRUTH:1",
+      wrong: "The rule named a line that begins nothing.",
+      instead: "It should have named the statement around it.",
+      where: { kind: "line", file: "src/totals.py", line: 4 },
     });
 
     assert.equal(
@@ -99,10 +105,12 @@ test("a Rust line that starts nothing is reported against the item around it", W
 
     const written = buildReport({
       root,
-      ruleId: "RUST-TYPE:4",
-      file: "src/totals.rs",
-      line: 3,
-      tried: "the rule named a line that begins nothing",
+      home: HOME,
+      kind: "rule",
+      about: "RUST-TYPE:4",
+      wrong: "The rule named a line that begins nothing.",
+      instead: "It should have named the statement around it.",
+      where: { kind: "line", file: "src/totals.rs", line: 3 },
     });
 
     assert.equal(
