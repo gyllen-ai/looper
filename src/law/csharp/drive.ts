@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -9,12 +8,10 @@ import {
   CSHARP_BUILD_LOCK_WAIT_MS,
   CSHARP_BUILD_TIMEOUT_MS,
   CSHARP_ENGINE_DIR,
-  CSHARP_ENGINE_NAME,
   CSHARP_ENGINE_PROJECT,
-  CSHARP_TIMEOUT_MS,
-  A_READER_MAY_ANSWER_WITH,
 } from "../../config.ts";
 import { failureOf, fieldAt, reasonFrom } from "../../fields.ts";
+import { buildCsharpReader, readerAt, runReader } from "../../start.ts";
 import { freshnessOf } from "../engine-age.ts";
 
 export type CsharpHit = {
@@ -58,18 +55,12 @@ export function engineIsBuilt(looperRoot: string): boolean {
 }
 
 function builtAt(looperRoot: string): string {
-  return join(looperRoot, CSHARP_ENGINE_DIR, "bin", "Release", "net10.0", CSHARP_ENGINE_NAME);
+  return readerAt(looperRoot, "csharp");
 }
 
 export function buildEngine(looperRoot: string): Judged {
   try {
-    execFileSync("dotnet", ["build", "-c", "Release", "--nologo", "-v", "q"], {
-      cwd: join(looperRoot, CSHARP_ENGINE_DIR),
-      encoding: "utf8",
-      timeout: CSHARP_BUILD_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    buildCsharpReader(looperRoot);
   } catch (cause) {
     return {
       kind: "unavailable",
@@ -127,15 +118,10 @@ function unreadableFrom(payload: unknown): readonly Unreadable[] {
   return found;
 }
 
-function ranWith(binary: string, args: readonly string[]): Judged {
+function ranWith(looperRoot: string, args: readonly string[]): Judged {
   let output = "";
   try {
-    output = execFileSync(binary, [...args], {
-      encoding: "utf8",
-      timeout: CSHARP_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    output = runReader(looperRoot, "csharp", args);
   } catch (cause) {
     const said = fieldAt(cause, "stdout");
     if (typeof said !== "string" || said.length === 0) {
@@ -167,5 +153,5 @@ export function judgeCsharp(
   }
   const ready = readied(looperRoot);
   if (ready.kind !== "found") return ready;
-  return ranWith(builtAt(looperRoot), [projectRoot, ...files]);
+  return ranWith(looperRoot, [projectRoot, ...files]);
 }

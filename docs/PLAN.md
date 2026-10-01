@@ -4025,6 +4025,17 @@ would change a decision above rather than merely a detail:
   install with scripts disabled and audit anything that wants one, and assert at
   runtime that the network modules were never loaded. The runtime assertion is
   the one that actually holds, and it is stronger than the tree audit it replaces.
+  **No such assertion was ever written, and the one described cannot be.
+  Corrected 2026-10-01.** Measured on Node 24.20: every looper command loads
+  `net` and `dgram`, because Node loads both itself for any program that can
+  start another. So "never loaded" is false on the first line of every run for
+  the two modules that open a socket. What can be asserted is the half above
+  them, and `tests/nothing-over-a-wire.test.ts` now does: twelve real runs — the
+  turn hook, four tool hooks, the server and six commands — load nothing that
+  could speak beyond what a program that only starts others loads. Reading the
+  files for those names finds an import somebody wrote down; this finds one
+  assembled while running. The scan of our files and of the resolved tree is
+  still what holds the rest.
 - **Node's startup floor is 18 ms and it is not ours to optimise.** Anything that
   wants to be cheaper than that has to not be a process, which is a real design
   option and not one we are taking yet.
@@ -6528,7 +6539,12 @@ came from.
 
 **Local, because looper has no network.** The authoritative check is `git
 ls-remote`, which would be looper's first outbound connection, and
-`tests/no-network.test.ts` exists to stop exactly that arriving by accident. So
+`tests/no-network.test.ts` exists to stop exactly that arriving by accident. **It
+would not have stopped it. Corrected 2026-10-01.** That test reads imports, and a
+`git ls-remote` is not an import: added to `src/git.ts` it would have passed, and
+passed `tests/invariants.test.ts` as well, which asked only that `git` was among
+the programs started. Both are closed under "Two programs looper starts could
+reach out on their own", at the end of this document. So
 the gate reads what is already on disk: the submodule's own remote-tracking
 refs. That costs nothing in the workflow that matters, because to pin a
 submodule to a new upstream commit you must first fetch that commit, and
@@ -8213,3 +8229,253 @@ report ends with the same sentence, addressed to whoever reads it here.
   said again, this line included; the refusals and the failures still carry the
   route.
 - **Anything that reads incoming reports for us.**
+
+## Two programs looper starts could reach out on their own — 2026-10-01
+
+Found while reviewing the report, which says of itself "looper cannot send it".
+looper opens no socket; that was always true and is still what the scan holds.
+But looper starts other programs, and they can reach a network without being
+asked to. The first version of this change closed two of them and said so. A
+reviewer who had seen none of the reasoning then showed it did not hold, and
+that there were four. Both halves are kept: what was first built, what was
+found, and what stands now.
+
+**How a connection was watched.** The first version said of the C# build "told,
+not seen: nothing on this machine could watch a connection". The reviewer built
+what could: a network namespace with nothing in it but loopback, and a small
+library loaded in front of every program that writes down each name it looks up
+and each address it connects to. Every number below marked seen was taken that
+way, 2026-10-01, on git 2.53.0, the .NET SDK 10.0.400, rustup 1.29.0 and
+Python 3.14.
+
+### git
+
+**First built:** every question looper asks git begins `-c protocol.allow=never`.
+In a clone made without file contents a plain `git show` had gone to the remote,
+and the `git grep` the push gate runs fetched every file it needed.
+
+**Found:** one line of the user's own configuration outranks that switch.
+`protocol.file.allow=always` is the usual cure for a submodule kept on the same
+machine, and with it git fetched again; so did `GIT_ALLOW_PROTOCOL` in the
+user's environment. Seen here as well: a clone that held 2 objects held 3.
+
+**Now:** every git looper starts is also given `GIT_ALLOW_PROTOCOL`, set and
+empty, which allows no transport and outranks the configuration. Seen: nothing
+fetched, and git stops with "transport 'file' not allowed". Three more things
+came with it.
+
+- **git is only ever asked to read.** The words looper hands git must open in
+  one of ten ways (`rev-parse`, `diff`, `grep`, `config --get` and six more), or
+  nothing is started. A list of words held in a variable went past every check
+  that read the source; this is checked when it runs.
+- **A revision written like an option is not one.** The command that compares
+  against a named revision takes the name from whoever typed it, and a name
+  beginning with a dash was read by git as an order: `--output=` made it write
+  a file. That was true before this change. Such a name is now refused before
+  git is started.
+- **The difference is always git's own.** With a program of the user's put in
+  charge of showing differences, the gate that reads what is about to be
+  committed for credentials read nothing and passed. That was true before this
+  change. Every `diff` now refuses the outside program. The first cure also
+  switched off the user's way of having git read a binary file as text, and the
+  second reviewer showed what that cost: a key inside such a file had been
+  read, and no longer was. That half was taken back out.
+- **The reason is git's.** A clone made without contents is said to be that,
+  where it used to be told that the scan had run out of time and to mark its
+  folders as generated. And some versions of git do not stop when they cannot
+  read a file they need: they answer with the files they have and exit as if
+  that were everything. Seen on two: 2.53, told not to fetch, came back with the
+  words of three files out of four and exit 0; 2.55, on the machines that run
+  the suite, stops with 128. The reviewer read in git's source that older ones
+  answer anyway even when the fetch itself fails; none was run here. git's
+  complaint on the way out is now enough to call the answer unknown, whatever
+  it exits with. Only a line git itself marks as a failure counts: the first
+  version listened for words anywhere in what git said, and a warning that
+  quoted a file's name, with those words in the name, threw a good answer away.
+
+### The C# build
+
+**First built:** three settings in the build's environment, "told, not seen".
+
+**Found, seen:** with those settings a first build still looked up the
+certificate authority's revocation hosts, 24 lookups. One of the three settings
+is in none of the 3,658 files of the SDK, searched as plain and as two-byte
+text; the other two are. It was written from memory and never checked against
+the SDK, and it did nothing. And the reader is built inside the user's
+project, under `node_modules`, so the user's own files above it shape the
+build: one that names an extra package source was asked about looper's
+packages (6 lookups), one that manages package versions centrally stopped the
+build, and
+one that pins another version of the tool stopped it with exit 155. An
+environment variable naming a source was asked too, 6 lookups.
+
+**Now:** the build is told not to look up revocation hosts, not to audit, to
+read only the reader's own package configuration, to take no source from
+outside, and to import nothing from the folders above; and an empty
+`global.json` beside the reader is found before the user's.
+
+| the build, seen | lookups | built |
+|---|---|---|
+| as first built, on a plain machine | 24 | yes |
+| as first built, in a project with all of the above around it | none: exit 155 | no |
+| now, on a plain machine | 0 | yes |
+| now, in that project, with the user's environment saying the opposite | 0 | yes |
+
+The last row was also run through `looper law` on a C# file, the way it really
+happens: the reader built, the file was judged, 0 lookups. Each setting was then
+taken away in turn. Three open something alone: the revocation setting (24
+lookups), the one about central package versions (the build fails), and the
+`global.json` (exit 155). Five overlap, so removing any one of them opened
+nothing; they are kept as second locks. The switch that ignores response files
+was not seen to matter.
+
+### The Rust build
+
+**Found, seen:** `cargo build --offline` keeps cargo from the network, and says
+nothing to the tool that stands in front of cargo on most machines. In a project
+that pins a compiler version nobody has installed, that tool went to download
+it: one lookup of the compiler's download host.
+
+**Now:** it is told not to install anything, and pointed at the compiler its own
+settings file names as installed, when that file can be read; when it cannot,
+the build goes ahead with the first setting alone. Seen: 0 lookups, and the reader builds with
+the compiler that is there. An older version of that tool may not know the first
+setting; none was run here, and the second is what holds there. A compiler the
+user has named in their own environment is left as they named it: it already
+outranks a project's pin, and if it is not installed nothing is fetched and the
+Rust half says it could not be built. The settings file is read for its one
+line; read whole, a folder name with an equals sign in it stopped the reading
+and no compiler was named at all.
+
+What the reader says when it fails is quoted at its end and up to 600
+characters, as the C# reader's always was. Keeping what it said on the way out
+had made one failure 32,484 characters where it had been 193.
+
+### Python
+
+**Found, seen here:** a file on the user's own Python path ran inside looper's
+reader before the reader. That is how monitoring tools attach themselves to
+every Python that starts. looper's readers use nothing but the standard library,
+so Python is now started alone, with no site and no environment. A test puts
+such a file in place and checks it did not run.
+
+### What may be started, and what may be loaded
+
+**First built:** the files allowed to start a program were listed, with what
+each starts, read by a pattern.
+
+**Found:** a program that reaches the network was added in eight spellings and
+seven passed: through a variable, through another name for the starter, as a
+shell line, in a new file whose name ended like an allowed one, in single
+quotes, as a list of words handed to git, and after the switch. The scan for
+sockets looked for seven module names inside double quotes, so `fetch`, which
+needs no import, passed, and so did an import put together while running.
+
+**Then:** one file starts programs, `src/start.ts`, and the module that does it
+is named in no other. The scan was rewritten to read the code and not its
+spelling, as a list of what must not be written. Twenty-two changes were made
+by hand to a copy, one at a time, and the suite stopped on each.
+
+**Found again, by a second reviewer, with a listener on the same machine:** a
+connection still got through the scan, the run-time check and the whole suite.
+A list of what must not be written is as long as the reviewer's patience. The
+module that loads looper's own source can also load anything by name, and was
+reached through its own name; `process` was held in a variable and asked for a
+module; a file ending `.mjs` was put beside the others, which the scan did not
+read; the first line of a Python reader became `import socket`; and the package
+file was given a table that makes a harmless name stand for the socket module.
+In the one file that starts programs, a third starter was brought in beside the
+two the test knew. And a dozen changes passed every test, because several tests
+checked that a word was written in the file and not that the program was
+handed it: git started without the switch, Python with one flag of two, the
+build with other words.
+
+**Now:**
+
+- **The scan is a list of what may be written.** Six modules may be loaded
+  anywhere, one more only in `src/start.ts` and one only in `bin/looper.js`,
+  where it is used for two things. A file of looper's own may be imported if it
+  is one, in `src` or `bin`, of a kind the scan reads. `process` may be asked
+  for eleven things and held in nothing. Thirteen names are never written.
+  Reaching for a function's constructor is refused. Everything else is, too.
+  `tests/the-scan-itself.test.ts` held thirty-eight ways round it that must be
+  refused and eleven pieces of ordinary code that must pass, and holds
+  forty-eight and thirteen after the third reading below, with one sample for
+  every name on every list, so none can be dropped unnoticed.
+- **The folders hold only kinds of file something reads**, the package file
+  gives no name a second meaning, and the two Python readers load five modules
+  of the standard library and nothing else.
+- **What each program is handed is written down by a stand-in.** A test puts its
+  own `git`, `cargo`, `dotnet` and `python3` first on the path, each of which
+  records its words, its environment and its folder, and looper's real code is
+  run against them. The words that were measured are the words that arrive.
+- **What a run loads is compared with a program that only starts others**, over
+  fifteen real runs and seven tools. A program that does load a module that
+  speaks must be noticed, or the test fails: without that, a Node that renamed
+  its modules would have passed every looper there could be.
+- **Thirty-seven more changes were made by hand to a copy** — every way through
+  the second reviewer found, each change that had passed, and changes to the
+  scan itself — and the suite stopped on each.
+
+**Found a third time, by the same reviewer checking its own findings.** Seven of
+ten were closed. But a connection still passed, and the reviewer said why it
+always would: any function leads to the thing that makes code out of text, and
+there is no end to the ways of asking for it. It took a function's constructor
+out by its key, where the scan looked for it after a dot. It took the socket
+that sits under the output when the output is piped. It added text to looper's
+source as the source was loaded, and it wrote a file while running and imported
+it. None of those is an accident; each is written to get past a reader.
+
+**So what a run does is watched, as well as how it is written.** A test loads a
+watcher before looper that writes down every connection, every listener, every
+datagram, every lookup of an address and every program started, whatever the
+code that did it is spelled like. Sixteen real runs of looper may do none of
+those except start git and python, and both are seen being started. A program
+that does connect and does start another must be seen doing both, or the test
+fails. The four ways above, and two more written to leave no word at all for
+the scan to read, were each put in a copy and called on every run: the scan,
+tightened, stopped two of them, and the watcher stopped all six.
+
+**The scan was tightened where that cost little:** a constructor taken by its
+key is refused, and the output and the input may each be used for one thing.
+The Python readers are now read by Python itself, since a scan that looked for
+`import` at the start of a line was passed by `import ast, socket`. One sample
+now stands for each kind of code the scan sees through, as one already stood
+for each name.
+
+Fifty-eight changes in all were made by hand to a copy at this point, one at a
+time, and the suite stopped on each.
+
+The scan refuses some ordinary code: a variable called `fetch`, a type imported
+from a module that connects, a module of Node's that looper does not use yet.
+Adding one to the list is one line, argued for like a dependency.
+
+### What this does not claim
+
+- **A project's own checks.** `looper loop` runs the lines a project declared.
+  What those lines reach is the project's decision, and looper never runs them
+  from a hook.
+- **That reading the code can stop somebody who means to get past it.** It
+  cannot, and three readings in a row showed it. The scan is against accident
+  and against a dependency that changes, and it is strict enough that an
+  accident has to look deliberate. What stops the rest is that every change to
+  looper is read by a person before it is merged.
+- **Roads nobody walked.** The watcher sees what happens on sixteen runs: every
+  command and seven tools, in a project with almost nothing in it. Code that
+  connects only deep in one branch of one of them is not run, so it is not
+  seen. And the watcher sits in Node: a connection made beneath it, by a
+  program looper starts, is what the measurements with the network taken away
+  are for, and those were taken by hand, once.
+- **Programs the user has told git to run to read a file as text.** They are
+  theirs, and the credential gate reads what they print.
+- **Programs the user has told git to run.** A file-watcher or a hook of the
+  user's own is started by git when git is asked about the working tree. Those
+  are theirs, on their machine, and were not changed.
+- **A git that speaks another language.** Its failure lines are read in
+  English. One that exits 0 with a short answer and says so in another language
+  is not noticed.
+- **What was not run:** an older git, an older version of the tool in front of
+  cargo, and any system but Linux for the measurements.
+- **That no packet leaves.** The promise is about looper and the programs it
+  starts, held by tests that can be read in ten minutes and by measurements
+  anybody with the same two tools can repeat.

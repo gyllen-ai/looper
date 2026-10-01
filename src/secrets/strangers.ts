@@ -2,6 +2,7 @@ import {
   additionsAgainst,
   additionsInHand,
   everyWordAt,
+  TOOK_TOO_LONG,
   whatTheRemoteAlreadyHas,
 } from "../git.ts";
 import { A_WRITTEN_TOKEN } from "../config.ts";
@@ -73,7 +74,10 @@ function sweep(root: string, revision: string, reach: Reach): Sweep {
 
 export function saidAboutStrangers(sweep: Sweep): string {
   if (sweep.kind === "cannot-tell") {
-    return `looper: the words about to leave this machine were not checked, because ${sweep.why}. That scan reads every word this repository already holds, so it runs out of time when a large generated tree is committed: name those directories as \`generated\` in law.toml and it will not read them. Nothing is blocked, and nothing here is a verdict on them.`;
+    const hint = sweep.why.includes(TOOK_TOO_LONG)
+      ? " That scan reads every word this repository already holds, so it runs out of time when a large generated tree is committed: name those directories as `generated` in law.toml and it will not read them."
+      : "";
+    return `looper: the words about to leave this machine were not checked, because ${sweep.why}.${hint} Nothing is blocked, and nothing here is a verdict on them.`;
   }
   if (sweep.strangers.length === 0) return "";
   const named = sweep.strangers.map(

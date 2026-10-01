@@ -13,10 +13,6 @@ const ROOT = join(import.meta.dirname, "..");
 import { ourFiles, sourceFiles } from "./our-files.ts";
 import { required } from "../src/present.ts";
 
-const SPAWN_CAPABLE = "node:child_process";
-
-const SPAWN_SANCTUM = "git.ts";
-
 const ARGUED_FOR: readonly string[] = ["@babel/parser"];
 
 const INSTALL_HOOKS: readonly string[] = ["preinstall", "install", "postinstall"];
@@ -52,25 +48,6 @@ function installedPackages(): readonly string[] {
   return found;
 }
 
-const MAY_SPAWN: readonly string[] = [
-  SPAWN_SANCTUM,
-  "law/rust/drive.ts",
-  "law/python/drive.ts",
-  "law/csharp/drive.ts",
-  "loop/run.ts",
-];
-
-test("only the named files may start another process, and each says what it starts", () => {
-  for (const file of ourFiles()) {
-    const text = readFileSync(file, "utf8");
-    if (!text.includes(`"${SPAWN_CAPABLE}"`)) continue;
-    assert.ok(
-      MAY_SPAWN.some((allowed) => file.endsWith(allowed)),
-      `${file} can start another process and is not on the list. Starting a process is only as safe as the thing being started, so every one lives in a named file and the list is short enough to read: ${MAY_SPAWN.join(", ")}.`,
-    );
-  }
-});
-
 test("the loop runner starts only what this project declared, and never on a hook", () => {
   const text = readFileSync(join(ROOT, "src", "loop", "run.ts"), "utf8");
   assert.ok(
@@ -82,21 +59,6 @@ test("the loop runner starts only what this project declared, and never on a hoo
     !wiring.includes("loop/run.ts") && !wiring.includes("commands/loop.ts"),
     "the loop runner is not reachable from a hook: a project's file may not be run because a session started",
   );
-});
-
-test("the files that may start a process start only what they were allowed to", () => {
-  const starts: Record<string, string> = {
-    [SPAWN_SANCTUM]: '"git"',
-    "law/rust/drive.ts": '"cargo"',
-    "law/csharp/drive.ts": '"dotnet"',
-  };
-  for (const [file, expected] of Object.entries(starts)) {
-    const text = readFileSync(join(ROOT, "src", file), "utf8");
-    assert.ok(
-      text.includes(`execFileSync(${expected}`) || text.includes("execFileSync(builtAt("),
-      `${file} is allowed to start ${expected} and looper's own Rust program, and nothing else.`,
-    );
-  }
 });
 
 test("every dependency is one that was argued for by name", () => {

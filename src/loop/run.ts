@@ -1,7 +1,5 @@
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-
-import { A_READER_MAY_ANSWER_WITH } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
+import { runDeclared, type Answered } from "../start.ts";
 import { LOOP_FILE, type Check, type Reach } from "./checks.ts";
 
 export type Verdict = "ok" | "broken" | "blind";
@@ -40,7 +38,7 @@ function firstLine(raw: string): string {
   return NO_DETAIL;
 }
 
-function whatItSaid(answered: SpawnSyncReturns<string>): string {
+function whatItSaid(answered: Answered): string {
   const out = typeof answered.stdout === "string" ? answered.stdout : "";
   const err = typeof answered.stderr === "string" ? answered.stderr : "";
   const said = `${out}${err}`;
@@ -60,12 +58,7 @@ export function verdictOf(status: number | null, reach: Reach, answered: boolean
 
 export function ask(check: Check, root: string): Seen {
   const began = Date.now();
-  const answered = spawnSync("sh", ["-c", check.run], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: check.patience * 1000,
-    maxBuffer: A_READER_MAY_ANSWER_WITH,
-  });
+  const answered = runDeclared(check.run, root, check.patience * 1000);
   const millis = Date.now() - began;
   const timedOut = fieldAt(answered.error, "code") === "ETIMEDOUT";
   const said = timedOut ? tooSlow(check) : firstLine(whatItSaid(answered));

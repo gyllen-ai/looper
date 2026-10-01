@@ -1,38 +1,129 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, extname, join, relative, sep } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
 
 import { ourFiles } from "./our-files.ts";
+import { reachesInPython } from "./reads-python.ts";
+import { NO_ALIASES, reachesIn, type Aliases } from "./reaches.ts";
 
-const SOCKET_CAPABLE: readonly string[] = [
-  "node:net",
-  "node:http",
-  "node:https",
-  "node:http2",
-  "node:tls",
-  "node:dgram",
-  "node:dns",
-];
+function named(file: string): string {
+  return relative(ROOT, file).split(sep).join("/");
+}
 
-test("nothing we wrote can open a socket", () => {
+test("nothing we wrote loads, names or reaches for anything outside a short list", () => {
+  const reaching: string[] = [];
   for (const file of ourFiles()) {
-    const text = readFileSync(file, "utf8");
-    for (const banned of SOCKET_CAPABLE) {
-      assert.ok(
-        !text.includes(`"${banned}"`),
-        `${file} imports ${banned}. looper runs on every edit and every commit and must not be able to reach the network.`,
-      );
+    for (const found of reachesIn(named(file), readFileSync(file, "utf8"), "ours", NO_ALIASES)) {
+      reaching.push(`${named(file)}:${found.line} — ${found.what}`);
     }
   }
+
+  assert.deepEqual(
+    reaching,
+    [],
+    `looper runs on every edit and every commit and must not be able to reach the network:\n${reaching.join("\n")}`,
+  );
 });
+
+const KINDS_OF_FILE_HERE: Readonly<Record<string, readonly string[]>> = {
+  src: [".ts", ".md", ".py", ""],
+  bin: [".js"],
+};
+
+const LEFT_BY_AN_EDITOR_OR_A_SYSTEM = /^\.|~$|\.sw[a-p]$/;
+
+function everyFileUnder(dir: string): readonly string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    if (entry === "__pycache__" || LEFT_BY_AN_EDITOR_OR_A_SYSTEM.test(entry)) continue;
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) found.push(...everyFileUnder(path));
+    else found.push(path);
+  }
+  return found;
+}
+
+test("looper's own folders hold only the kinds of file something here reads", () => {
+  const strange: string[] = [];
+  for (const [part, kinds] of Object.entries(KINDS_OF_FILE_HERE)) {
+    for (const file of everyFileUnder(join(ROOT, part))) {
+      if (!kinds.includes(extname(file))) strange.push(named(file));
+    }
+  }
+
+  assert.deepEqual(
+    strange,
+    [],
+    `the scan reads .ts and .js. A reviewer put a file ending .mjs beside the others, imported it, and connected: ${strange.join(", ")}`,
+  );
+  assert.deepEqual(
+    everyFileUnder(join(ROOT, "src")).filter((file) => extname(file) === "").map(named),
+    ["src/built-from"],
+    "the one file with no ending is the mark an install fills in",
+  );
+  for (const left of [".DS_Store", ".main.ts.swp", "looper.js~"]) {
+    assert.ok(LEFT_BY_AN_EDITOR_OR_A_SYSTEM.test(left), `${left} is what an editor or a file manager leaves behind, and the suite failed on it`);
+  }
+  for (const real of ["side.mjs", "hole.cjs", "main.ts"]) {
+    assert.ok(!LEFT_BY_AN_EDITOR_OR_A_SYSTEM.test(real), `${real} is a file of code and is never skipped`);
+  }
+});
+
+test("looper's package file gives no name a second meaning", () => {
+  const held: unknown = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+
+  assert.equal(
+    Object.getOwnPropertyDescriptor(held, "imports"),
+    undefined,
+    'an "imports" table makes a harmless-looking name stand for any module at all, and the scan reads names',
+  );
+});
+
+test("the two python readers load five modules of the standard library and nothing else", () => {
+  const reaching: string[] = [];
+  const readers = everyFileUnder(join(ROOT, "src")).filter((one) => extname(one) === ".py");
+  assert.equal(readers.length, 2);
+  for (const file of readers) {
+    for (const found of reachesInPython(readFileSync(file, "utf8"))) reaching.push(`${named(file)} ${found}`);
+  }
+
+  assert.deepEqual(
+    reaching,
+    [],
+    `the Rust and C# halves were scanned and these were not: a reviewer made the first line of one "import socket", connected, and every test passed. ${reaching.join("; ")}`,
+  );
+});
+
+function leavesOf(value: unknown): readonly string[] {
+  if (typeof value === "string") return [value];
+  if (value === null || typeof value !== "object") return [];
+  return Object.values(value).flatMap(leavesOf);
+}
+
+function aliasesOf(packageDir: string): Aliases {
+  const manifest = join(packageDir, "package.json");
+  const aliases = new Map<string, readonly string[]>();
+  if (!existsSync(manifest)) return aliases;
+  const held: unknown = JSON.parse(readFileSync(manifest, "utf8"));
+  const table: unknown = Object.getOwnPropertyDescriptor(held, "imports")?.value;
+  if (table === null || typeof table !== "object") return aliases;
+  for (const [alias, leads] of Object.entries(table)) aliases.set(alias, leavesOf(leads));
+  return aliases;
+}
+
+function packageHolding(file: string, modules: string): string {
+  let at = dirname(file);
+  while (at !== modules && !existsSync(join(at, "package.json"))) at = dirname(at);
+  return at;
+}
 
 test("nothing we installed can open a socket either", () => {
   const modules = join(ROOT, "node_modules");
   if (!existsSync(modules)) return;
-  const hits = grepTree(modules);
+  const hits = grepTree(modules, modules);
   assert.deepEqual(
     hits,
     [],
@@ -40,28 +131,17 @@ test("nothing we installed can open a socket either", () => {
   );
 });
 
-function grepTree(dir: string): readonly string[] {
+function grepTree(dir: string, modules: string): readonly string[] {
   const hits: string[] = [];
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) {
-      hits.push(...grepTree(path));
+      hits.push(...grepTree(path, modules));
       continue;
     }
     if (!/\.(js|cjs|mjs)$/.test(entry)) continue;
-    const text = readFileSync(path, "utf8");
-    for (const banned of SOCKET_CAPABLE) {
-      const bare = banned.slice("node:".length);
-      if (
-        text.includes(`require("${banned}")`) ||
-        text.includes(`require('${banned}')`) ||
-        text.includes(`require("${bare}")`) ||
-        text.includes(`require('${bare}')`) ||
-        text.includes(`from "${banned}"`) ||
-        text.includes(`from '${banned}'`)
-      ) {
-        hits.push(`${path} (${banned})`);
-      }
+    for (const found of reachesIn(named(path), readFileSync(path, "utf8"), "installed", aliasesOf(packageHolding(path, modules)))) {
+      hits.push(`${named(path)}:${found.line} — ${found.what}`);
     }
   }
   return hits;

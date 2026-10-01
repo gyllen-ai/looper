@@ -129,8 +129,6 @@ export const RUST_ENGINE_DIR = "vendor/rust-law";
 
 export const RUST_ENGINE_NAME = "looper-rust";
 
-export const RUST_TIMEOUT_MS = 120_000;
-
 export const A_READER_MAY_ANSWER_WITH = 256 * 1024 * 1024;
 
 export const A_FAILURE_IS_QUOTED_UP_TO = 600;
@@ -142,8 +140,6 @@ export const PYTHON_COMMAND = "python3";
 export const PYTHON_READER = "src/law/python/read.py";
 
 export const PYTHON_SKELETON = "src/law/python/skeleton.py";
-
-export const PYTHON_TIMEOUT_MS = 60_000;
 
 export const CSHARP_EXTENSIONS: readonly string[] = [".cs", ".razor"];
 
@@ -158,8 +154,6 @@ export const CSHARP_ENGINE_DIR = "vendor/csharp-law";
 export const CSHARP_ENGINE_NAME = "looper-csharp";
 
 export const CSHARP_ENGINE_PROJECT = "looper-csharp.csproj";
-
-export const CSHARP_TIMEOUT_MS = 120_000;
 
 export const CSHARP_BUILD_TIMEOUT_MS = 300_000;
 
@@ -314,8 +308,6 @@ export const SUPPRESSIONS: readonly string[] = [
 
 export const MAX_LOC_DEFAULT = 500;
 
-export const GIT_TIMEOUT_MS = 3000;
-
 export const SERVER_NAME = "looper";
 
 export const SERVER_VERSION = "0.1.0";
@@ -427,6 +419,18 @@ export function projectRoot(from: string, named: Named): Rooted {
     return { root: named.root, how: `${PROJECT_DIR}, set by the agent that started this` };
   }
   return nearestProject(from);
+}
+
+export function environmentWith(more: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
+  return { ...process.env, ...more };
+}
+
+export function saidByTheUser(name: string): string {
+  return process.env[name] || "";
+}
+
+export function whereRustupLives(): string {
+  return saidByTheUser("RUSTUP_HOME") || join(homedir(), ".rustup");
 }
 
 export function searchPath(): readonly string[] {

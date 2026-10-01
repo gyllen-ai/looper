@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import { join } from "node:path";
 import { Secrets } from "../src/secrets/capability.ts";
 import { dispatchHook } from "../src/registry.ts";
 import { intentOf } from "../src/law/commit-command.ts";
-import { everyWordAt } from "../src/git.ts";
+import { TOOK_TOO_LONG, everyWordAt, whyGitCouldNot } from "../src/git.ts";
 import { strangers } from "../src/commands/strangers.ts";
 import {
   saidAboutStrangers,
@@ -208,7 +209,11 @@ test("a directory the project says is generated is not vocabulary and is not sea
 });
 
 test("a scan that ran out of time says what it was doing and what would fix it", () => {
-  const said = saidAboutStrangers({ kind: "cannot-tell", why: "spawnSync git ETIMEDOUT" });
+  const stopped = spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 5000)"], { encoding: "utf8", timeout: 100 });
+  const why = whyGitCouldNot(stopped);
+  assert.equal(why, TOOK_TOO_LONG, "a program stopped for taking too long is said to have taken too long, in words and not in a code");
+
+  const said = saidAboutStrangers({ kind: "cannot-tell", why });
 
   assert.match(said, /generated/i);
   assert.match(
@@ -216,6 +221,20 @@ test("a scan that ran out of time says what it was doing and what would fix it",
     /law\.toml/,
     "an adopter told only 'spawnSync git ETIMEDOUT' has no way to reach the fix; the sentence has to name what timed out and where to say so",
   );
+});
+
+test("a scan that failed for another reason does not send anybody to mark their folders as generated", () => {
+  const said = saidAboutStrangers({
+    kind: "cannot-tell",
+    why: "this clone was made without the contents of every file, and looper never lets git fetch them (git said: fatal: could not fetch from promisor remote)",
+  });
+
+  assert.doesNotMatch(
+    said,
+    /generated/i,
+    "every failure of the scan was explained as running out of time, so a clone that simply does not hold the files was told to change its law.toml, which changes nothing",
+  );
+  assert.match(said, /made without the contents/);
 });
 
 test("a hyphenated name is one word, so a class name is not read as the common words in it", () => {

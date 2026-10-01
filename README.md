@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 619 cases · 793 tests
+90 rules · 5 languages · 619 cases · 826 tests
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -94,7 +94,11 @@ it in the same turn, while the reasoning that produced it is still in the room.
 Nothing in that list can reach the network. `npm test` holds it: no file in the
 resolved tree may open a socket, the eighteen Rust crates and three C# packages
 are vendored into this repository, and a build with an empty package cache was
-run to prove it needs nothing fetched.
+run to prove it needs nothing fetched. The programs looper starts are all started from
+one file, each so that it cannot reach out on its own: git with every transport
+forbidden, the C# and Rust builds unable to fetch a package, a certificate list
+or a compiler, and Python alone. That was measured with the network taken away
+and every lookup written down: none.
 
 ## What it reads
 

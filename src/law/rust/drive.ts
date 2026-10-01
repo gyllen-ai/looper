@@ -1,14 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  A_READER_MAY_ANSWER_WITH,
-  RUST_ENGINE_DIR,
-  RUST_ENGINE_NAME,
-  RUST_TIMEOUT_MS,
-} from "../../config.ts";
-import { fieldAt, reasonFrom } from "../../fields.ts";
+import { A_FAILURE_IS_QUOTED_UP_TO, RUST_ENGINE_DIR } from "../../config.ts";
+import { failureOf, fieldAt, reasonFrom } from "../../fields.ts";
+import { buildRustReader, readerAt, runReader } from "../../start.ts";
 import { freshnessOf } from "../engine-age.ts";
 
 export type RustHit = {
@@ -37,22 +31,17 @@ function manifestsOf(looperRoot: string): readonly string[] {
 }
 
 function builtAt(looperRoot: string): string {
-  return join(looperRoot, RUST_ENGINE_DIR, "target", "release", RUST_ENGINE_NAME);
+  return readerAt(looperRoot, "rust");
 }
 
 
 export function buildEngine(looperRoot: string): Judged {
   try {
-    execFileSync("cargo", ["build", "--offline", "--release"], {
-      cwd: join(looperRoot, RUST_ENGINE_DIR),
-      encoding: "utf8",
-      timeout: RUST_TIMEOUT_MS,
-      stdio: ["ignore", "ignore", "pipe"],
-    });
+    buildRustReader(looperRoot);
   } catch (cause) {
     return {
       kind: "unavailable",
-      detail: `looper's Rust half would not build (${reasonFrom(cause)})`,
+      detail: `looper's Rust half would not build: cargo ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}`,
     };
   }
   return { kind: "found", hits: [], names: [] };
@@ -78,19 +67,14 @@ function hitsFrom(payload: unknown): readonly RustHit[] {
   return found;
 }
 
-function ranWith(binary: string, args: readonly string[]): Judged {
+function ranWith(looperRoot: string, args: readonly string[]): Judged {
   let output = "";
   try {
-    output = execFileSync(binary, [...args], {
-      encoding: "utf8",
-      timeout: RUST_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    output = runReader(looperRoot, "rust", args);
   } catch (cause) {
     const said = fieldAt(cause, "stdout");
     if (typeof said !== "string" || said.length === 0) {
-      return { kind: "unavailable", detail: reasonFrom(cause) };
+      return { kind: "unavailable", detail: `the Rust reader ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}` };
     }
     output = said;
   }
@@ -116,7 +100,7 @@ export function commandsUnder(looperRoot: string, crateRoot: string): Commands {
     const built = buildEngine(looperRoot);
     if (built.kind !== "found") return { kind: "unavailable", detail: built.detail };
   }
-  const said = ranWith(builtAt(looperRoot), ["--commands", crateRoot]);
+  const said = ranWith(looperRoot, ["--commands", crateRoot]);
   if (said.kind !== "found") {
     return { kind: "unavailable", detail: said.kind === "refused" ? said.detail : said.detail };
   }
@@ -132,7 +116,7 @@ export function judgeRust(
     const built = buildEngine(looperRoot);
     if (built.kind !== "found") return built;
   }
-  return ranWith(builtAt(looperRoot), [projectRoot, ...files]);
+  return ranWith(looperRoot, [projectRoot, ...files]);
 }
 
 export type Shaped =
@@ -153,14 +137,9 @@ export function shapeFromRust(
   }
   let output = "";
   try {
-    output = execFileSync(builtAt(looperRoot), ["--shape", path, String(line), String(depth)], {
-      encoding: "utf8",
-      timeout: RUST_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    output = runReader(looperRoot, "rust", ["--shape", path, String(line), String(depth)]);
   } catch (cause) {
-    return { kind: "unavailable", detail: `the Rust reader would not run (${reasonFrom(cause)})` };
+    return { kind: "unavailable", detail: `the Rust reader ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}` };
   }
   try {
     return { kind: "found", payload: JSON.parse(output) };

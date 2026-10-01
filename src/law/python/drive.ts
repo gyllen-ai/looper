@@ -1,15 +1,9 @@
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  PYTHON_COMMAND,
-  PYTHON_READER,
-  PYTHON_SKELETON,
-  PYTHON_TIMEOUT_MS,
-  A_READER_MAY_ANSWER_WITH,
-} from "../../config.ts";
+import { PYTHON_COMMAND, PYTHON_READER, PYTHON_SKELETON } from "../../config.ts";
 import { fieldAt, reasonFrom } from "../../fields.ts";
+import { runPython } from "../../start.ts";
 
 export type PythonHit = {
   readonly rule: string;
@@ -74,12 +68,7 @@ export function judgePython(looperRoot: string, files: readonly string[]): Judge
 
   let output = "";
   try {
-    output = execFileSync(PYTHON_COMMAND, [readerAt(looperRoot), ...files], {
-      encoding: "utf8",
-      timeout: PYTHON_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    output = runPython(looperRoot, "rules", files);
   } catch (cause) {
     return {
       kind: "unavailable",
@@ -115,12 +104,7 @@ export function shapeFromPython(
   }
   let output = "";
   try {
-    output = execFileSync(PYTHON_COMMAND, [reader, path, String(line), String(depth)], {
-      encoding: "utf8",
-      timeout: PYTHON_TIMEOUT_MS,
-      maxBuffer: A_READER_MAY_ANSWER_WITH,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    output = runPython(looperRoot, "shape", [path, String(line), String(depth)]);
   } catch (cause) {
     return {
       kind: "unavailable",
