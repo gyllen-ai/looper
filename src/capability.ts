@@ -17,6 +17,7 @@ export type Injection = {
   readonly text: string;
   readonly required: boolean;
   readonly notice: boolean;
+  readonly waits?: boolean;
   readonly summary?: string;
 };
 
@@ -62,7 +63,14 @@ export type ToolDef = {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: unknown;
+  readonly asksThePerson?: boolean;
 };
+
+export type Client =
+  | { readonly kind: "unknown" }
+  | { readonly kind: "named"; readonly name: string; readonly version: string };
+
+export const NOBODY_KNOWN: Client = { kind: "unknown" };
 
 export type Shown = { readonly media: string; readonly base64: string };
 
@@ -75,6 +83,7 @@ export type ToolCall = {
   readonly root: string;
   readonly tool: string;
   readonly args: ReadonlyMap<string, string>;
+  readonly client: Client;
 };
 
 export interface Capability {

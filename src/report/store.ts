@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
@@ -12,9 +12,9 @@ const WHAT_WAS_DECIDED = "decided.json";
 
 const NAME_LENGTH = 12;
 
-export type State = "written" | "sent" | "kept";
+export type State = "written" | "released" | "sent" | "kept";
 
-const STATES: readonly State[] = ["written", "sent", "kept"];
+const STATES: readonly State[] = ["written", "released", "sent", "kept"];
 
 export type Held = {
   readonly id: string;
@@ -46,6 +46,8 @@ const AN_ID = /^[0-9a-f]{12}$/;
 
 const A_NAME_SHOWS = 40;
 
+const A_DAY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+
 function shortHash(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, NAME_LENGTH);
 }
@@ -58,8 +60,13 @@ export function printOf(body: string): string {
   return createHash("sha256").update(body).digest("hex");
 }
 
+function whereItReallyIs(root: string): string {
+  return existsSync(root) ? realpathSync(root) : root;
+}
+
 export function reportsIn(root: string, home: string): string {
-  return join(home, REPORTS_DIR, `${basename(root)}-${shortHash(root)}`);
+  const real = whereItReallyIs(root);
+  return join(home, REPORTS_DIR, `${basename(real)}-${shortHash(real)}`);
 }
 
 export function pathOf(root: string, home: string, id: string): string {
@@ -94,7 +101,7 @@ function heldFrom(id: string, value: unknown): Entry {
   const on = fieldAt(value, "on");
   const title = fieldAt(value, "title");
   const print = fieldAt(value, "print");
-  if (typeof on !== "string" || typeof title !== "string" || typeof print !== "string") {
+  if (typeof on !== "string" || !A_DAY.test(on) || typeof title !== "string" || typeof print !== "string") {
     return { kind: "not-one", why: `an entry for ${id} that is not a report` };
   }
   if (state === undefined) {

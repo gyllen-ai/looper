@@ -175,6 +175,10 @@ export const COMMIT_GATE_TIMEOUT_SECONDS = 300;
 
 export const REPORT_TOOL = "report";
 
+export const RELEASE_TOOL = "release";
+
+export const REPORT_PRIORITY = 40;
+
 export const REPORT_DEPTH = 6;
 
 export const ADOPTED_PATH = ".looper/adopted.toml";

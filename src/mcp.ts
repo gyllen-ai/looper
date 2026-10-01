@@ -4,9 +4,9 @@ import {
   SERVER_NAME,
   SERVER_VERSION,
 } from "./config.ts";
-import type { Capability, ToolResult } from "./capability.ts";
+import { NOBODY_KNOWN, type Capability, type Client, type ToolResult } from "./capability.ts";
 import { ageOfOurCode, agingSaid, type Age } from "./code-age.ts";
-import { reasonFrom } from "./fields.ts";
+import { fieldAt, reasonFrom } from "./fields.ts";
 import { isOursToFix } from "./errors.ts";
 import { couldNotAnswer } from "./report/say.ts";
 
@@ -71,6 +71,28 @@ export function parseRequest(line: string): Incoming {
   return { kind: "request", request: { id, method, args, toolName } };
 }
 
+const THE_PERSON_MUST_ANSWER = "anthropic/requiresUserInteraction";
+
+export type Met =
+  | { readonly kind: "unreadable"; readonly why: string }
+  | { readonly kind: "said-nothing" }
+  | { readonly kind: "introduced"; readonly client: Client };
+
+export function clientIn(line: string): Met {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch (cause) {
+    return { kind: "unreadable", why: reasonFrom(cause) };
+  }
+  if (fieldAt(parsed, "method") !== "initialize") return { kind: "said-nothing" };
+  const info = fieldAt(fieldAt(parsed, "params"), "clientInfo");
+  const name = fieldAt(info, "name");
+  const version = fieldAt(info, "version");
+  if (typeof name !== "string" || typeof version !== "string") return { kind: "introduced", client: NOBODY_KNOWN };
+  return { kind: "introduced", client: { kind: "named", name, version } };
+}
+
 function envelope(id: string | number, result: unknown): string {
   return JSON.stringify({ jsonrpc: JSONRPC_VERSION, id, result });
 }
@@ -87,11 +109,16 @@ function toolList(capabilities: readonly Capability[]): unknown {
   const tools = [];
   for (const capability of capabilities) {
     for (const tool of capability.tools()) {
-      tools.push({
+      const listed = {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
-      });
+      };
+      if (tool.asksThePerson === true) {
+        tools.push({ ...listed, _meta: { [THE_PERSON_MUST_ANSWER]: true } });
+        continue;
+      }
+      tools.push(listed);
     }
   }
   return { tools };
@@ -126,6 +153,7 @@ function invoke(
   root: string,
   request: Request,
   loaded: Age,
+  client: Client,
 ): unknown {
   const asked = request.toolName;
   if (asked === null) {
@@ -137,7 +165,7 @@ function invoke(
   for (const capability of capabilities) {
     if (!capability.tools().some((tool) => tool.name === asked)) continue;
     try {
-      return content(capability.call({ root, tool: asked, args: request.args }), agingSaid(loaded));
+      return content(capability.call({ root, tool: asked, args: request.args, client }), agingSaid(loaded));
     } catch (cause) {
       return {
         content: [
@@ -158,6 +186,7 @@ export function respond(
   root: string,
   request: Request,
   loaded: Age,
+  client: Client,
 ): Reply {
   const id = request.id;
   if (id === null) return { kind: "none" };
@@ -177,12 +206,26 @@ export function respond(
     return { kind: "message", text: envelope(id, toolList(capabilities)) };
   }
   if (request.method === "tools/call") {
-    return { kind: "message", text: envelope(id, invoke(capabilities, root, request, loaded)) };
+    return { kind: "message", text: envelope(id, invoke(capabilities, root, request, loaded, client)) };
   }
   return {
     kind: "message",
     text: failure(id, -32601, `looper does not answer ${request.method}`),
   };
+}
+
+export function handleFor(
+  capabilities: readonly Capability[],
+  root: string,
+  line: string,
+  loaded: Age,
+  client: Client,
+): Reply {
+  const incoming = parseRequest(line);
+  if (incoming.kind === "unreadable") {
+    return { kind: "unreadable", detail: incoming.detail };
+  }
+  return respond(capabilities, root, incoming.request, loaded, client);
 }
 
 export function handle(
@@ -191,9 +234,18 @@ export function handle(
   line: string,
   loaded: Age,
 ): Reply {
-  const incoming = parseRequest(line);
-  if (incoming.kind === "unreadable") {
-    return { kind: "unreadable", detail: incoming.detail };
-  }
-  return respond(capabilities, root, incoming.request, loaded);
+  return handleFor(capabilities, root, line, loaded, NOBODY_KNOWN);
+}
+
+export function conversation(
+  capabilities: readonly Capability[],
+  root: string,
+  loaded: Age,
+): (line: string) => Reply {
+  let asking: Client = NOBODY_KNOWN;
+  return (line) => {
+    const met = clientIn(line);
+    if (met.kind === "introduced") asking = met.client;
+    return handleFor(capabilities, root, line, loaded, asking);
+  };
 }

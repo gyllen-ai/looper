@@ -74,6 +74,9 @@ function commitSaid(held: Head): string {
   return held.changed ? `commit ${held.commit} with changes not committed` : `commit ${held.commit}`;
 }
 
+export const A_SOURCE =
+  /^looper [0-9]+\.[0-9]+\.[0-9]+, commit (?:not known|[0-9a-f]{40}(?: with changes not committed)?), files [0-9a-f]{12}, node v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.]+)?, [a-z0-9]+$/;
+
 export function originOf(looperRoot: string): string {
   return [
     `looper ${SERVER_VERSION}`,
@@ -137,4 +140,28 @@ export function namesOf(root: string): Names {
   const remote = remoteOf(root);
   const remotely = remote.kind === "named" ? keptAt(remote.address) : [];
   return { kind: "named", names: [basename(root), ...packaged.names, ...remotely] };
+}
+
+export type Home =
+  | { readonly kind: "unknown"; readonly why: string }
+  | { readonly kind: "named"; readonly address: string };
+
+const WRITTEN_FOR_GIT = /^git\+/;
+
+const A_REPOSITORY_ENDING = /\.git$/;
+
+export function homeOf(looperRoot: string): Home {
+  const path = join(looperRoot, "package.json");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (cause) {
+    return { kind: "unknown", why: `looper's own package.json could not be read (${reasonFrom(cause)})` };
+  }
+  const held = fieldAt(parsed, "repository");
+  const url = typeof held === "string" ? held : fieldAt(held, "url");
+  if (typeof url !== "string" || url.length === 0) {
+    return { kind: "unknown", why: "looper's own package.json names no repository" };
+  }
+  return { kind: "named", address: url.replace(WRITTEN_FOR_GIT, "").replace(A_REPOSITORY_ENDING, "") };
 }

@@ -144,10 +144,29 @@ test("what a report is called is one line, and never half a character", () => {
 
     const listed = said(held, {});
 
-    assert.equal(listed.split("\n").length, 1, `a title with a line of its own is a second voice wherever the title is shown: ${listed}`);
+    assert.equal(listed.split("\n").length, 2, `one line says where the reports are and one names this report, so a title with a line of its own is a second voice wherever the title is shown: ${listed}`);
     assert.ok(listed.isWellFormed(), "a title cut through the middle of a character cannot be written into the answer of a hook at all");
     assert.ok(!onlyReport(held).includes("stopped\n\nlooper:"), "each of the two sentences is one paragraph in the file as well");
   } finally {
+    strike(held);
+  }
+});
+
+test("a project reached by a link and by its real path keeps one set of reports", () => {
+  const held = scene();
+  const linked = `${held.root}-linked`;
+  try {
+    symlinkSync(held.root, linked);
+    said({ root: linked, home: held.home }, A_FAILED_HOOK);
+
+    const listed = said(held, {});
+
+    assert.ok(
+      listed.includes("nobody has said"),
+      `the folder a report is kept in was named after the path as it was spelled, so the hook and the server, started in the same project by two spellings of its path, each kept reports the other never saw: ${listed}`,
+    );
+  } finally {
+    rmSync(linked, { force: true });
     strike(held);
   }
 });

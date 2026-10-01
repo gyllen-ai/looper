@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 619 cases · 757 tests
+90 rules · 5 languages · 619 cases · 793 tests
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -176,6 +176,13 @@ bug worth having. Your agent says so with the `report` tool, and in a shell it
 is `looper report`: looper writes down the shape the rule fired on and nothing
 else of yours, in a file under your home folder, for you to read before it goes
 anywhere. looper cannot send it. Nothing is written into your project.
+
+Each session is told once that looper can be wrong. If your agent writes a
+report, it shows you the text and asks looper to release it — and that question
+comes to you from Claude Code itself, every time, in every permission mode. The
+agent cannot answer it. Only after your yes does looper say where its makers
+are; then the agent files it as an issue under your name. `[report] offer =
+"never"` in `law.toml` turns the telling and the leaving off.
 
 The same tool takes any other fault of looper's own — a hook that failed, an
 answer that was untrue, a rule that stayed silent — and when looper itself

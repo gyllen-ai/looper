@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { Capability } from "../src/capability.ts";
+import type { Capability, Client } from "../src/capability.ts";
 import { ageOfOurCode } from "../src/code-age.ts";
 import { REPORT_TOOL } from "../src/config.ts";
-import { handle } from "../src/mcp.ts";
+import { handle, handleFor } from "../src/mcp.ts";
 import { Report } from "../src/report/capability.ts";
-import { reportsIn } from "../src/report/store.ts";
+import { heldIn, reportsIn } from "../src/report/store.ts";
 
 export const PRIVATE = `import { acmeBillingGateway } from "@acme/billing-internal";
 
@@ -90,4 +90,36 @@ export function onlyReport(held: Scene): string {
   const files = written(held);
   assert.equal(files.length, 1, `expected one report and found ${files.length}`);
   return readFileSync(join(reportsIn(held.root, held.home), String(files[0])), "utf8");
+}
+
+export const ASKS: Client = { kind: "named", name: "claude-code", version: "2.1.286" };
+
+export function saidAs(held: Scene, tool: string, args: unknown, client: Client): string {
+  const line = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: args } });
+  const reply = handleFor([new Report(held.home)], held.root, line, ageOfOurCode(), client);
+  assert.equal(reply.kind, "message");
+  if (reply.kind !== "message") throw new Error("unreachable");
+  const result: unknown = Object.getOwnPropertyDescriptor(JSON.parse(reply.text), "result")?.value;
+  const content: unknown = Object.getOwnPropertyDescriptor(result, "content")?.value;
+  assert.ok(Array.isArray(content));
+  return String(Object.getOwnPropertyDescriptor(content[0], "text")?.value);
+}
+
+export type Drafted = { readonly id: string; readonly title: string; readonly answer: string };
+
+export function drafted(held: Scene, args: unknown): Drafted {
+  const answer = saidAs(held, REPORT_TOOL, args, ASKS);
+  const read = heldIn(held.root, held.home);
+  assert.equal(read.kind, "read", answer);
+  if (read.kind !== "read") throw new Error("unreachable");
+  const one = read.held.at(-1);
+  assert.ok(one !== undefined, answer);
+  return { id: one.id, title: one.title, answer };
+}
+
+export function stateOf(held: Scene, id: string): string {
+  const read = heldIn(held.root, held.home);
+  if (read.kind !== "read") return read.why;
+  const one = read.held.find((kept) => kept.id === id);
+  return one === undefined ? "gone" : one.state;
 }

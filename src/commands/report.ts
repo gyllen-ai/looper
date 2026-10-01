@@ -46,7 +46,7 @@ export function report(args: readonly string[], out: Out): number {
     out.warn(HOW);
     return 2;
   }
-  const reply = new Report(whereTheUserLives()).answer(here(), said);
+  const reply = new Report(whereTheUserLives()).answer(here(), said, "shell");
   if (reply.done) {
     out.say(reply.text);
     return 0;
