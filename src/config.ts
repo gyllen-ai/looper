@@ -429,6 +429,10 @@ export function projectRoot(from: string, named: Named): Rooted {
   return nearestProject(from);
 }
 
+export function withoutCallingHome(): NodeJS.ProcessEnv {
+  return { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE: "true", DOTNET_SDK_VULNERABILITY_CHECK_DISABLE: "true", DOTNET_NOLOGO: "true" };
+}
+
 export function searchPath(): readonly string[] {
   const written = process.env["PATH"];
   if (written === undefined) return [];

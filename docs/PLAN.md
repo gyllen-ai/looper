@@ -4025,6 +4025,16 @@ would change a decision above rather than merely a detail:
   install with scripts disabled and audit anything that wants one, and assert at
   runtime that the network modules were never loaded. The runtime assertion is
   the one that actually holds, and it is stronger than the tree audit it replaces.
+  **No such assertion was ever written, and the one described cannot be.
+  Corrected 2026-10-01.** Measured on Node 24.20: every looper command loads
+  `net` and `dgram`, because Node loads both itself for any program that can
+  start another. So "never loaded" is false on the first line of every run for
+  the two modules that open a socket. What can be asserted is the half above
+  them, and `tests/nothing-over-a-wire.test.ts` now does: six real runs — the
+  turn hook, three tool hooks, the server and a command — load none of `http`,
+  `https`, `http2`, `tls` or `dns`. Reading the files for those names finds an
+  import somebody wrote down; this finds one assembled while running. The scan
+  of our files and of the resolved tree is still what holds the rest.
 - **Node's startup floor is 18 ms and it is not ours to optimise.** Anything that
   wants to be cheaper than that has to not be a process, which is a real design
   option and not one we are taking yet.
@@ -6528,7 +6538,12 @@ came from.
 
 **Local, because looper has no network.** The authoritative check is `git
 ls-remote`, which would be looper's first outbound connection, and
-`tests/no-network.test.ts` exists to stop exactly that arriving by accident. So
+`tests/no-network.test.ts` exists to stop exactly that arriving by accident. **It
+would not have stopped it. Corrected 2026-10-01.** That test reads imports, and a
+`git ls-remote` is not an import: added to `src/git.ts` it would have passed, and
+passed `tests/invariants.test.ts` as well, which asked only that `git` was among
+the programs started. Both are closed under "Two programs looper starts could
+reach out on their own", at the end of this document. So
 the gate reads what is already on disk: the submodule's own remote-tracking
 refs. That costs nothing in the workflow that matters, because to pin a
 submodule to a new upstream commit you must first fetch that commit, and
@@ -8213,3 +8228,55 @@ report ends with the same sentence, addressed to whoever reads it here.
   said again, this line included; the refusals and the failures still carry the
   route.
 - **Anything that reads incoming reports for us.**
+
+## Two programs looper starts could reach out on their own — 2026-10-01
+
+Found while reviewing the report, which says of itself "looper cannot send it".
+looper opens no socket; that was always true and is still what the scan holds.
+But looper starts other programs, and two of them can reach a network without
+being asked to.
+
+**git fetches on its own in a clone made without file contents. Seen.** In a
+clone made with `--filter=blob:none`, a plain `git show` of a file that was
+never checked out went to the remote and came back with it, and a `git grep`
+over a revision fetched every file it needed: four objects that had not been on
+the machine. That last command is the one the push gate runs to learn which
+words are new. So in such a clone looper's own gate would have pulled a
+repository's history over the network to count its words.
+
+Every question looper asks git now begins `-c protocol.allow=never`, which
+forbids every transport, and the same two commands then stop with "transport
+not allowed" and fetch nothing. looper already reads a git that could not
+answer as "cannot tell", and says so. It is the one switch every version of git
+since 2.12 understands; `--no-lazy-fetch` says the same thing more politely and
+an older git refuses it as an unknown option, which would break every call.
+`tests/nothing-over-a-wire.test.ts` builds such a clone and counts its objects
+before and after.
+
+**The C# build reports to its maker and looks for updates. Told, not seen.**
+looper builds its C# reader with `dotnet build`. The SDK's own documentation,
+read 2026-10-01: telemetry "is enabled by default" and "is collected when using
+any of the .NET CLI commands, such as `dotnet build`", and workload manifests are
+downloaded "asynchronously in the background" when `dotnet build` runs, no more
+than once a day. Nothing on this machine could watch a connection being opened,
+so this rests on the documentation and not on a measurement. The build is now
+started with the three settings that documentation gives for turning each off,
+and the reader was rebuilt from nothing with them set and passes its cases.
+Running the built reader was never in question: the same page says nothing is
+collected when a built application is started.
+
+**The check on what may be started asked the wrong question.** It asked whether
+the allowed program was among those a file starts. It now asks for the exact
+list, per file: git; cargo and the Rust reader; Python; `dotnet` and the C#
+reader; and the shell that runs a project's own declared checks. A second
+program beside any of them fails the suite.
+
+### What this does not claim
+
+- **A project's own checks.** `looper loop` runs the lines a project declared.
+  What those lines reach is the project's decision, and looper never runs them
+  from a hook.
+- **What a started program starts.** cargo builds with `--offline` from sources
+  in this repository; Python reads one file. Neither was changed.
+- **That no packet leaves.** The promise is about looper and the programs it
+  starts, held by tests that can be read in five minutes.

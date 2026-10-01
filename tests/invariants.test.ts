@@ -84,17 +84,27 @@ test("the loop runner starts only what this project declared, and never on a hoo
   );
 });
 
-test("the files that may start a process start only what they were allowed to", () => {
-  const starts: Record<string, string> = {
-    [SPAWN_SANCTUM]: '"git"',
-    "law/rust/drive.ts": '"cargo"',
-    "law/csharp/drive.ts": '"dotnet"',
-  };
-  for (const [file, expected] of Object.entries(starts)) {
+const STARTED: Readonly<Record<string, readonly string[]>> = {
+  [SPAWN_SANCTUM]: ['"git"'],
+  "law/rust/drive.ts": ['"cargo"', "binary", "builtAt(looperRoot)"],
+  "law/python/drive.ts": ["PYTHON_COMMAND"],
+  "law/csharp/drive.ts": ['"dotnet"', "binary"],
+  "loop/run.ts": ['"sh"'],
+};
+
+const A_START = /\b(?:execFileSync|spawnSync|execSync|execFile|spawn|exec|fork)\(\s*([^,\n]+?)\s*,/g;
+
+test("the files that may start a process start exactly what they were allowed to, and nothing else", () => {
+  assert.deepEqual(Object.keys(STARTED).sort(), [...MAY_SPAWN].sort(), "every file that may start a process says here what it starts");
+
+  for (const [file, allowed] of Object.entries(STARTED)) {
     const text = readFileSync(join(ROOT, "src", file), "utf8");
-    assert.ok(
-      text.includes(`execFileSync(${expected}`) || text.includes("execFileSync(builtAt("),
-      `${file} is allowed to start ${expected} and looper's own Rust program, and nothing else.`,
+    const started = [...new Set([...text.matchAll(A_START)].map((held) => String(held[1])))].sort();
+
+    assert.deepEqual(
+      started,
+      [...allowed].sort(),
+      `${file} starts ${started.join(", ")} and is allowed ${allowed.join(", ")}. This check used to ask only that the allowed program was among them, so a second program beside it — one that reaches the network — would have passed every test here`,
     );
   }
 });

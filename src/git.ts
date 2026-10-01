@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { A_READER_MAY_ANSWER_WITH, A_WRITTEN_TOKEN, GIT_TIMEOUT_MS } from "./config.ts";
 import { reasonFrom } from "./fields.ts";
 
+const NEVER_OVER_A_WIRE: readonly string[] = ["-c", "protocol.allow=never"];
+
 const IN_HAND: readonly (readonly string[])[] = [
   ["diff", "HEAD", "--name-only", "--no-renames"],
   ["ls-files", "--others", "--exclude-standard"],
@@ -19,7 +21,7 @@ export type Changed =
   | { readonly kind: "paths"; readonly paths: readonly string[] };
 
 function askWhole(root: string, args: readonly string[]): string {
-  return execFileSync("git", [...args], {
+  return execFileSync("git", [...NEVER_OVER_A_WIRE, ...args], {
     cwd: root,
     encoding: "utf8",
     timeout: GIT_TIMEOUT_MS,
@@ -322,7 +324,7 @@ export type Ancestry =
   | { readonly kind: "no" };
 
 export function isAncestorIn(root: string, earlier: string, later: string): Ancestry {
-  const answered = spawnSync("git", ["merge-base", "--is-ancestor", earlier, later], {
+  const answered = spawnSync("git", [...NEVER_OVER_A_WIRE, "merge-base", "--is-ancestor", earlier, later], {
     cwd: root,
     encoding: "utf8",
     timeout: GIT_TIMEOUT_MS,
@@ -370,7 +372,7 @@ export type Remote =
 
 export function remoteOf(root: string): Remote {
   if (!existsSync(join(root, ".git"))) return { kind: "none" };
-  const answered = spawnSync("git", ["config", "--get", "remote.origin.url"], {
+  const answered = spawnSync("git", [...NEVER_OVER_A_WIRE, "config", "--get", "remote.origin.url"], {
     cwd: root,
     encoding: "utf8",
     timeout: GIT_TIMEOUT_MS,

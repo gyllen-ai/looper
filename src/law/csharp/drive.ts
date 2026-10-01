@@ -13,6 +13,7 @@ import {
   CSHARP_ENGINE_PROJECT,
   CSHARP_TIMEOUT_MS,
   A_READER_MAY_ANSWER_WITH,
+  withoutCallingHome,
 } from "../../config.ts";
 import { failureOf, fieldAt, reasonFrom } from "../../fields.ts";
 import { freshnessOf } from "../engine-age.ts";
@@ -65,6 +66,7 @@ export function buildEngine(looperRoot: string): Judged {
   try {
     execFileSync("dotnet", ["build", "-c", "Release", "--nologo", "-v", "q"], {
       cwd: join(looperRoot, CSHARP_ENGINE_DIR),
+      env: withoutCallingHome(),
       encoding: "utf8",
       timeout: CSHARP_BUILD_TIMEOUT_MS,
       maxBuffer: A_READER_MAY_ANSWER_WITH,
