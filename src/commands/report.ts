@@ -8,6 +8,8 @@ const SAID_WITH: readonly string[] = ["kind", "about", "wrong", "instead", "file
 
 const IT_FIRED = "The rule fired on this line and the code is fine.";
 
+const NOT_STATED = "What was tried was not stated.";
+
 const HOW = [
   "looper report says looper got something wrong, without sending anything.",
   '  looper report --kind rule --about TS-ERROR:4 --wrong "what it did" --instead "what you tried"',
@@ -34,6 +36,7 @@ function asked(args: readonly string[]): ReadonlyMap<string, string> {
   }
   const tried = valueAfter(args, "--tried");
   if (tried.kind === "given") said.set("instead", tried.value);
+  if (rule.kind === "given" && !said.has("instead")) said.set("instead", NOT_STATED);
   return said;
 }
 

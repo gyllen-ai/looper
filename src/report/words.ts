@@ -27,11 +27,21 @@ const PAIRS: readonly (readonly [string, string])[] = [
   ["<", ">"],
 ];
 
-const ENDS_A_SENTENCE = /[.!?:]["'”’)\]]*$/;
+const ENDS_A_SENTENCE = /[.!?]["'”’)\]]*$/;
 
-const A_NUMBER = /^#?[0-9][0-9.,:%x×/-]*$/;
+const A_COUNT = /^#?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?%?$/;
 
-const A_MEASURE = /^[0-9][0-9.,]*(?:[A-Za-z]{1,2}|(?:-?[a-z]+)+)$/;
+const A_VERSION = /^[0-9]+(?:\.[0-9]+){1,2}$/;
+
+const A_SHARE_A_TIME_OR_A_SIZE = /^[0-9]+(?:[:/x×][0-9]+){1,2}$/;
+
+const A_MEASURE = /^[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?(?:[A-Za-z]{1,3}|(?:-[a-z]+)+)$/;
+
+const DIGITS_IN_GROUPS = /^[0-9]+(?:-[0-9]+)+$/;
+
+const A_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+
+const A_RANGE = /^[0-9]+-[0-9]+$/;
 
 const JOINED_BY_HYPHENS = /^[A-Za-z0-9'’]+(?:-[A-Za-z0-9'’]+)+$/;
 
@@ -39,7 +49,9 @@ const A_CONTRACTION = /^I['’][a-z]+$/;
 
 const LETTERS_WITH_DOTS = /^[a-z](?:\.[a-z])+$/;
 
-const A_LETTER_OR_DIGIT = /[A-Za-z0-9]/;
+const A_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+
+const PLAIN_TYPING = /^[\x00-\x7F]*$/;
 
 const TOO_LONG_FOR_A_COUNT = /[0-9]{5,}/;
 
@@ -49,7 +61,9 @@ const A_LETTER_FROM_ELSEWHERE = /[^\x00-\x7F‘’“”…]/;
 
 const BETWEEN_WORDS = /[\s—–]+/;
 
-const A_CAPITAL_OR_DIGIT = /[A-Z0-9]/;
+const A_CAPITAL = /[A-Z]/;
+
+const A_DIGIT = /[0-9]/;
 
 const OPENS_WITH_A_CAPITAL = /^[A-Z]/;
 
@@ -137,32 +151,56 @@ function isOursOnDisk(token: string): boolean {
 
 function isOnlyWriting(token: string): boolean {
   return (
-    token.length <= 1 ||
     !A_LETTER_OR_DIGIT.test(token) ||
+    (token.length <= 1 && PLAIN_TYPING.test(token)) ||
     A_CONTRACTION.test(token) ||
     LETTERS_WITH_DOTS.test(token)
   );
 }
 
+function isCounted(token: string): boolean {
+  return (
+    A_COUNT.test(token) ||
+    A_VERSION.test(token) ||
+    A_SHARE_A_TIME_OR_A_SIZE.test(token) ||
+    A_MEASURE.test(token)
+  );
+}
+
+const TOO_LONG = "a number this long reads like a ticket or an account";
+
+function whyNotGrouped(token: string): string {
+  if (TOO_LONG_FOR_A_COUNT.test(token)) return TOO_LONG;
+  if (A_DATE.test(token) || A_RANGE.test(token)) return "";
+  return "digits in groups like these read like a telephone, a card or an account";
+}
+
 function whyNot(token: string, opens: boolean, ours: ReadonlySet<string>, names: ReadonlySet<string>): string {
   if (isOnlyWriting(token) || ours.has(token.toLowerCase())) return "";
-  if (partsOf(token).some((part) => names.has(part))) return "it is this project's own name";
+  if (partsOf(token).some((part) => names.has(part))) {
+    return "it is this project's own name, or part of the address it is kept at";
+  }
   if (isOursOnDisk(token)) return "";
+  if (DIGITS_IN_GROUPS.test(token)) return whyNotGrouped(token);
   if (JOINED_BY_HYPHENS.test(token)) {
     const whys = token.split("-").map((part, at) => whyNot(part, opens && at === 0, ours, names));
     const first = whys.find((why) => why.length > 0);
     return first === undefined ? "" : first;
   }
-  if (A_NUMBER.test(token) || A_MEASURE.test(token)) {
-    return TOO_LONG_FOR_A_COUNT.test(token) ? "a number this long reads like a ticket or an account" : "";
-  }
+  if (isCounted(token)) return TOO_LONG_FOR_A_COUNT.test(token) ? TOO_LONG : "";
   if (A_LETTER_FROM_ELSEWHERE.test(token)) {
     return "it has a letter outside a to z, and a report is written in plain English so that every word of it can be checked";
   }
   if (OTHER_THAN_PLAIN.test(token)) return "it is written like a path, an address or a piece of code";
-  if (A_CAPITAL_OR_DIGIT.test(token.slice(1))) return "a capital or a digit inside a word is how code writes a name";
+  if (A_CAPITAL.test(token.slice(1)) || A_DIGIT.test(token)) {
+    return "a capital inside a word, or a digit anywhere in one, is how code writes a name";
+  }
   if (OPENS_WITH_A_CAPITAL.test(token) && !opens) return "a capital in the middle of a sentence is a name";
   return "";
+}
+
+function endsASentence(raw: string): boolean {
+  return ENDS_A_SENTENCE.test(raw) && !LETTERS_WITH_DOTS.test(bare(raw));
 }
 
 function credentialsIn(text: string): readonly Refused[] {
@@ -183,15 +221,13 @@ export function refusedIn(
   const names = theirNames(theirs, ours);
   const refused = new Map<string, string>();
 
-  for (const line of text.split("\n")) {
-    let opens = true;
-    for (const raw of line.split(BETWEEN_WORDS)) {
-      const token = bare(raw);
-      if (token.length === 0) continue;
-      const why = whyNot(token, opens, ours, names);
-      if (why.length > 0 && !refused.has(token)) refused.set(token, why);
-      opens = ENDS_A_SENTENCE.test(raw);
-    }
+  let opens = true;
+  for (const raw of text.split(BETWEEN_WORDS)) {
+    const token = bare(raw);
+    if (token.length === 0) continue;
+    const why = whyNot(token, opens, ours, names);
+    if (why.length > 0 && !refused.has(token)) refused.set(token, why);
+    opens = endsASentence(raw);
   }
 
   const stopped: Refused[] = [...refused].map(([word, why]) => ({ word, why }));

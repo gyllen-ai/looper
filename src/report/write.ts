@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 
 import { canonBranchNames } from "../canon.ts";
@@ -20,7 +20,7 @@ import { looperRoot } from "../law/readers.ts";
 import { gistOf } from "../said.ts";
 import { namesOf, originOf } from "./origin.ts";
 import { SKELETON_WORDS, render, shapeFor } from "./skeleton.ts";
-import { heldIn, idOf, keep, pathOf, printOf, type Held } from "./store.ts";
+import { idOf, keep, printOf, type Held } from "./store.ts";
 import { looperWords, notLoopers, refusedIn, type Refused } from "./words.ts";
 
 const WORD = new RegExp(A_NAME_IN_CODE, "g");
@@ -206,6 +206,13 @@ function placed(root: string, where: Where): Placed {
   if (!existsSync(full) || !statSync(full).isFile()) {
     return { kind: "refused", why: `there is no file at ${inside}` };
   }
+  const reached = relative(realpathSync(resolve(root)), realpathSync(full));
+  if (reached.startsWith("..") || isAbsolute(reached)) {
+    return {
+      kind: "refused",
+      why: `${where.file} is a link to a file that is not inside this project, and a shape is only ever drawn from a file inside this project`,
+    };
+  }
   if (!Number.isInteger(where.line) || where.line < 1) {
     return { kind: "refused", why: `a line is a whole number from 1, and ${String(where.line)} is not one` };
   }
@@ -326,10 +333,17 @@ function bodyOf(told: Told): string {
   ].join("\n");
 }
 
+const ANY_SPACE = /\s+/g;
+
+function onOneLine(said: string): string {
+  return said.trim().replace(ANY_SPACE, " ");
+}
+
 function titleOf(about: string, wrong: string): string {
-  const said = wrong.trim().split(/(?<=[.!?])\s/)[0];
+  const said = onOneLine(wrong).split(/(?<=[.!?])\s/)[0];
   const first = said === undefined ? "" : said;
-  const cut = first.length > A_TITLE_HOLDS ? `${first.slice(0, A_TITLE_HOLDS)}…` : first;
+  const letters = Array.from(first);
+  const cut = letters.length > A_TITLE_HOLDS ? `${letters.slice(0, A_TITLE_HOLDS).join("")}…` : first;
   return `${about}: ${cut}`;
 }
 
@@ -349,9 +363,11 @@ export function buildReport(request: Request): Written {
   if (part.kind === "unknown") {
     return { kind: "refused", why: `"${request.about}" ${NOT_A_PART_OF_LOOPER}` };
   }
+  const wrong = onOneLine(request.wrong);
+  const instead = onOneLine(request.instead);
   for (const [called, text] of [
-    ["what looper did", request.wrong],
-    ["what it should have done", request.instead],
+    ["what looper did", wrong],
+    ["what it should have done", instead],
   ] as const) {
     const why = unsaid(called, text);
     if (why.length > 0) return { kind: "refused", why };
@@ -364,8 +380,12 @@ export function buildReport(request: Request): Written {
       why: `${names.why}, so looper cannot tell what this project is called, and a name it cannot check is a name it cannot keep out`,
     };
   }
-  const typed = refusedIn(`${request.wrong}\n${request.instead}`, looperWords(), names.names);
-  if (typed.length > 0) return { kind: "would-leak", leaks: typed };
+  const ours = looperWords();
+  const typed = new Map<string, Leak>();
+  for (const said of [wrong, instead]) {
+    for (const leak of refusedIn(said, ours, names.names)) typed.set(leak.word, leak);
+  }
+  if (typed.size > 0) return { kind: "would-leak", leaks: [...typed.values()] };
 
   const shape = drawn(placed(request.root, request.where));
   if (shape.kind === "refused" || shape.kind === "no-shape") return shape;
@@ -374,36 +394,17 @@ export function buildReport(request: Request): Written {
     if (leaks.length > 0) return { kind: "shape-leaks", leaks };
   }
 
-  const what = shape.kind === "drawn" ? shape.shape : gistOf(`${request.wrong}\n${request.instead}`);
+  const what = shape.kind === "drawn" ? shape.shape : gistOf(`${wrong}\n${instead}`);
   const id = idOf([request.kind, part.name, what]);
-  const before = heldIn(request.root, request.home);
-  if (before.kind === "unreadable") return { kind: "refused", why: before.why };
-  const already = before.held.find((one) => one.id === id);
-  if (already !== undefined) {
-    return { kind: "already", held: already, path: pathOf(request.root, request.home, id) };
-  }
-
-  const body = bodyOf({
-    kind: request.kind,
-    about: part.name,
-    id,
-    wrong: request.wrong,
-    instead: request.instead,
-    shape,
-  });
+  const body = bodyOf({ kind: request.kind, about: part.name, id, wrong, instead, shape });
   const kept = keep(
     request.root,
     request.home,
-    { id, state: "written", on: today(), title: titleOf(part.name, request.wrong), print: printOf(body) },
+    { id, state: "written", on: today(), title: titleOf(part.name, wrong), print: printOf(body) },
     body,
   );
+  if (kept.kind === "already") return kept;
   if (kept.kind !== "kept") return { kind: "refused", why: kept.why };
 
-  return {
-    kind: "written",
-    id,
-    path: kept.path,
-    body,
-    notOurs: notLoopers(`${request.wrong}\n${request.instead}`, looperWords()),
-  };
+  return { kind: "written", id, path: kept.path, body, notOurs: notLoopers(`${wrong}\n${instead}`, ours) };
 }

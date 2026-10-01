@@ -1,6 +1,6 @@
 import { HOOK_OUTPUT_CEILING, HOOK_PREVIEW_CHARS, INJECTION_SEPARATOR } from "./config.ts";
 import type { Capability, InjectContext, Injection } from "./capability.ts";
-import { NotOursToFix } from "./errors.ts";
+import { isOursToFix } from "./errors.ts";
 import { reasonFrom } from "./fields.ts";
 import { couldNotSpeak } from "./report/say.ts";
 import { heardBefore, noteSaid } from "./said.ts";
@@ -30,6 +30,7 @@ export type Complaint = {
 export type AllocationRun = {
   readonly allocation: Allocation;
   readonly complaints: readonly Complaint[];
+  readonly unrecorded: readonly string[];
 };
 
 function gather(
@@ -43,7 +44,7 @@ function gather(
       injections.push(...capability.inject(context));
     } catch (cause) {
       const detail = reasonFrom(cause);
-      complaints.push({ capability: capability.name, detail, ours: !(cause instanceof NotOursToFix) });
+      complaints.push({ capability: capability.name, detail, ours: isOursToFix(cause) });
     }
   }
   return { injections, complaints };
@@ -80,13 +81,20 @@ function clampedMarker(cut: number): string {
   ].join(" ");
 }
 
-function clamp(text: string): string {
-  if (text.length <= HOOK_OUTPUT_CEILING) return text;
+function clamp(text: string, ceiling: number): string {
+  if (text.length <= ceiling) return text;
   const widest = clampedMarker(text.length).length;
-  const room = HOOK_OUTPUT_CEILING - widest - INJECTION_SEPARATOR.length;
-  if (room <= 0) return clampedMarker(text.length).slice(0, HOOK_OUTPUT_CEILING);
+  const room = ceiling - widest - INJECTION_SEPARATOR.length;
+  if (room <= 0) return clampedMarker(text.length).slice(0, Math.max(ceiling, 0));
   const kept = text.slice(0, room);
   return [kept, clampedMarker(text.length - kept.length)].join(INJECTION_SEPARATOR);
+}
+
+function withWhatFailed(spoken: string, failed: string): string {
+  if (failed.length === 0) return clamp(spoken, HOOK_OUTPUT_CEILING);
+  if (spoken.length === 0) return clamp(failed, HOOK_OUTPUT_CEILING);
+  const left = HOOK_OUTPUT_CEILING - failed.length - INJECTION_SEPARATOR.length;
+  return clamp([clamp(spoken, left), failed].join(INJECTION_SEPARATOR), HOOK_OUTPUT_CEILING);
 }
 
 export function allocate(
@@ -95,6 +103,9 @@ export function allocate(
 ): AllocationRun {
   const { injections, complaints } = gather(capabilities, context);
   const ordered = [...injections].sort(byPriority);
+  const failed = complaints.map((held) => couldNotSpeak(held.capability, held.detail, held.ours));
+  const owed = failed.reduce((sum, one) => sum + one.length + INJECTION_SEPARATOR.length, 0);
+  const room = context.budget - owed;
 
   const parts: string[] = [];
   const contributors: string[] = [];
@@ -123,7 +134,7 @@ export function allocate(
       continue;
     }
     const separator = parts.length === 0 ? 0 : INJECTION_SEPARATOR.length;
-    if (used + separator + injection.text.length <= context.budget) {
+    if (used + separator + injection.text.length <= room) {
       take(injection);
       continue;
     }
@@ -135,11 +146,11 @@ export function allocate(
     });
   }
 
-  const requiredAlone = used > context.budget;
+  const requiredAlone = used > room;
 
   while (dropped.length > 0 && parts.length > 1 && !requiredAlone) {
     const projected = used + INJECTION_SEPARATOR.length + droppedMarker(dropped).length;
-    if (projected <= context.budget) break;
+    if (projected <= room) break;
     const last = parts.pop();
     const name = contributors.pop();
     const held = weighed.pop();
@@ -154,26 +165,34 @@ export function allocate(
     dropped.push(held);
   }
 
-  for (const name of contributors) {
-    const spoken = ordered.find((one) => one.source === name && one.notice);
-    if (spoken !== undefined) noteSaid(context.said, spoken.source, spoken.text);
-  }
+  const heard = contributors.flatMap((name) => ordered.filter((one) => one.source === name && one.notice));
 
   if (dropped.length > 0) parts.push(droppedMarker(dropped));
-  if (requiredAlone) parts.push(overBudgetMarker(used, context.budget));
+  if (requiredAlone) parts.push(overBudgetMarker(used, room));
 
   const spoken = parts.join(INJECTION_SEPARATOR);
-  const failed = complaints.map((held) => couldNotSpeak(held.capability, held.detail, held.ours));
-  const text = clamp([...(spoken.length === 0 ? [] : [spoken]), ...failed].join(INJECTION_SEPARATOR));
+  const text = withWhatFailed(spoken, failed.join(INJECTION_SEPARATOR));
+
+  const unrecorded: string[] = [];
+  for (const notice of heard) {
+    if (!text.includes(notice.text)) continue;
+    try {
+      noteSaid(context.said, notice.source, notice.text);
+    } catch (cause) {
+      unrecorded.push(reasonFrom(cause));
+    }
+  }
+
   return {
     allocation: {
       text,
       contributors,
       weighed,
       dropped,
-      overflowed: requiredAlone || spoken.length > context.budget,
+      overflowed: requiredAlone || spoken.length > room,
       chars: text.length,
     },
     complaints,
+    unrecorded,
   };
 }

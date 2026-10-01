@@ -1,7 +1,7 @@
 import { first } from "./helpers.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -223,4 +223,62 @@ test("an edit that is refused says how to tell looper the rule is wrong", () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+class ReadsWhatItMayNot extends Broken {
+  override readonly name = "law";
+  private readonly path: string;
+
+  constructor(path: string) {
+    super();
+    this.path = path;
+  }
+
+  override inject(): readonly Injection[] {
+    readFileSync(this.path, "utf8");
+    return [];
+  }
+
+  override onHook(): Outcome {
+    readFileSync(this.path, "utf8");
+    return { kind: "pass" };
+  }
+}
+
+const NOTHING_IS_SHUT = process.getuid !== undefined && process.getuid() === 0
+  ? "a root user can read a file with no read bit"
+  : false;
+
+test("a file the machine will not let looper read is not called a fault in looper", { skip: NOTHING_IS_SHUT }, () => {
+  const root = mkdtempSync(join(tmpdir(), "looper-hook-says-"));
+  const shut = join(root, "law.toml");
+  try {
+    writeFileSync(shut, "[rules]\n");
+    chmodSync(shut, 0o000);
+
+    const context = contextIn(first(answerTo("PostToolUse", dispatched([new ReadsWhatItMayNot(shut)], "PostToolUse")).said));
+    assert.ok(context.includes("EACCES"), context);
+    assert.ok(
+      !context.includes(A_FAULT_IN_LOOPER),
+      `a file somebody shut is theirs to open, and every machine that ever shut one would have sent it to looper's makers as looper's fault: ${context}`,
+    );
+
+    const turn = allocate([new ReadsWhatItMayNot(shut), new Speaks("router")], { root: ".", budget: 9800, turn: NO_TURN, said: NEVER_SAID });
+    assert.ok(turn.allocation.text.includes("EACCES") && !turn.allocation.text.includes(A_FAULT_IN_LOOPER), turn.allocation.text);
+  } finally {
+    chmodSync(shut, 0o644);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("what went wrong is said at a length that leaves room for everything else", () => {
+  const answer = answerTo("PostToolUse", {
+    refusals: [],
+    mentions: [],
+    complaints: [{ capability: "law", detail: "x".repeat(5000), ours: true }],
+  });
+  const context = contextIn(first(answer.said));
+
+  assert.ok(context.length < 1000, `one failure's own words took ${context.length} characters of the agent's context`);
+  assert.ok(context.includes(A_FAULT_IN_LOOPER), "what is cut is the middle of the reason, never the sentence that says whose fault it is");
 });

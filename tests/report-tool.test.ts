@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { USAGE } from "../src/announce.ts";
@@ -12,92 +11,10 @@ import { ageOfOurCode } from "../src/code-age.ts";
 import { REPORT_TOOL } from "../src/config.ts";
 import { handle } from "../src/mcp.ts";
 import { registry } from "../src/registry.ts";
-import { Report } from "../src/report/capability.ts";
 import { reportsIn } from "../src/report/store.ts";
 import { partsOfLooper } from "../src/report/write.ts";
+import { A_FAILED_HOOK, THEIRS, onlyReport, said, scene, strike, written } from "./report-scene.ts";
 import { knownRuleIds } from "../src/law/checks.ts";
-
-const PRIVATE = `import { acmeBillingGateway } from "@acme/billing-internal";
-
-export async function reconcileTenantLedger(tenantRef: string) {
-  try {
-    return await acmeBillingGateway.settle(tenantRef, "PROD-TENANT-8842");
-  } catch (cause) {
-    auditTrail.record(cause);
-    return [];
-  }
-}
-`;
-
-const THEIRS: readonly string[] = [
-  "acmeBillingGateway",
-  "billing-internal",
-  "reconcileTenantLedger",
-  "tenantRef",
-  "PROD-TENANT-8842",
-  "auditTrail",
-  "settle",
-];
-
-const A_FAILED_HOOK = {
-  kind: "failed",
-  about: "PostToolUse",
-  wrong: "The hook exited without saying anything and the edit was never judged.",
-  instead: "It should have said that the edit was not judged.",
-};
-
-type Scene = { readonly root: string; readonly home: string };
-
-function scene(): Scene {
-  const root = mkdtempSync(join(tmpdir(), "looper-report-tool-"));
-  const home = mkdtempSync(join(tmpdir(), "looper-report-home-"));
-  mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "src/billing.ts"), PRIVATE);
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "t" }));
-  return { root, home };
-}
-
-function strike(held: Scene): void {
-  rmSync(held.root, { recursive: true, force: true });
-  rmSync(held.home, { recursive: true, force: true });
-}
-
-function resultOf(capabilities: readonly Capability[], root: string, args: unknown): Record<string, unknown> {
-  const line = JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "tools/call",
-    params: { name: REPORT_TOOL, arguments: args },
-  });
-  const reply = handle(capabilities, root, line, ageOfOurCode());
-  assert.equal(reply.kind, "message");
-  if (reply.kind !== "message") throw new Error("unreachable");
-  const parsed: unknown = JSON.parse(reply.text);
-  assert.ok(parsed !== null && typeof parsed === "object" && "result" in parsed);
-  const result: unknown = Object.getOwnPropertyDescriptor(parsed, "result")?.value;
-  assert.ok(result !== null && typeof result === "object");
-  return { ...result };
-}
-
-function said(held: Scene, args: unknown): string {
-  const content = resultOf([new Report(held.home)], held.root, args)["content"];
-  assert.ok(Array.isArray(content));
-  const text: unknown = Object.getOwnPropertyDescriptor(content[0], "text")?.value;
-  assert.equal(typeof text, "string");
-  return String(text);
-}
-
-function written(held: Scene): readonly string[] {
-  const dir = reportsIn(held.root, held.home);
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).filter((name) => name.endsWith(".md"));
-}
-
-function onlyReport(held: Scene): string {
-  const files = written(held);
-  assert.equal(files.length, 1, `expected one report and found ${files.length}`);
-  return readFileSync(join(reportsIn(held.root, held.home), String(files[0])), "utf8");
-}
 
 test("the report tool is on the server every project already runs", () => {
   const tools = registry().flatMap((capability) => capability.tools());
@@ -388,7 +305,12 @@ test("the answer lists the words that are not looper's own, for the person to gl
       instead: "It should have fired on the replaced total.",
     });
 
-    assert.ok(answer.includes("invoice"), answer);
+    const glance = answer.split("\n").find((line) => line.startsWith("Words in the two sentences that are not looper's own"));
+    assert.ok(
+      glance !== undefined && glance.includes("invoice"),
+      `the report itself repeats the sentence, so only the line that lists the words can show the list was made: ${answer}`,
+    );
+    assert.ok(glance !== undefined && !glance.includes("rule"), "looper's own words are not worth anybody's glance");
   } finally {
     strike(held);
   }
@@ -398,6 +320,11 @@ const NO_EVENTS: readonly HookEvent[] = [];
 
 class Throws implements Capability {
   readonly name = "throws";
+  private readonly tool: string;
+
+  constructor(tool: string) {
+    this.tool = tool;
+  }
 
   inject(): readonly Injection[] {
     return [];
@@ -412,7 +339,7 @@ class Throws implements Capability {
   }
 
   tools(): readonly ToolDef[] {
-    return [{ name: REPORT_TOOL, description: "throws", inputSchema: { type: "object" } }];
+    return [{ name: this.tool, description: "throws", inputSchema: { type: "object" } }];
   }
 
   call(): ToolResult {
@@ -420,13 +347,33 @@ class Throws implements Capability {
   }
 }
 
-test("a tool that throws is an error the caller can read, never the end of the server", () => {
-  const result = resultOf([new Throws()], ".", {});
-  const content = result["content"];
-
-  assert.equal(result["isError"], true);
+function failureOf(tool: string): string {
+  const line = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: {} } });
+  const reply = handle([new Throws(tool)], ".", line, ageOfOurCode());
+  assert.equal(reply.kind, "message");
+  if (reply.kind !== "message") throw new Error("unreachable");
+  const result: unknown = Object.getOwnPropertyDescriptor(JSON.parse(reply.text), "result")?.value;
+  assert.equal(Object.getOwnPropertyDescriptor(result, "isError")?.value, true);
+  const content: unknown = Object.getOwnPropertyDescriptor(result, "content")?.value;
   assert.ok(Array.isArray(content));
-  const text = String(Object.getOwnPropertyDescriptor(content[0], "text")?.value);
+  return String(Object.getOwnPropertyDescriptor(content[0], "text")?.value);
+}
+
+test("a tool that throws is an error the caller can read, never the end of the server", () => {
+  const text = failureOf("recall");
+
   assert.ok(text.includes("the disk is full"), text);
   assert.ok(text.includes("fault in looper"), `a tool of looper's that fails is the thing most worth reporting: ${text}`);
+  assert.ok(text.includes(`\`${REPORT_TOOL}\` tool`), text);
+});
+
+test("when the tool that failed is the one for saying so, the agent is sent to the person and not back to it", () => {
+  const text = failureOf(REPORT_TOOL);
+
+  assert.ok(text.includes("the disk is full") && text.includes("fault in looper"), text);
+  assert.ok(
+    !text.includes(`say so with the \`${REPORT_TOOL}\` tool`),
+    `the answer to a failing report tool was to use the report tool, which fails the same way for as long as the fault lasts: ${text}`,
+  );
+  assert.ok(text.includes("person"), text);
 });

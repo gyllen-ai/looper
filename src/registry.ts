@@ -5,7 +5,7 @@ import { Recall } from "./recall/capability.ts";
 import { Router } from "./router.ts";
 import { Secrets } from "./secrets/capability.ts";
 import type { Capability, HookContext, Outcome } from "./capability.ts";
-import { NotOursToFix } from "./errors.ts";
+import { isOursToFix } from "./errors.ts";
 import { reasonFrom } from "./fields.ts";
 import { whereTheUserLives } from "./config.ts";
 import { Look } from "./look/capability.ts";
@@ -76,7 +76,7 @@ export function dispatchHook(
       }
     } catch (cause) {
       const detail = reasonFrom(cause);
-      complaints.push({ capability: capability.name, detail, ours: !(cause instanceof NotOursToFix) });
+      complaints.push({ capability: capability.name, detail, ours: isOursToFix(cause) });
     }
   }
 
