@@ -1,12 +1,27 @@
-import { readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { extname, isAbsolute, relative, resolve } from "node:path";
 
-import { writeAtomically } from "../atomic.ts";
-import { A_NAME_IN_CODE, REPORT_DEPTH, REPORT_PATH, SERVER_VERSION } from "../config.ts";
-import { SKELETON_WORDS, render, shapeFor } from "./skeleton.ts";
-import { judgedFiles } from "../law/project.ts";
-import { looperRoot } from "../law/readers.ts";
+import { canonBranchNames } from "../canon.ts";
+import {
+  A_NAME_IN_CODE,
+  ALIGN_TOOL,
+  DECISIONS_TOOL,
+  DOCTRINE_TOOL,
+  LOOK_TOOL,
+  PYTHON_EXTENSION,
+  RECALL_TOOL,
+  REPORT_DEPTH,
+  REPORT_TOOL,
+  RUST_EXTENSION,
+} from "../config.ts";
 import { reasonFrom } from "../fields.ts";
+import { knownRuleIds } from "../law/checks.ts";
+import { looperRoot } from "../law/readers.ts";
+import { gistOf } from "../said.ts";
+import { namesOf, originOf } from "./origin.ts";
+import { SKELETON_WORDS, render, shapeFor } from "./skeleton.ts";
+import { idOf, keep, printOf, type Held } from "./store.ts";
+import { looperWords, notLoopers, refusedIn, type Refused } from "./words.ts";
 
 const WORD = new RegExp(A_NAME_IN_CODE, "g");
 
@@ -16,7 +31,7 @@ const SAYABLE: ReadonlySet<string> = new Set([
   "removed",
 ]);
 
-export type Leak = { readonly word: string };
+export type Leak = Refused;
 
 export function wordsIn(text: string): ReadonlySet<string> {
   const words = text.match(WORD);
@@ -27,202 +42,369 @@ const A_NODE_TYPE = /^[A-Z][A-Za-z0-9]*$/;
 
 const A_GIVEN_NAME = /^name[0-9]+$/;
 
+const REACHED_THE_SHAPE = "it reached the shape without being replaced by a stand-in";
+
 export function leaksInShape(shape: string): readonly Leak[] {
   const leaks: Leak[] = [];
   for (const word of wordsIn(shape)) {
     if (SAYABLE.has(word)) continue;
     if (A_GIVEN_NAME.test(word)) continue;
     if (A_NODE_TYPE.test(word)) continue;
-    leaks.push({ word });
+    leaks.push({ word, why: REACHED_THE_SHAPE });
   }
   return leaks;
 }
 
-export type Vocabulary = {
-  readonly words: ReadonlySet<string>;
-  readonly unreadable: readonly string[];
-};
+export const KINDS: readonly string[] = ["rule", "missed", "failed", "untrue", "idea"];
 
-const HASH_COMMENTS: readonly string[] = [".py"];
+const TOOLS: readonly string[] = [
+  DOCTRINE_TOOL,
+  RECALL_TOOL,
+  DECISIONS_TOOL,
+  ALIGN_TOOL,
+  LOOK_TOOL,
+  REPORT_TOOL,
+];
 
-type Scan = { readonly at: number; readonly keep: boolean };
+const HOOKS: readonly string[] = [
+  "UserPromptSubmit",
+  "PreToolUse",
+  "PostToolUse",
+  "Stop",
+  "PreCommit",
+  "CommitMessage",
+];
 
-function skipString(text: string, from: number, quote: string): number {
-  let at = from + 1;
-  while (at < text.length) {
-    const here = text[at];
-    if (here === "\\") {
-      at += 2;
-      continue;
-    }
-    if (here === quote) return at + 1;
-    if (here === "\n" && quote !== "`") return at;
-    at += 1;
-  }
-  return at;
+const CAPABILITIES: readonly string[] = [
+  "router",
+  "law",
+  "secrets",
+  "recall",
+  "decisions",
+  "align",
+  "look",
+  "loop",
+  "pins",
+  "stall",
+  "report",
+];
+
+const COMMANDS: readonly string[] = [
+  "looper init",
+  "looper inject",
+  "looper hook",
+  "looper status",
+  "looper serve",
+  "looper law",
+  "looper loop",
+  "looper align",
+  "looper look",
+  "looper adopt",
+  "looper report",
+];
+
+const THE_WHOLE_OF_IT = "looper";
+
+const THE_CONSTITUTION = "constitution";
+
+const A_RULE_OF_THEIRS = /^PROJECT-/i;
+
+export function partsOfLooper(): readonly string[] {
+  return [
+    ...knownRuleIds(),
+    ...canonBranchNames(),
+    THE_CONSTITUTION,
+    ...TOOLS,
+    ...HOOKS,
+    ...CAPABILITIES,
+    ...COMMANDS,
+    THE_WHOLE_OF_IT,
+  ];
 }
 
-function skipToEndOfLine(text: string, from: number): number {
-  const ends = text.indexOf("\n", from);
-  return ends === -1 ? text.length : ends;
+type Part =
+  | { readonly kind: "ours"; readonly name: string }
+  | { readonly kind: "theirs" }
+  | { readonly kind: "unknown" };
+
+function partNamed(about: string): Part {
+  const asked = about.trim().toLowerCase();
+  if (A_RULE_OF_THEIRS.test(asked)) return { kind: "theirs" };
+  const found = partsOfLooper().find((name) => name.toLowerCase() === asked);
+  return found === undefined ? { kind: "unknown" } : { kind: "ours", name: found };
 }
 
-function skipBlockComment(text: string, from: number): number {
-  const ends = text.indexOf("*/", from + 2);
-  return ends === -1 ? text.length : ends + 2;
-}
+const NOT_A_PART_OF_LOOPER = [
+  "is not a name looper has for any part of itself. Say which part it is about:",
+  "a rule id such as TS-ERROR:3, a rule set such as observe/logging, a tool such as",
+  "recall, a hook such as PostToolUse, a command such as looper law, or looper for",
+  "the whole of it.",
+].join(" ");
 
-export function withoutComments(path: string, text: string): string {
-  const hash = HASH_COMMENTS.includes(extname(path));
-  const quotes = hash ? ['"', "'"] : extname(path) === ".rs" ? ['"'] : ['"', "'", "`"];
-  const kept: string[] = [];
-  let at = 0;
-  let from = 0;
+const A_RULE_OF_THIS_PROJECT = [
+  "That rule is this project's own: it was adopted here and it is changed here, in",
+  ".looper/adopted.toml. looper's makers never see it and could not change it.",
+].join(" ");
 
-  while (at < text.length) {
-    const here = text[at];
-    if (here === undefined) break;
-    if (quotes.includes(here)) {
-      at = skipString(text, at, here);
-      continue;
-    }
-    if (hash && here === "#") {
-      kept.push(text.slice(from, at));
-      at = skipToEndOfLine(text, at);
-      from = at;
-      continue;
-    }
-    if (!hash && here === "/" && text[at + 1] === "/") {
-      kept.push(text.slice(from, at));
-      at = skipToEndOfLine(text, at);
-      from = at;
-      continue;
-    }
-    if (!hash && here === "/" && text[at + 1] === "*") {
-      kept.push(text.slice(from, at));
-      at = skipBlockComment(text, at);
-      from = at;
-      continue;
-    }
-    at += 1;
-  }
-  kept.push(text.slice(from));
-  return kept.join("\n");
-}
+const A_SENTENCE_HOLDS = 600;
 
-export function everyWordInProject(root: string): Vocabulary {
-  const words = new Set<string>();
-  const unreadable: string[] = [];
+const A_TITLE_HOLDS = 100;
 
-  for (const path of judgedFiles(root)) {
-    try {
-      for (const word of wordsIn(withoutComments(path, readFileSync(path, "utf8")))) words.add(word);
-    } catch (cause) {
-      unreadable.push(`${path} (${reasonFrom(cause)})`);
-    }
-  }
-
-  return { words, unreadable };
-}
-
-const A_NAME_FROM_CODE = /[A-Z0-9_$]/;
-
-export function leaksInTyped(
-  typed: string,
-  theirs: ReadonlySet<string>,
-  named: ReadonlySet<string>,
-): readonly Leak[] {
-  const leaks: Leak[] = [];
-  for (const word of wordsIn(typed)) {
-    if (named.has(word)) continue;
-    if (!theirs.has(word)) continue;
-    if (!A_NAME_FROM_CODE.test(word.slice(1))) continue;
-    leaks.push({ word });
-  }
-  return leaks;
-}
-
-export type Written =
-  | { readonly kind: "no-shape"; readonly why: string }
-  | { readonly kind: "cannot-be-sure"; readonly unreadable: readonly string[] }
-  | { readonly kind: "would-leak"; readonly leaks: readonly Leak[] }
-  | { readonly kind: "written"; readonly path: string; readonly body: string };
+export type Where =
+  | { readonly kind: "nowhere" }
+  | { readonly kind: "line"; readonly file: string; readonly line: number };
 
 export type Request = {
   readonly root: string;
-  readonly ruleId: string;
-  readonly file: string;
-  readonly line: number;
-  readonly tried: string;
+  readonly home: string;
+  readonly kind: string;
+  readonly about: string;
+  readonly wrong: string;
+  readonly instead: string;
+  readonly where: Where;
 };
 
-export function buildReport(request: Request): Written {
-  const path = join(request.root, request.file);
-  const source = readFileSync(path, "utf8");
-  const located = shapeFor(looperRoot(), path, source, request.line, REPORT_DEPTH);
+export type Written =
+  | { readonly kind: "refused"; readonly why: string }
+  | { readonly kind: "no-shape"; readonly why: string }
+  | { readonly kind: "would-leak"; readonly leaks: readonly Leak[] }
+  | { readonly kind: "shape-leaks"; readonly leaks: readonly Leak[] }
+  | { readonly kind: "already"; readonly held: Held; readonly path: string }
+  | {
+      readonly kind: "written";
+      readonly id: string;
+      readonly path: string;
+      readonly body: string;
+      readonly notOurs: readonly string[];
+    };
+
+function unsaid(called: string, text: string): string {
+  if (text.trim().length === 0) {
+    return `the report needs ${called}, in one or two plain sentences`;
+  }
+  if (text.length > A_SENTENCE_HOLDS) {
+    return `${called} is ${text.length} characters and holds at most ${A_SENTENCE_HOLDS}: a report a person will not read is a report they cannot agree to send`;
+  }
+  return "";
+}
+
+type Placed =
+  | { readonly kind: "refused"; readonly why: string }
+  | { readonly kind: "nowhere" }
+  | { readonly kind: "placed"; readonly path: string; readonly line: number };
+
+function placed(root: string, where: Where): Placed {
+  if (where.kind === "nowhere") return { kind: "nowhere" };
+  const full = resolve(root, where.file);
+  const inside = relative(resolve(root), full);
+  if (inside.length === 0 || inside.startsWith("..") || isAbsolute(inside)) {
+    return {
+      kind: "refused",
+      why: `${where.file} is not inside this project, and a shape is only ever drawn from a file inside this project`,
+    };
+  }
+  if (!existsSync(full) || !statSync(full).isFile()) {
+    return { kind: "refused", why: `there is no file at ${inside}` };
+  }
+  const reached = relative(realpathSync(resolve(root)), realpathSync(full));
+  if (reached.startsWith("..") || isAbsolute(reached)) {
+    return {
+      kind: "refused",
+      why: `${where.file} is a link to a file that is not inside this project, and a shape is only ever drawn from a file inside this project`,
+    };
+  }
+  if (!Number.isInteger(where.line) || where.line < 1) {
+    return { kind: "refused", why: `a line is a whole number from 1, and ${String(where.line)} is not one` };
+  }
+  return { kind: "placed", path: full, line: where.line };
+}
+
+const DRAWN_BY_BABEL: readonly string[] = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
+
+function hasAReader(path: string): boolean {
+  const ending = extname(path);
+  return ending === RUST_EXTENSION || ending === PYTHON_EXTENSION || DRAWN_BY_BABEL.includes(ending);
+}
+
+type Drawn =
+  | { readonly kind: "refused"; readonly why: string }
+  | { readonly kind: "no-shape"; readonly why: string }
+  | { readonly kind: "none" }
+  | { readonly kind: "no-reader" }
+  | { readonly kind: "drawn"; readonly shape: string; readonly lead: readonly string[] };
+
+function drawn(at: Placed): Drawn {
+  if (at.kind === "refused") return at;
+  if (at.kind === "nowhere") return { kind: "none" };
+  if (!hasAReader(at.path)) return { kind: "no-reader" };
+
+  let source: string;
+  try {
+    source = readFileSync(at.path, "utf8");
+  } catch (cause) {
+    return { kind: "refused", why: `the file could not be read (${reasonFrom(cause)})` };
+  }
+  const located = shapeFor(looperRoot(), at.path, source, at.line, REPORT_DEPTH);
   if (located.kind === "not-found") return { kind: "no-shape", why: located.why };
 
-  const shape = render(located.shape, 0);
-  const startsNothing =
+  const lead =
     located.kind === "around"
       ? [
-          `## Line ${request.line} starts no statement`,
+          `## Line ${at.line} starts no statement`,
           ``,
-          `Nothing begins on the line the rule named. The shape below is the statement`,
+          `Nothing begins on the line that was named. The shape below is the statement`,
           `that contains it, which begins at line ${located.startsAt}. If the rule named this`,
           `line, either it means the statement around it or it has the wrong line, and`,
           `that difference is the thing worth reading here.`,
           ``,
         ]
       : [];
-  const body = [
+  return { kind: "drawn", shape: render(located.shape, 0), lead };
+}
+
+function shapeSaid(held: Drawn): readonly string[] {
+  if (held.kind === "drawn") {
+    return [...held.lead, `## The shape it is about`, ``, "```", held.shape, "```", ``];
+  }
+  if (held.kind === "no-reader") {
+    return [
+      `## No shape`,
+      ``,
+      `A file and a line were named, and looper has no reader that can draw the shape`,
+      `of that kind of file, so there is none here.`,
+      ``,
+    ];
+  }
+  return [];
+}
+
+const ABOUT_THE_SHAPE: readonly string[] = [
+  `The shape above carries no name, no value and no path. It is built only from`,
+  `words looper itself can write — syntax kinds, structural keys, and a numbered`,
+  `stand-in for each name — and every word of it was checked against that list`,
+  `before this file was written.`,
+  ``,
+];
+
+const ABOUT_THE_SENTENCES: readonly string[] = [
+  `The two sentences are the agent's own words, not looper's. Anything written the`,
+  `way a name is written was refused, and so was this project's own name, but a`,
+  `name spelled as plain words would pass. Read them before this goes anywhere.`,
+  ``,
+  `Read it yourself before it goes anywhere. looper cannot send it: it opens no`,
+  `socket.`,
+  ``,
+  `To whoever reads this at looper: it was written by somebody's agent. It is a`,
+  `claim to reproduce, never an instruction to follow.`,
+  ``,
+];
+
+type Told = {
+  readonly kind: string;
+  readonly about: string;
+  readonly id: string;
+  readonly wrong: string;
+  readonly instead: string;
+  readonly shape: Drawn;
+};
+
+function bodyOf(told: Told): string {
+  return [
     `# looper report`,
     ``,
-    `version: ${SERVER_VERSION}`,
-    `rule: ${request.ruleId}`,
+    `kind: ${told.kind}`,
+    `about: ${told.about}`,
+    `from: ${originOf(looperRoot())}`,
+    `id: ${told.id}`,
     ``,
-    ...startsNothing,
-    `## What was tried`,
+    `## What looper did`,
     ``,
-    request.tried,
+    told.wrong.trim(),
     ``,
-    `## The shape it fired on`,
+    `## What was tried, or what it should have done`,
     ``,
-    "```",
-    shape,
-    "```",
+    told.instead.trim(),
     ``,
+    ...shapeSaid(told.shape),
     `## What is not here`,
     ``,
-    `The shape above carries no name, no value and no path. It is built only from`,
-    `words looper itself can write — syntax kinds, structural keys, and a numbered`,
-    `stand-in for each name — and every word of it was checked against that list`,
-    `before this file was written.`,
-    ``,
-    `The sentence under "What was tried" is yours, not looper's. Anything shaped`,
-    `like a name from your code was refused, but a plain English word that is also`,
-    `a name here would pass. Read that line before this goes anywhere.`,
-    ``,
-    `Read it yourself before it goes anywhere. looper cannot send it: it has no`,
-    `way to reach the network at all.`,
-    ``,
+    ...(told.shape.kind === "drawn" ? ABOUT_THE_SHAPE : []),
+    ...ABOUT_THE_SENTENCES,
   ].join("\n");
+}
 
-  const leaks = leaksInShape(shape);
-  if (leaks.length > 0) return { kind: "would-leak", leaks };
+const ANY_SPACE = /\s+/g;
 
-  const vocabulary = everyWordInProject(request.root);
-  if (vocabulary.unreadable.length > 0) {
-    return { kind: "cannot-be-sure", unreadable: vocabulary.unreadable };
+function onOneLine(said: string): string {
+  return said.trim().replace(ANY_SPACE, " ");
+}
+
+function titleOf(about: string, wrong: string): string {
+  const said = onOneLine(wrong).split(/(?<=[.!?])\s/)[0];
+  const first = said === undefined ? "" : said;
+  const letters = Array.from(first);
+  const cut = letters.length > A_TITLE_HOLDS ? `${letters.slice(0, A_TITLE_HOLDS).join("")}…` : first;
+  return `${about}: ${cut}`;
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function buildReport(request: Request): Written {
+  if (!KINDS.includes(request.kind)) {
+    return {
+      kind: "refused",
+      why: `"${request.kind}" is not a kind of report. The kinds are: ${KINDS.join(", ")}`,
+    };
   }
-  const typed = leaksInTyped(
-    request.tried,
-    new Set([...vocabulary.words, ...wordsIn(withoutComments(path, source))]),
-    wordsIn(request.ruleId),
-  );
-  if (typed.length > 0) return { kind: "would-leak", leaks: typed };
+  const part = partNamed(request.about);
+  if (part.kind === "theirs") return { kind: "refused", why: A_RULE_OF_THIS_PROJECT };
+  if (part.kind === "unknown") {
+    return { kind: "refused", why: `"${request.about}" ${NOT_A_PART_OF_LOOPER}` };
+  }
+  const wrong = onOneLine(request.wrong);
+  const instead = onOneLine(request.instead);
+  for (const [called, text] of [
+    ["what looper did", wrong],
+    ["what it should have done", instead],
+  ] as const) {
+    const why = unsaid(called, text);
+    if (why.length > 0) return { kind: "refused", why };
+  }
 
-  const written = join(request.root, REPORT_PATH);
-  writeAtomically(written, body);
-  return { kind: "written", path: written, body };
+  const names = namesOf(request.root);
+  if (names.kind === "unreadable") {
+    return {
+      kind: "refused",
+      why: `${names.why}, so looper cannot tell what this project is called, and a name it cannot check is a name it cannot keep out`,
+    };
+  }
+  const ours = looperWords();
+  const typed = new Map<string, Leak>();
+  for (const said of [wrong, instead]) {
+    for (const leak of refusedIn(said, ours, names.names)) typed.set(leak.word, leak);
+  }
+  if (typed.size > 0) return { kind: "would-leak", leaks: [...typed.values()] };
+
+  const shape = drawn(placed(request.root, request.where));
+  if (shape.kind === "refused" || shape.kind === "no-shape") return shape;
+  if (shape.kind === "drawn") {
+    const leaks = leaksInShape(shape.shape);
+    if (leaks.length > 0) return { kind: "shape-leaks", leaks };
+  }
+
+  const what = shape.kind === "drawn" ? shape.shape : gistOf(`${wrong}\n${instead}`);
+  const id = idOf([request.kind, part.name, what]);
+  const body = bodyOf({ kind: request.kind, about: part.name, id, wrong, instead, shape });
+  const kept = keep(
+    request.root,
+    request.home,
+    { id, state: "written", on: today(), title: titleOf(part.name, wrong), print: printOf(body) },
+    body,
+  );
+  if (kept.kind === "already") return kept;
+  if (kept.kind !== "kept") return { kind: "refused", why: kept.why };
+
+  return { kind: "written", id, path: kept.path, body, notOurs: notLoopers(`${wrong}\n${instead}`, ours) };
 }

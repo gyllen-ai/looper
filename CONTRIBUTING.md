@@ -36,16 +36,23 @@ forever.
 has one prints it in the report. Widening a knob is a decision about your
 codebase; make it small and make it deliberate.
 
-**It is wrong everywhere.** That is a looper bug and we want it. Run:
+**It is wrong everywhere.** That is a looper bug and we want it. Your agent says
+so with the `report` tool. In a shell it is:
 
 ```sh
-looper report
+looper report --kind rule --about TS-ERROR:3 --file src/a.ts --line 12 \
+  --wrong "what the rule did" --instead "what you tried"
 ```
 
-It writes a file describing the shape the rule fired on and nothing else of
-yours — no identifiers, no paths, no logic, and it refuses to write at all if it
-cannot prove that. Read the file. If you are content with it, open an issue and
+It writes a file under your home folder, never in your project: the shape the
+rule fired on and nothing else of yours — no identifiers, no paths, no logic —
+and the two sentences, which are refused if a word in them is written the way a
+name is written. Read the file. If you are content with it, open an issue and
 paste it. If you are not, delete it and nothing has left your machine.
+
+The same route takes any other fault of looper's own: a hook that failed
+(`--kind failed`), an answer that was untrue, a rule that stayed silent on code
+it should have caught, or something looper should do and does not.
 
 ## Changing a rule, or adding one
 

@@ -1,4 +1,30 @@
-export class SettingsUnparseable extends Error {
+import { fieldAt } from "./fields.ts";
+
+export class NotOursToFix extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotOursToFix";
+  }
+}
+
+const THE_MACHINE_SAID_NO: readonly string[] = [
+  "EACCES",
+  "EPERM",
+  "EROFS",
+  "ENOSPC",
+  "EDQUOT",
+  "EMFILE",
+  "ENFILE",
+  "EIO",
+];
+
+export function isOursToFix(cause: unknown): boolean {
+  if (cause instanceof NotOursToFix) return false;
+  const code = fieldAt(cause, "code");
+  return typeof code !== "string" || !THE_MACHINE_SAID_NO.includes(code);
+}
+
+export class SettingsUnparseable extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, detail: string) {
@@ -10,7 +36,7 @@ export class SettingsUnparseable extends Error {
   }
 }
 
-export class SettingsNotAnObject extends Error {
+export class SettingsNotAnObject extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, found: string) {
@@ -34,7 +60,7 @@ export class RuleOnTheWrongPass extends Error {
   }
 }
 
-export class TomlMalformed extends Error {
+export class TomlMalformed extends NotOursToFix {
   readonly what: string;
   readonly line: number;
 
@@ -49,7 +75,7 @@ export class TomlMalformed extends Error {
   }
 }
 
-export class AtomicWriteFailed extends Error {
+export class AtomicWriteFailed extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, detail: string) {
@@ -61,7 +87,7 @@ export class AtomicWriteFailed extends Error {
   }
 }
 
-export class HookGroupsNotAnArray extends Error {
+export class HookGroupsNotAnArray extends NotOursToFix {
   readonly path: string;
   readonly event: string;
 

@@ -26,7 +26,7 @@ export const USAGE: readonly string[] = [
   "  looper align            judge every captured page: does every line connect",
   "  looper look             judge every captured page: does one kind wear one look",
   "  looper adopt            propose a rule this project should follow",
-  "  looper report           say a looper rule is wrong, without sending anything",
+  "  looper report           say looper got something wrong, without sending anything",
 ];
 
 export const AFTER_INIT: readonly string[] = [

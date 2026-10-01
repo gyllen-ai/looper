@@ -1,77 +1,56 @@
 import type { Out } from "../out.ts";
-import { buildReport } from "../report/write.ts";
-import { saidOr, valueAfter } from "./args.ts";
+import { whereTheUserLives } from "../config.ts";
+import { Report } from "../report/capability.ts";
+import { valueAfter } from "./args.ts";
 import { here } from "../session.ts";
 
-export function report(args: readonly string[], out: Out): number {
-  const ruleId = valueAfter(args, "--rule");
-  const file = valueAfter(args, "--file");
-  const line = valueAfter(args, "--line");
+const SAID_WITH: readonly string[] = ["kind", "about", "wrong", "instead", "file", "line", "sent", "kept"];
+
+const IT_FIRED = "The rule fired on this line and the code is fine.";
+
+const NOT_STATED = "What was tried was not stated.";
+
+const HOW = [
+  "looper report says looper got something wrong, without sending anything.",
+  '  looper report --kind rule --about TS-ERROR:4 --wrong "what it did" --instead "what you tried"',
+  "                [--file src/a.ts --line 12]",
+  "  kinds: rule, missed, failed, untrue, idea",
+  "  looper report --list",
+  "",
+  "It writes a short file under your home folder and says where. Nothing from your",
+  "code goes in it, and looper cannot send it anywhere — you decide what to do",
+  "with the file.",
+].join("\n");
+
+function asked(args: readonly string[]): ReadonlyMap<string, string> {
+  const said = new Map<string, string>();
+  for (const field of SAID_WITH) {
+    const given = valueAfter(args, `--${field}`);
+    if (given.kind === "given") said.set(field, given.value);
+  }
+  const rule = valueAfter(args, "--rule");
+  if (rule.kind === "given") {
+    said.set("kind", "rule");
+    said.set("about", rule.value);
+    if (!said.has("wrong")) said.set("wrong", IT_FIRED);
+  }
   const tried = valueAfter(args, "--tried");
+  if (tried.kind === "given") said.set("instead", tried.value);
+  if (rule.kind === "given" && !said.has("instead")) said.set("instead", NOT_STATED);
+  return said;
+}
 
-  if (ruleId.kind === "none" || file.kind === "none" || line.kind === "none") {
-    out.warn(
-      [
-        "looper report says a rule of looper's own is wrong, without sending anything.",
-        '  looper report --rule TS-ERROR:4 --file src/a.ts --line 12 --tried "what you tried"',
-        "",
-        "It writes a file describing the shape the rule fired on. Nothing from your",
-        "code goes in it, and looper cannot send it anywhere — you decide what to do",
-        "with the file.",
-      ].join("\n"),
-    );
+export function report(args: readonly string[], out: Out): number {
+  const said = asked(args);
+  if (said.size === 0 && !args.includes("--list")) {
+    out.warn(HOW);
     return 2;
   }
-
-  const written = buildReport({
-    root: here(),
-    ruleId: ruleId.value,
-    file: file.value,
-    line: Number(line.value),
-    tried: saidOr(tried, "not stated"),
-  });
-
-  if (written.kind === "no-shape") {
-    out.warn(`looper: no report written — ${written.why}.`);
-    return 2;
+  const reply = new Report(whereTheUserLives()).answer(here(), said);
+  if (reply.done) {
+    out.say(reply.text);
+    return 0;
   }
-  if (written.kind === "cannot-be-sure") {
-    out.warn(
-      [
-        "looper refused to write the report. What you typed into --tried is checked",
-        "against every file in the project, and it could not read these:",
-        ...written.unreadable.map((one) => `  ${one}`),
-        "",
-        "A file it could not read is a file it could not check against. Nothing was",
-        "written.",
-      ].join("\n"),
-    );
-    return 2;
-  }
-  if (written.kind === "would-leak") {
-    out.warn(
-      [
-        "looper refused to write the report, because it would have carried something",
-        `from your code: ${written.leaks.map((one) => one.word).join(", ")}.`,
-        "",
-        "What you typed into --tried is checked word by word against your project.",
-        "Say it without the names — the shape below the text is what a rule is argued",
-        "with, and it carries no name at all.",
-        "",
-        "That is a bug in looper, not in your project. Nothing was written.",
-      ].join("\n"),
-    );
-    return 2;
-  }
-
-  out.say(
-    [
-      `Written to ${written.path}.`,
-      "",
-      "Read it. Nothing from your code is in it and looper cannot send it anywhere.",
-      "If you want us to see it, that is yours to do — open an issue and paste it,",
-      "or have your agent do it with whatever it already uses.",
-    ].join("\n"),
-  );
-  return 0;
+  out.warn(reply.text);
+  return 2;
 }

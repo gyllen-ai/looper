@@ -349,3 +349,35 @@ export function tagsPointingAt(root: string, commit: string): Naming {
     return { kind: "cannot-tell", why: reasonFrom(cause) };
   }
 }
+
+export type Head =
+  | { readonly kind: "not-known"; readonly why: string }
+  | { readonly kind: "known"; readonly commit: string; readonly changed: boolean };
+
+export function headOf(root: string): Head {
+  try {
+    const commit = ask(root, ["rev-parse", "HEAD"])[0];
+    if (commit === undefined) return { kind: "not-known", why: "git named no commit" };
+    return { kind: "known", commit, changed: ask(root, ["status", "--porcelain"]).length > 0 };
+  } catch (cause) {
+    return { kind: "not-known", why: reasonFrom(cause) };
+  }
+}
+
+export type Remote =
+  | { readonly kind: "none" }
+  | { readonly kind: "named"; readonly address: string };
+
+export function remoteOf(root: string): Remote {
+  if (!existsSync(join(root, ".git"))) return { kind: "none" };
+  const answered = spawnSync("git", ["config", "--get", "remote.origin.url"], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: GIT_TIMEOUT_MS,
+    maxBuffer: A_READER_MAY_ANSWER_WITH,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  const said = typeof answered.stdout === "string" ? answered.stdout.trim() : "";
+  if (answered.status !== 0 || said.length === 0) return { kind: "none" };
+  return { kind: "named", address: said };
+}

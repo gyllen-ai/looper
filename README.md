@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 619 cases · 646 tests
+90 rules · 5 languages · 619 cases · 757 tests
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -172,8 +172,15 @@ ways out, and the rule tells you which one it has:
 - **off** — a whole rule, project-wide, which is the loudest thing you can write
 
 If none of those is the right answer, the rule is wrong everywhere and that is a
-bug worth having: `looper report` writes down the shape it fired on and nothing
-else of yours, for you to read before it goes anywhere.
+bug worth having. Your agent says so with the `report` tool, and in a shell it
+is `looper report`: looper writes down the shape the rule fired on and nothing
+else of yours, in a file under your home folder, for you to read before it goes
+anywhere. looper cannot send it. Nothing is written into your project.
+
+The same tool takes any other fault of looper's own — a hook that failed, an
+answer that was untrue, a rule that stayed silent — and when looper itself
+fails, it now tells the agent so, because a fault nobody was told about is a
+fault nobody reports.
 
 The rules are meant to be argued with. See [CONTRIBUTING.md](CONTRIBUTING.md).
 

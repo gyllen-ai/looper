@@ -5,11 +5,13 @@ import { Recall } from "./recall/capability.ts";
 import { Router } from "./router.ts";
 import { Secrets } from "./secrets/capability.ts";
 import type { Capability, HookContext, Outcome } from "./capability.ts";
+import { isOursToFix } from "./errors.ts";
 import { reasonFrom } from "./fields.ts";
 import { whereTheUserLives } from "./config.ts";
 import { Look } from "./look/capability.ts";
 import { Loop } from "./loop/capability.ts";
 import { Pins } from "./pins/capability.ts";
+import { Report } from "./report/capability.ts";
 import { Stall } from "./stall/capability.ts";
 
 export type Refusal = {
@@ -20,6 +22,7 @@ export type Refusal = {
 export type Complaint = {
   readonly capability: string;
   readonly detail: string;
+  readonly ours: boolean;
 };
 
 export type Mention = {
@@ -45,6 +48,7 @@ export function registry(): readonly Capability[] {
     new Loop(whereTheUserLives()),
     new Pins(),
     new Stall(),
+    new Report(whereTheUserLives()),
   ];
 }
 
@@ -72,7 +76,7 @@ export function dispatchHook(
       }
     } catch (cause) {
       const detail = reasonFrom(cause);
-      complaints.push({ capability: capability.name, detail });
+      complaints.push({ capability: capability.name, detail, ours: isOursToFix(cause) });
     }
   }
 

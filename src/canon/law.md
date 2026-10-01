@@ -9,8 +9,8 @@ on an element are refused before you see them.
   browser sees.** A parameter, an argument array and a schema at the edge.
 - **If a rule blocks you and its suggestions do not work, looper is wrong, not
   you.** Do not switch it off or hand the command to a person: the same rules
-  judge their commit. Run `looper report`, which writes the shape it fired on and
-  nothing else of yours, and say so once.
+  judge their commit. Say so once with the `report` tool, which writes the shape
+  it fired on and nothing else of yours.
 - **A promise the law cannot trace is still yours to await.** `TS-ERROR:1` follows
   a project function; `Promise.resolve`, a bare `.then` and anything imported
   from outside the project it cannot.

@@ -173,7 +173,7 @@ export const HOOK_TIMEOUT_SECONDS = 30;
 
 export const COMMIT_GATE_TIMEOUT_SECONDS = 300;
 
-export const REPORT_PATH = ".looper/report.md";
+export const REPORT_TOOL = "report";
 
 export const REPORT_DEPTH = 6;
 
@@ -285,7 +285,7 @@ export function preCommitScript(entry: string): string {
   ].join("\n");
 }
 
-export const NOT_A_WAY_THROUGH = `Asking a person to run this command instead is not a way through: the same rules apply to their commit. If the rule is wrong here, run \`looper report\` — it writes the case for changing it, and CONTRIBUTING.md has the three routes out.`;
+export const NOT_A_WAY_THROUGH = `Asking a person to run this command instead is not a way through: the same rules apply to their commit. If the rule is wrong here, say so with the \`${REPORT_TOOL}\` tool, or run \`looper report\` in a shell: it writes the case for changing it and nothing else of yours.`;
 
 export const TS_SECTION = "ts";
 

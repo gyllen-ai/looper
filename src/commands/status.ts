@@ -6,6 +6,8 @@ import { totalIn, readBaseline } from "../law/baseline.ts";
 import { surveyProject } from "../law/project.ts";
 import { here, allocationFor } from "../session.ts";
 import { NO_TURN, type Turn } from "../capability.ts";
+import { looperRoot } from "../law/readers.ts";
+import { originOf } from "../report/origin.ts";
 
 const NOTHING_NAMED: readonly string[] = [];
 
@@ -26,6 +28,7 @@ export function status(out: Out, paths: readonly string[]): number {
   const rooted = projectRoot(process.cwd(), namedProject());
   const lines = [
     `looper status`,
+    `  running            ${originOf(looperRoot())}`,
     `  project            ${rooted.root}`,
     `                     chosen by ${rooted.how}`,
     ...hookLines(),
