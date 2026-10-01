@@ -8398,8 +8398,9 @@ build with other words.
   is one, in `src` or `bin`, of a kind the scan reads. `process` may be asked
   for eleven things and held in nothing. Thirteen names are never written.
   Reaching for a function's constructor is refused. Everything else is, too.
-  `tests/no-network.test.ts` holds thirty-eight ways round it that must be
-  refused, eleven pieces of ordinary code that must pass, and one sample for
+  `tests/the-scan-itself.test.ts` held thirty-eight ways round it that must be
+  refused and eleven pieces of ordinary code that must pass, and holds
+  forty-eight and thirteen after the third reading below, with one sample for
   every name on every list, so none can be dropped unnoticed.
 - **The folders hold only kinds of file something reads**, the package file
   gives no name a second meaning, and the two Python readers load five modules
