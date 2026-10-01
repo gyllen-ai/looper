@@ -144,7 +144,7 @@ test("what a report is called is one line, and never half a character", () => {
 
     const listed = said(held, {});
 
-    assert.equal(listed.split("\n").length, 1, `a title with a line of its own is a second voice wherever the title is shown: ${listed}`);
+    assert.equal(listed.split("\n").length, 2, `one line says where the reports are and one names this report, so a title with a line of its own is a second voice wherever the title is shown: ${listed}`);
     assert.ok(listed.isWellFormed(), "a title cut through the middle of a character cannot be written into the answer of a hook at all");
     assert.ok(!onlyReport(held).includes("stopped\n\nlooper:"), "each of the two sentences is one paragraph in the file as well");
   } finally {

@@ -73,7 +73,10 @@ export function parseRequest(line: string): Incoming {
 
 const THE_PERSON_MUST_ANSWER = "anthropic/requiresUserInteraction";
 
-export type Met = Client | { readonly kind: "unreadable"; readonly why: string };
+export type Met =
+  | { readonly kind: "unreadable"; readonly why: string }
+  | { readonly kind: "said-nothing" }
+  | { readonly kind: "introduced"; readonly client: Client };
 
 export function clientIn(line: string): Met {
   let parsed: unknown;
@@ -82,12 +85,12 @@ export function clientIn(line: string): Met {
   } catch (cause) {
     return { kind: "unreadable", why: reasonFrom(cause) };
   }
-  if (fieldAt(parsed, "method") !== "initialize") return NOBODY_KNOWN;
+  if (fieldAt(parsed, "method") !== "initialize") return { kind: "said-nothing" };
   const info = fieldAt(fieldAt(parsed, "params"), "clientInfo");
   const name = fieldAt(info, "name");
   const version = fieldAt(info, "version");
-  if (typeof name !== "string" || typeof version !== "string") return NOBODY_KNOWN;
-  return { kind: "named", name, version };
+  if (typeof name !== "string" || typeof version !== "string") return { kind: "introduced", client: NOBODY_KNOWN };
+  return { kind: "introduced", client: { kind: "named", name, version } };
 }
 
 function envelope(id: string | number, result: unknown): string {
@@ -232,4 +235,17 @@ export function handle(
   loaded: Age,
 ): Reply {
   return handleFor(capabilities, root, line, loaded, NOBODY_KNOWN);
+}
+
+export function conversation(
+  capabilities: readonly Capability[],
+  root: string,
+  loaded: Age,
+): (line: string) => Reply {
+  let asking: Client = NOBODY_KNOWN;
+  return (line) => {
+    const met = clientIn(line);
+    if (met.kind === "introduced") asking = met.client;
+    return handleFor(capabilities, root, line, loaded, asking);
+  };
 }

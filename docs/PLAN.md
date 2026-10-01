@@ -8042,7 +8042,11 @@ nothing can then be remembered as heard. It waits for room, so it never costs a
 rule set its place. And when a report was written and nobody has answered
 whether it may leave, the line names that report instead and has the agent ask
 in words, so a session that ended before the question was settled does not bury
-it.
+it. It names the report by its id and its date and by nothing else: the first
+version named it by its title, and a title is the agent's own sentence, which
+then arrived in every later session as looper speaking. The line and the
+reminder are remembered apart, so answering a report does not bring the line
+back.
 
 ### The yes
 
@@ -8097,14 +8101,26 @@ Four things follow from making the tool the consent.
 - **Only a release says where looper's makers are.** The address is read from
   looper's own package file, so a fork reports to itself and nothing names a
   host. Before the yes the agent is told to show the report and ask; it is not
-  told where to send.
+  told where to send. The command in a shell does not say it either: every
+  refusal tells an agent it may run that command, so its answer is written for
+  either reader.
 - **The question names what is agreed to.** The call carries the report's own
-  title and is refused with any other, because the prompt shows the call.
-- **A changed file is not released.** looper keeps the hash of what it wrote.
+  title and is refused with any other, because the prompt shows the call. The
+  title is worked out again from the file that would leave, never taken from
+  the record beside it.
+- **What leaves is read back and checked again.** looper keeps the hash of what
+  it wrote, which catches an accident. The record sits beside the report, so an
+  agent could rewrite both; so the file is also read back as a report, written
+  out again from its own parts and compared, and its two sentences and its
+  shape are put through the same checks as on the day it was written. A file
+  that is a link, or anything but an ordinary file, is not read.
+- **A report that was answered is not asked about again.** Kept or sent, the
+  release is refused.
 - **A client that is not known to ask is refused.** The handshake carries the
   client's name and version (seen: `claude-code`, `2.1.286`). The mark is
-  honoured from 2.1.199; anything older, or anything else, is told where the
-  file is so a person can pass it on by hand.
+  honoured from 2.1.199; anything older, anything else, or a version that is
+  not three plain numbers, is told where the file is so a person can pass it on
+  by hand. Whoever introduced itself last is who is asking.
 
 After a yes the agent sends the text with whatever it already has, and tells
 looper it went. looper still opens no socket and still knows no host.
@@ -8112,9 +8128,59 @@ looper it went. looper still opens no socket and still knows no host.
 ### The switch
 
 `[report] offer = "never"` in `law.toml`: no line, and no release. A report can
-still be written and stays on the machine. Any other value there is said out
-loud rather than read as yes or as no. `init` documents it in the file it
+still be written and stays on the machine. `init` documents it in the file it
 writes, beside every other knob.
+
+**Anything that looks like the switch is the switch thrown.** The first version
+read any other value as "still offered" and said so. A project that wrote
+`"Never"`, a list, a dotted key, `[reports]` or no section at all had plainly
+asked for no offer and was made one, and released from. Each of those, and a
+`law.toml` that cannot be read at all, is now taken as never, and the session is
+told once how looper reads it.
+
+### What a second reader found, the same day
+
+A reviewer who had seen none of the reasoning was given this branch and told to
+get a report released with nobody asked. Through the tool's arguments and the
+client's introduction alone it could not be done: 38 odd ids and titles, and
+every variant of a client that is not the one that asks, were refused. Around
+that, these were found, run, and given a test here before they were fixed.
+
+- **The command printed the address with no release**, and every refusal tells
+  an agent it may run that command.
+- **One hand edit satisfied three conditions.** The id, the title and the hash
+  were all checked against the record beside the report. A body, its hash and
+  its title rewritten together were released, and an entry named like a path
+  released a file from outside the folder.
+- **A report the person had kept was released**, and one already sent was
+  handed out to be sent again.
+- **A switch written almost right failed open**, in eight spellings.
+- **A `law.toml` that could not be read** made the tool say it had done nothing
+  after it had written the report, and put a complaint in every turn.
+- **A title could carry a second paragraph** into the line every later session
+  is handed, and be cut through the middle of a character.
+- **The line came back after every answered report.**
+- **A version was read only as far as it made sense**, so `2.1.199-beta` and
+  `2.1.199garbage` were taken for a client that asks.
+- **Nothing tested the server's memory of who introduced itself.** It could
+  have forgotten every client, or taken every caller for one that asks, with
+  every test passing. `tests/serve-asks.test.ts` now runs the server as it
+  really runs; both mistakes were put in by hand and both fail it.
+
+**Whether a hook can answer in the person's place was read by the reviewer out
+of the host's own text and not run, so it was run, 2026-10-01, on 2.1.286.** A
+scratch project carried a hook that answers "allow" for the marked tool, with
+and without handing the tool's input back. With nobody at the keyboard the tool
+did not run either way: "MCPTool requires permission". With somebody at the
+keyboard, in bypass mode, the hook ran and the host still stopped and asked,
+yes or no. The marked tool was called zero times. Not run: a program built on
+the host's own kit that supplies its own answer; looper cannot tell that apart
+from a person and does not claim to.
+
+Left as it is, and said: a file that never ends, put where `law.toml` or the
+record is, would hold whatever reads it; and what a session was told cannot be
+written down in a home that cannot be written, so there the line repeats on
+every turn rather than costing the turn.
 
 ### On our side
 

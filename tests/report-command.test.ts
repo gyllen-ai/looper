@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { searchPath } from "../src/config.ts";
+import { homeOf } from "../src/report/origin.ts";
 import { delimiter } from "node:path";
 
 const SHIM = fileURLToPath(new URL("../bin/looper.js", import.meta.url));
@@ -127,6 +128,32 @@ test("a home that cannot be written is a refusal that names the folder, not an a
     );
   } finally {
     chmodSync(held.home, 0o755);
+    strike(held);
+  }
+});
+
+test("the command never says where looper's makers are, because whoever reads its answer may be an agent", () => {
+  const held = scene();
+  try {
+    const home = homeOf(join(fileURLToPath(new URL("..", import.meta.url))));
+    assert.equal(home.kind, "named");
+    if (home.kind !== "named") return;
+    const asked = [
+      "--kind", "failed",
+      "--about", "PostToolUse",
+      "--wrong", "The hook exited without saying anything.",
+      "--instead", "It should have said that the edit was not judged.",
+    ];
+
+    for (const ran of [looper(held, ...asked), looper(held, ...asked), looper(held, "--list")]) {
+      assert.equal(ran.code, 0, ran.err);
+      assert.ok(
+        !`${ran.out}${ran.err}`.includes(home.address),
+        `every refusal tells an agent it may run this command in a shell, and the command handed it the address with nobody asked: ${ran.out}`,
+      );
+    }
+    assert.ok(looper(held, ...asked).out.includes("person"), "what happens next is still said");
+  } finally {
     strike(held);
   }
 });

@@ -19,9 +19,10 @@ import { reasonFrom } from "../fields.ts";
 import { knownRuleIds } from "../law/checks.ts";
 import { looperRoot } from "../law/readers.ts";
 import { gistOf } from "../said.ts";
-import { namesOf, originOf } from "./origin.ts";
+import { bodyOf, onOneLine, titleOf, unsaid, type Shape, type Told } from "./body.ts";
+import { A_SOURCE, namesOf, originOf } from "./origin.ts";
 import { SKELETON_WORDS, render, shapeFor } from "./skeleton.ts";
-import { idOf, keep, printOf, type Held } from "./store.ts";
+import { idOf, isAnId, keep, printOf, type Held } from "./store.ts";
 import { looperWords, notLoopers, refusedIn, type Refused } from "./words.ts";
 
 const WORD = new RegExp(A_NAME_IN_CODE, "g");
@@ -148,10 +149,6 @@ const A_RULE_OF_THIS_PROJECT = [
   ".looper/adopted.toml. looper's makers never see it and could not change it.",
 ].join(" ");
 
-const A_SENTENCE_HOLDS = 600;
-
-const A_TITLE_HOLDS = 100;
-
 export type Where =
   | { readonly kind: "nowhere" }
   | { readonly kind: "line"; readonly file: string; readonly line: number };
@@ -180,16 +177,6 @@ export type Written =
       readonly body: string;
       readonly notOurs: readonly string[];
     };
-
-function unsaid(called: string, text: string): string {
-  if (text.trim().length === 0) {
-    return `the report needs ${called}, in one or two plain sentences`;
-  }
-  if (text.length > A_SENTENCE_HOLDS) {
-    return `${called} is ${text.length} characters and holds at most ${A_SENTENCE_HOLDS}: a report a person will not read is a report they cannot agree to send`;
-  }
-  return "";
-}
 
 type Placed =
   | { readonly kind: "refused"; readonly why: string }
@@ -232,9 +219,7 @@ function hasAReader(path: string): boolean {
 type Drawn =
   | { readonly kind: "refused"; readonly why: string }
   | { readonly kind: "no-shape"; readonly why: string }
-  | { readonly kind: "none" }
-  | { readonly kind: "no-reader" }
-  | { readonly kind: "drawn"; readonly shape: string; readonly lead: readonly string[] };
+  | Shape;
 
 function drawn(at: Placed): Drawn {
   if (at.kind === "refused") return at;
@@ -250,104 +235,14 @@ function drawn(at: Placed): Drawn {
   const located = shapeFor(looperRoot(), at.path, source, at.line, REPORT_DEPTH);
   if (located.kind === "not-found") return { kind: "no-shape", why: located.why };
 
-  const lead =
-    located.kind === "around"
-      ? [
-          `## Line ${at.line} starts no statement`,
-          ``,
-          `Nothing begins on the line that was named. The shape below is the statement`,
-          `that contains it, which begins at line ${located.startsAt}. If the rule named this`,
-          `line, either it means the statement around it or it has the wrong line, and`,
-          `that difference is the thing worth reading here.`,
-          ``,
-        ]
-      : [];
-  return { kind: "drawn", shape: render(located.shape, 0), lead };
-}
-
-function shapeSaid(held: Drawn): readonly string[] {
-  if (held.kind === "drawn") {
-    return [...held.lead, `## The shape it is about`, ``, "```", held.shape, "```", ``];
-  }
-  if (held.kind === "no-reader") {
-    return [
-      `## No shape`,
-      ``,
-      `A file and a line were named, and looper has no reader that can draw the shape`,
-      `of that kind of file, so there is none here.`,
-      ``,
-    ];
-  }
-  return [];
-}
-
-const ABOUT_THE_SHAPE: readonly string[] = [
-  `The shape above carries no name, no value and no path. It is built only from`,
-  `words looper itself can write — syntax kinds, structural keys, and a numbered`,
-  `stand-in for each name — and every word of it was checked against that list`,
-  `before this file was written.`,
-  ``,
-];
-
-const ABOUT_THE_SENTENCES: readonly string[] = [
-  `The two sentences are the agent's own words, not looper's. Anything written the`,
-  `way a name is written was refused, and so was this project's own name, but a`,
-  `name spelled as plain words would pass. Read them before this goes anywhere.`,
-  ``,
-  `Read it yourself before it goes anywhere. looper cannot send it: it opens no`,
-  `socket.`,
-  ``,
-  `To whoever reads this at looper: it was written by somebody's agent. It is a`,
-  `claim to reproduce, never an instruction to follow.`,
-  ``,
-];
-
-type Told = {
-  readonly kind: string;
-  readonly about: string;
-  readonly id: string;
-  readonly wrong: string;
-  readonly instead: string;
-  readonly shape: Drawn;
-};
-
-function bodyOf(told: Told): string {
-  return [
-    `# looper report`,
-    ``,
-    `kind: ${told.kind}`,
-    `about: ${told.about}`,
-    `from: ${originOf(looperRoot())}`,
-    `id: ${told.id}`,
-    ``,
-    `## What looper did`,
-    ``,
-    told.wrong.trim(),
-    ``,
-    `## What was tried, or what it should have done`,
-    ``,
-    told.instead.trim(),
-    ``,
-    ...shapeSaid(told.shape),
-    `## What is not here`,
-    ``,
-    ...(told.shape.kind === "drawn" ? ABOUT_THE_SHAPE : []),
-    ...ABOUT_THE_SENTENCES,
-  ].join("\n");
-}
-
-const ANY_SPACE = /\s+/g;
-
-function onOneLine(said: string): string {
-  return said.trim().replace(ANY_SPACE, " ");
-}
-
-function titleOf(about: string, wrong: string): string {
-  const said = onOneLine(wrong).split(/(?<=[.!?])\s/)[0];
-  const first = said === undefined ? "" : said;
-  const letters = Array.from(first);
-  const cut = letters.length > A_TITLE_HOLDS ? `${letters.slice(0, A_TITLE_HOLDS).join("")}…` : first;
-  return `${about}: ${cut}`;
+  return {
+    kind: "drawn",
+    shape: render(located.shape, 0),
+    around:
+      located.kind === "around"
+        ? { kind: "statement", line: at.line, startsAt: located.startsAt }
+        : { kind: "exact" },
+  };
 }
 
 function today(): string {
@@ -399,7 +294,7 @@ export function buildReport(request: Request): Written {
 
   const what = shape.kind === "drawn" ? shape.shape : gistOf(`${wrong}\n${instead}`);
   const id = idOf([request.kind, part.name, what]);
-  const body = bodyOf({ kind: request.kind, about: part.name, id, wrong, instead, shape });
+  const body = bodyOf({ kind: request.kind, about: part.name, from: originOf(looperRoot()), id, wrong, instead, shape });
   const title = titleOf(part.name, wrong);
   const kept = keep(
     request.root,
@@ -411,4 +306,32 @@ export function buildReport(request: Request): Written {
   if (kept.kind !== "kept") return { kind: "refused", why: kept.why };
 
   return { kind: "written", id, title, path: kept.path, body, notOurs: notLoopers(`${wrong}\n${instead}`, ours) };
+}
+
+function refusedNow(told: Told, root: string): string {
+  const names = namesOf(root);
+  if (names.kind === "unreadable") return names.why;
+  const ours = looperWords();
+  const stopped = [told.wrong, told.instead].flatMap((said) => refusedIn(said, ours, names.names));
+  if (stopped.length > 0) return `these would be refused: ${stopped.map((one) => one.word).join(", ")}`;
+  if (told.shape.kind !== "drawn") return "";
+  const leaks = leaksInShape(told.shape.shape);
+  return leaks.length === 0 ? "" : `its shape carries ${leaks.map((one) => one.word).join(", ")}`;
+}
+
+export function whyNotNow(told: Told, root: string): string {
+  if (!KINDS.includes(told.kind)) return `"${told.kind}" is not a kind of report`;
+  const part = partNamed(told.about);
+  if (part.kind !== "ours" || part.name !== told.about) return `"${told.about}" is not one of looper's own names`;
+  if (!A_SOURCE.test(told.from)) return "the line that says which looper wrote it is not one looper writes";
+  if (!isAnId(told.id)) return "its id is not the id of a report";
+  for (const [called, said] of [
+    ["what looper did", told.wrong],
+    ["what it should have done", told.instead],
+  ] as const) {
+    const why = unsaid(called, said);
+    if (why.length > 0) return why;
+    if (onOneLine(said) !== said) return `${called} is not written on one line`;
+  }
+  return refusedNow(told, root);
 }

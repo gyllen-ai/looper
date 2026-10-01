@@ -46,6 +46,8 @@ const AN_ID = /^[0-9a-f]{12}$/;
 
 const A_NAME_SHOWS = 40;
 
+const A_DAY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+
 function shortHash(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, NAME_LENGTH);
 }
@@ -94,7 +96,7 @@ function heldFrom(id: string, value: unknown): Entry {
   const on = fieldAt(value, "on");
   const title = fieldAt(value, "title");
   const print = fieldAt(value, "print");
-  if (typeof on !== "string" || typeof title !== "string" || typeof print !== "string") {
+  if (typeof on !== "string" || !A_DAY.test(on) || typeof title !== "string" || typeof print !== "string") {
     return { kind: "not-one", why: `an entry for ${id} that is not a report` };
   }
   if (state === undefined) {

@@ -65,6 +65,9 @@ A project that never wants the offer says so once, in `law.toml`:
 offer = "never"
 ```
 
+Written nearly like that — another spelling, another section — it is still
+taken as never, and looper says how it reads the switch.
+
 The same route takes any other fault of looper's own: a hook that failed
 (`--kind failed`), an answer that was untrue, a rule that stayed silent on code
 it should have caught, or something looper should do and does not.

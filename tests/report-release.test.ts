@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { Client } from "../src/capability.ts";
 import { ageOfOurCode } from "../src/code-age.ts";
 import { RELEASE_TOOL, REPORT_TOOL } from "../src/config.ts";
-import { clientIn, handle, handleFor } from "../src/mcp.ts";
+import { clientIn, conversation, handle, handleFor } from "../src/mcp.ts";
 import { registry } from "../src/registry.ts";
 import { Report, asksAPerson } from "../src/report/capability.ts";
 import { homeOf } from "../src/report/origin.ts";
@@ -189,6 +189,13 @@ test("which clients ask a person is read from their version as numbers", () => {
   for (const version of ["2.1.198", "2.1.99", "2.0.999", "1.9.9", "2.1", "", "next"]) {
     assert.equal(asks(version), false, `${version} would be asked nothing and must not be trusted to ask`);
   }
+  for (const version of ["2.1.199-beta", "2.1.199garbage", "2.1.199.5", "02.01.199", " 2.1.286", "v2.1.300", "2.1.99999999999999999999"]) {
+    assert.equal(
+      asks(version),
+      false,
+      `${JSON.stringify(version)} is not three plain numbers, and a version read only as far as it made sense was taken for one that asks`,
+    );
+  }
 });
 
 test("a report changed after looper wrote it is not released", () => {
@@ -251,9 +258,47 @@ test("the client is whoever introduced itself when the server started", () => {
     params: { protocolVersion: "2025-11-25", clientInfo: { name: "claude-code", title: "Claude Code", version: "2.1.286" } },
   });
 
-  assert.deepEqual(clientIn(hello), ASKS);
-  assert.deepEqual(clientIn(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })), { kind: "unknown" });
+  assert.deepEqual(clientIn(hello), { kind: "introduced", client: ASKS });
+  assert.deepEqual(clientIn(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })), { kind: "said-nothing" });
+  assert.deepEqual(
+    clientIn(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: RELEASE_TOOL, clientInfo: { name: "claude-code", version: "9.9.9" } } })),
+    { kind: "said-nothing" },
+    "a call that carries its own introduction is the agent naming itself, which is the one thing the introduction exists to rule out",
+  );
+  assert.deepEqual(
+    clientIn(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize", params: {} })),
+    { kind: "introduced", client: { kind: "unknown" } },
+  );
   assert.equal(clientIn("{ not json").kind, "unreadable");
+});
+
+function introduction(name: string, version: string): string {
+  return JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize", params: { clientInfo: { name, version } } });
+}
+
+test("a server remembers who introduced itself, and forgets when somebody else does", () => {
+  const held = scene();
+  try {
+    const report = drafted(held);
+    const answer = conversation([new Report(held.home)], held.root, ageOfOurCode());
+    const release = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: RELEASE_TOOL, arguments: { id: report.id, title: report.title } } });
+
+    assert.ok(textOf(answer(release)).includes("released nothing"), "nobody has introduced themselves yet");
+    assert.equal(stateOf(held, report.id), "written");
+
+    answer(introduction("claude-code", "2.1.286"));
+    answer(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize", params: {} }));
+    assert.ok(
+      textOf(answer(release)).includes("released nothing"),
+      "a second introduction that names nobody left the first one standing, so whoever spoke last was not who looper took them for",
+    );
+
+    answer(introduction("claude-code", "2.1.286"));
+    assert.ok(textOf(answer(release)).includes("may leave"), "the client that asks a person is the one that introduced itself last");
+    assert.equal(stateOf(held, report.id), "released");
+  } finally {
+    strike(held);
+  }
 });
 
 test("what a report says is not here is still true once it can be released", () => {

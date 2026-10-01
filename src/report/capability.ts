@@ -13,25 +13,26 @@ import type {
   ToolDef,
   ToolResult,
 } from "../capability.ts";
-import { looperRoot } from "../law/readers.ts";
-import { homeOf } from "./origin.ts";
-import { SAID_NEVER, offerIn, release, unclearSaid } from "./release.ts";
+import { closedSaid, offerIn, release } from "./release.ts";
 import { A_FAULT_IN_LOOPER } from "./say.ts";
-import { decide, heldIn, type Held, type State } from "./store.ts";
+import { decide, heldIn, reportsIn, type Held, type State } from "./store.ts";
 import { buildReport, type Leak, type Where, type Written } from "./write.ts";
 
 export { asksAPerson } from "./release.ts";
 
 export const THE_LINE = `looper: looper can be wrong. A rule that fires on code that is fine or misses code that is not, a check that fails, an answer that is untrue, something it should do and does not: say so with the \`${REPORT_TOOL}\` tool. It writes a file on this machine and sends nothing; only the person can let it leave.`;
 
-const A_TITLE_IN_THE_LINE = 60;
+const SAID_BY_THE_LINE = "report";
 
-function unanswered(waiting: readonly Held[]): string {
-  const [first, ...rest] = waiting;
-  if (first === undefined) return THE_LINE;
-  const title = first.title.length > A_TITLE_IN_THE_LINE ? `${first.title.slice(0, A_TITLE_IN_THE_LINE)}…` : first.title;
-  const more = rest.length === 0 ? "" : `, and ${rest.length} more`;
-  return `looper: a report about looper was written here on ${first.on} and nobody has said whether it may leave: ${title}${more}. Ask the person in words: send it or keep it? Then the \`${RELEASE_TOOL}\` tool, or \`${REPORT_TOOL}\` with {"kept":"${first.id}"}.`;
+const SAID_ABOUT_ONE_WAITING = "report:waiting";
+
+const SAID_ABOUT_THE_SWITCH = "report:switch";
+
+const SAID_ABOUT_THE_RECORD = "report:record";
+
+function unanswered(first: Held, others: number): string {
+  const more = others === 0 ? "" : `, and ${others} more`;
+  return `looper: a report about looper was written here on ${first.on} and nobody has said whether it may leave: ${first.id}${more}. The \`${REPORT_TOOL}\` tool with no argument says where it is. Ask the person in words: send it or keep it? Then the \`${RELEASE_TOOL}\` tool, or \`${REPORT_TOOL}\` with {"kept":"${first.id}"}.`;
 }
 
 const NO_EVENTS: readonly HookEvent[] = [];
@@ -81,13 +82,14 @@ const WHAT_BECAME_OF_IT: Readonly<Record<State, string>> = {
   kept: "kept here",
 };
 
-export type Asker = "agent" | "person";
+export type Asker = "agent" | "shell";
 
-function listed(held: readonly Held[]): string {
+function listed(held: readonly Held[], kept: string): string {
   if (held.length === 0) return "nothing has been written here about looper yet.";
-  return held
-    .map((one) => `${one.on}  ${one.id}  ${one.title} — ${WHAT_BECAME_OF_IT[one.state]}`)
-    .join("\n");
+  return [
+    `Reports about looper written here, each a file named by its id in ${kept}:`,
+    ...held.map((one) => `${one.on}  ${one.id}  ${one.title} — ${WHAT_BECAME_OF_IT[one.state]}`),
+  ].join("\n");
 }
 
 function named(leaks: readonly Leak[]): string {
@@ -102,16 +104,18 @@ function glance(notOurs: readonly string[]): readonly string[] {
 }
 
 function whatNext(root: string, asker: Asker, id: string, title: string): string {
-  if (offerIn(root).kind === "never") {
-    return `It stays on this machine: ${SAID_NEVER}.`;
-  }
-  if (asker === "person") {
-    const home = homeOf(looperRoot());
-    const where = home.kind === "named" ? ` Its makers are at ${home.address}.` : "";
-    return `Whether it goes any further is yours to decide.${where}`;
+  const closed = closedSaid(offerIn(root));
+  if (closed.length > 0) return `It stays on this machine: ${closed}.`;
+  const asking = `the \`${RELEASE_TOOL}\` tool with {"id":"${id}","title":${JSON.stringify(title)}}`;
+  if (asker === "shell") {
+    return [
+      `Whether it leaves this machine is the person's to decide, and nobody else's.`,
+      `If you are an agent: show them the report above, as it is, and ask with ${asking}, which puts the question to them directly.`,
+      `If you are that person: the file above is the whole report, and what happens to it is yours to say.`,
+    ].join(" ");
   }
   return [
-    `Show the person the report above, as it is. Then ask whether it may leave: the \`${RELEASE_TOOL}\` tool with {"id":"${id}","title":${JSON.stringify(title)}}.`,
+    `Show the person the report above, as it is. Then ask whether it may leave: ${asking}.`,
     `The person is asked directly, every time, so the yes is theirs and not yours to give. If they say no, tell looper: {"kept":"${id}"}.`,
   ].join(" ");
 }
@@ -175,28 +179,30 @@ export class Report implements Capability {
     this.home = home;
   }
 
-  private said(root: string): string {
-    const held = heldIn(root, this.home);
-    if (held.kind === "unreadable") {
-      return `looper: what was written here about looper could not be read (${held.why}). ${A_FAULT_IN_LOOPER}`;
-    }
-    return unanswered(held.held.filter((one) => one.state === "written"));
+  private once(source: string, text: string): readonly Injection[] {
+    return [{ source, priority: REPORT_PRIORITY, required: false, notice: true, waits: true, text }];
   }
 
   inject(context: InjectContext): readonly Injection[] {
     if (context.turn.session.kind === "unknown") return SILENT;
     const offer = offerIn(context.root);
     if (offer.kind === "never") return SILENT;
-    return [
-      {
-        source: this.name,
-        priority: REPORT_PRIORITY,
-        required: false,
-        notice: true,
-        waits: true,
-        text: offer.kind === "unclear" ? unclearSaid(offer.said) : this.said(context.root),
-      },
-    ];
+    if (offer.kind === "unclear") {
+      return this.once(
+        SAID_ABOUT_THE_SWITCH,
+        `looper: ${offer.why}. It is taken as never until that is mended: no report about looper is offered or released here.`,
+      );
+    }
+    const held = heldIn(context.root, this.home);
+    if (held.kind === "unreadable") {
+      return this.once(
+        SAID_ABOUT_THE_RECORD,
+        `looper: ${held.why}, so no report about looper can be written or released here until that file is mended or removed.`,
+      );
+    }
+    const [first, ...others] = held.held.filter((one) => one.state === "written");
+    if (first !== undefined) return this.once(SAID_ABOUT_ONE_WAITING, unanswered(first, others.length));
+    return this.once(SAID_BY_THE_LINE, THE_LINE);
   }
 
   hooks(): readonly HookEvent[] {
@@ -270,7 +276,7 @@ export class Report implements Capability {
       if (held.kind === "unreadable") {
         return { done: false, text: `looper could not read what was written here: ${held.why}.` };
       }
-      return { done: true, text: listed(held.held) };
+      return { done: true, text: listed(held.held, reportsIn(root, this.home)) };
     }
 
     const kind = args.get("kind");

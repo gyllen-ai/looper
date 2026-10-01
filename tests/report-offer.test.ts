@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { allocate } from "../src/allocator.ts";
 import type { Capability, HookEvent, Injection, Outcome, ToolDef, ToolResult, Turn } from "../src/capability.ts";
 import { BULLET_CEILING, RELEASE_TOOL, REPORT_TOOL } from "../src/config.ts";
-import { Report } from "../src/report/capability.ts";
+import { Report, THE_LINE } from "../src/report/capability.ts";
+import { heldIn } from "../src/report/store.ts";
 import { SaidInSession, type Said } from "../src/said.ts";
 
 type Scene = { readonly root: string; readonly home: string };
@@ -101,25 +102,38 @@ test("a project that said never is told nothing", () => {
   }
 });
 
+const WHAT_THE_AGENT_WROTE = "The hook exited without saying anything and the edit was never judged.";
+
+function writes(held: Scene): string {
+  new Report(held.home).call({
+    root: held.root,
+    tool: REPORT_TOOL,
+    client: { kind: "unknown" },
+    args: new Map([
+      ["kind", "failed"],
+      ["about", "PostToolUse"],
+      ["wrong", WHAT_THE_AGENT_WROTE],
+      ["instead", "It should have said that the edit was not judged."],
+    ]),
+  });
+  const read = heldIn(held.root, held.home);
+  assert.equal(read.kind, "read");
+  if (read.kind !== "read") throw new Error("unreachable");
+  return first(read.held).id;
+}
+
+function decides(held: Scene, what: string, id: string): void {
+  new Report(held.home).call({ root: held.root, tool: REPORT_TOOL, client: { kind: "unknown" }, args: new Map([[what, id]]) });
+}
+
 test("a report nobody has answered is named instead of the line", () => {
   const held = scene();
   try {
-    const report = new Report(held.home);
-    report.call({
-      root: held.root,
-      tool: REPORT_TOOL,
-      client: { kind: "unknown" },
-      args: new Map([
-        ["kind", "failed"],
-        ["about", "PostToolUse"],
-        ["wrong", "The hook exited without saying anything and the edit was never judged."],
-        ["instead", "It should have said that the edit was not judged."],
-      ]),
-    });
+    const id = writes(held);
     const told = first(offered(held, turnOf("b")));
 
     assert.ok(
-      told.text.includes("PostToolUse") && told.text.includes(`\`${RELEASE_TOOL}\``),
+      told.text.includes(id) && told.text.includes(`\`${RELEASE_TOOL}\``),
       `a session that ended before anyone was asked leaves a report nobody will ever see, unless the next session is told it is there: ${told.text}`,
     );
     assert.ok(
@@ -127,6 +141,95 @@ test("a report nobody has answered is named instead of the line", () => {
       `a person who already said no at the prompt must be asked in words, not shown the same prompt again: ${told.text}`,
     );
     assert.ok(told.text.length < BULLET_CEILING, `${told.text.length} characters`);
+  } finally {
+    strike(held);
+  }
+});
+
+test("nothing an agent wrote is said again in looper's own voice", () => {
+  const held = scene();
+  try {
+    writes(held);
+    const told = first(offered(held, turnOf("b")));
+
+    for (const word of ["exited", "judged", "PostToolUse:"]) {
+      assert.ok(
+        !told.text.includes(word),
+        `the line named the waiting report by its title, and a title is the agent's own sentence: one written to read like an instruction arrived in every later session as looper speaking. It said: ${told.text}`,
+      );
+    }
+  } finally {
+    strike(held);
+  }
+});
+
+test("a report that was answered is no longer named, and the line is not said a second time for it", () => {
+  const held = scene();
+  try {
+    const report = new Report(held.home);
+    const heard = saidIn(held, "a");
+    const told = (): string => allocate([report], { root: held.root, budget: 9800, turn: turnOf("a"), said: heard }).allocation.text;
+
+    assert.equal(told(), THE_LINE);
+    const id = writes(held);
+    assert.ok(told().includes(id), "the report that waits is named once");
+    assert.equal(told(), "", "and only once");
+
+    decides(held, "kept", id);
+    assert.equal(
+      told(),
+      "",
+      "what a session has heard was kept as one thing per speaker, so the line and the reminder took turns overwriting each other and the line was said again after every report",
+    );
+    assert.ok(!first(offered(held, turnOf("b"))).text.includes(id), "another session is not told about a report somebody answered");
+  } finally {
+    strike(held);
+  }
+});
+
+const NEARLY_NEVER: readonly (readonly [string, string])[] = [
+  ["a capital in the word", '[report]\noffer = "Never"\n'],
+  ["a space in the word", '[report]\noffer = "never "\n'],
+  ["a list", '[report]\noffer = ["never"]\n'],
+  ["no section", 'offer = "never"\n'],
+  ["a dotted key", 'report.offer = "never"\n'],
+  ["a plural", '[reports]\noffer = "never"\n'],
+  ["a capital on the section", '[Report]\noffer = "never"\n'],
+  ["a capital on the key", '[report]\nOffer = "never"\n'],
+];
+
+test("a switch that is nearly right is taken as thrown, and the session is told how it is written", () => {
+  for (const [called, law] of NEARLY_NEVER) {
+    const held = scene();
+    try {
+      writeFileSync(join(held.root, "law.toml"), law);
+      const told = offered(held, turnOf("a"));
+
+      assert.equal(told.length, 1, called);
+      const text = first(told).text;
+      assert.ok(
+        !text.includes("looper can be wrong"),
+        `with ${called} the project had plainly asked for no offer and was made one anyway: ${text}`,
+      );
+      assert.ok(text.includes('offer = "never"') && text.includes("law.toml"), `${called}: ${text}`);
+    } finally {
+      strike(held);
+    }
+  }
+});
+
+test("a law.toml that cannot be read stops the offer and says so once, without a word about a fault in looper", () => {
+  const held = scene();
+  try {
+    writeFileSync(join(held.root, "law.toml"), "[rules]\ndisabled = oops\n");
+    const report = new Report(held.home);
+    const heard = saidIn(held, "a");
+    const turn = () => allocate([report], { root: held.root, budget: 9800, turn: turnOf("a"), said: heard });
+
+    const firstTurn = turn();
+    assert.deepEqual([...firstTurn.complaints], [], "a file of the project's that cannot be read is not the report capability failing");
+    assert.ok(firstTurn.allocation.text.includes("law.toml") && !firstTurn.allocation.text.includes("looper can be wrong"), firstTurn.allocation.text);
+    assert.equal(turn().allocation.text, "", "it was said on every turn, 383 characters each time, for as long as the file stayed mistyped");
   } finally {
     strike(held);
   }
