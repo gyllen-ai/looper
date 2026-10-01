@@ -13,10 +13,6 @@ const ROOT = join(import.meta.dirname, "..");
 import { ourFiles, sourceFiles } from "./our-files.ts";
 import { required } from "../src/present.ts";
 
-const SPAWN_CAPABLE = "node:child_process";
-
-const SPAWN_SANCTUM = "git.ts";
-
 const ARGUED_FOR: readonly string[] = ["@babel/parser"];
 
 const INSTALL_HOOKS: readonly string[] = ["preinstall", "install", "postinstall"];
@@ -52,25 +48,6 @@ function installedPackages(): readonly string[] {
   return found;
 }
 
-const MAY_SPAWN: readonly string[] = [
-  SPAWN_SANCTUM,
-  "law/rust/drive.ts",
-  "law/python/drive.ts",
-  "law/csharp/drive.ts",
-  "loop/run.ts",
-];
-
-test("only the named files may start another process, and each says what it starts", () => {
-  for (const file of ourFiles()) {
-    const text = readFileSync(file, "utf8");
-    if (!text.includes(`"${SPAWN_CAPABLE}"`)) continue;
-    assert.ok(
-      MAY_SPAWN.some((allowed) => file.endsWith(allowed)),
-      `${file} can start another process and is not on the list. Starting a process is only as safe as the thing being started, so every one lives in a named file and the list is short enough to read: ${MAY_SPAWN.join(", ")}.`,
-    );
-  }
-});
-
 test("the loop runner starts only what this project declared, and never on a hook", () => {
   const text = readFileSync(join(ROOT, "src", "loop", "run.ts"), "utf8");
   assert.ok(
@@ -82,31 +59,6 @@ test("the loop runner starts only what this project declared, and never on a hoo
     !wiring.includes("loop/run.ts") && !wiring.includes("commands/loop.ts"),
     "the loop runner is not reachable from a hook: a project's file may not be run because a session started",
   );
-});
-
-const STARTED: Readonly<Record<string, readonly string[]>> = {
-  [SPAWN_SANCTUM]: ['"git"'],
-  "law/rust/drive.ts": ['"cargo"', "binary", "builtAt(looperRoot)"],
-  "law/python/drive.ts": ["PYTHON_COMMAND"],
-  "law/csharp/drive.ts": ['"dotnet"', "binary"],
-  "loop/run.ts": ['"sh"'],
-};
-
-const A_START = /\b(?:execFileSync|spawnSync|execSync|execFile|spawn|exec|fork)\(\s*([^,\n]+?)\s*,/g;
-
-test("the files that may start a process start exactly what they were allowed to, and nothing else", () => {
-  assert.deepEqual(Object.keys(STARTED).sort(), [...MAY_SPAWN].sort(), "every file that may start a process says here what it starts");
-
-  for (const [file, allowed] of Object.entries(STARTED)) {
-    const text = readFileSync(join(ROOT, "src", file), "utf8");
-    const started = [...new Set([...text.matchAll(A_START)].map((held) => String(held[1])))].sort();
-
-    assert.deepEqual(
-      started,
-      [...allowed].sort(),
-      `${file} starts ${started.join(", ")} and is allowed ${allowed.join(", ")}. This check used to ask only that the allowed program was among them, so a second program beside it — one that reaches the network — would have passed every test here`,
-    );
-  }
 });
 
 test("every dependency is one that was argued for by name", () => {

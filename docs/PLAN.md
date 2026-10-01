@@ -4030,11 +4030,12 @@ would change a decision above rather than merely a detail:
   `net` and `dgram`, because Node loads both itself for any program that can
   start another. So "never loaded" is false on the first line of every run for
   the two modules that open a socket. What can be asserted is the half above
-  them, and `tests/nothing-over-a-wire.test.ts` now does: six real runs — the
-  turn hook, three tool hooks, the server and a command — load none of `http`,
-  `https`, `http2`, `tls` or `dns`. Reading the files for those names finds an
-  import somebody wrote down; this finds one assembled while running. The scan
-  of our files and of the resolved tree is still what holds the rest.
+  them, and `tests/nothing-over-a-wire.test.ts` now does: twelve real runs — the
+  turn hook, four tool hooks, the server and six commands — load nothing that
+  could speak beyond what a program that only starts others loads. Reading the
+  files for those names finds an import somebody wrote down; this finds one
+  assembled while running. The scan of our files and of the resolved tree is
+  still what holds the rest.
 - **Node's startup floor is 18 ms and it is not ours to optimise.** Anything that
   wants to be cheaper than that has to not be a process, which is a real design
   option and not one we are taking yet.
@@ -8233,50 +8234,153 @@ report ends with the same sentence, addressed to whoever reads it here.
 
 Found while reviewing the report, which says of itself "looper cannot send it".
 looper opens no socket; that was always true and is still what the scan holds.
-But looper starts other programs, and two of them can reach a network without
-being asked to.
+But looper starts other programs, and they can reach a network without being
+asked to. The first version of this change closed two of them and said so. A
+reviewer who had seen none of the reasoning then showed it did not hold, and
+that there were four. Both halves are kept: what was first built, what was
+found, and what stands now.
 
-**git fetches on its own in a clone made without file contents. Seen.** In a
-clone made with `--filter=blob:none`, a plain `git show` of a file that was
-never checked out went to the remote and came back with it, and a `git grep`
-over a revision fetched every file it needed: four objects that had not been on
-the machine. That last command is the one the push gate runs to learn which
-words are new. So in such a clone looper's own gate would have pulled a
-repository's history over the network to count its words.
+**How a connection was watched.** The first version said of the C# build "told,
+not seen: nothing on this machine could watch a connection". The reviewer built
+what could: a network namespace with nothing in it but loopback, and a small
+library loaded in front of every program that writes down each name it looks up
+and each address it connects to. Every number below marked seen was taken that
+way, 2026-10-01, on git 2.53.0, the .NET SDK 10.0.400, rustup 1.29.0 and
+Python 3.14.
 
-Every question looper asks git now begins `-c protocol.allow=never`, which
-forbids every transport, and the same two commands then stop with "transport
-not allowed" and fetch nothing. looper already reads a git that could not
-answer as "cannot tell", and says so. It is the one switch every version of git
-since 2.12 understands; `--no-lazy-fetch` says the same thing more politely and
-an older git refuses it as an unknown option, which would break every call.
-`tests/nothing-over-a-wire.test.ts` builds such a clone and counts its objects
-before and after.
+### git
 
-**The C# build reports to its maker and looks for updates. Told, not seen.**
-looper builds its C# reader with `dotnet build`. The SDK's own documentation,
-read 2026-10-01: telemetry "is enabled by default" and "is collected when using
-any of the .NET CLI commands, such as `dotnet build`", and workload manifests are
-downloaded "asynchronously in the background" when `dotnet build` runs, no more
-than once a day. Nothing on this machine could watch a connection being opened,
-so this rests on the documentation and not on a measurement. The build is now
-started with the three settings that documentation gives for turning each off,
-and the reader was rebuilt from nothing with them set and passes its cases.
-Running the built reader was never in question: the same page says nothing is
-collected when a built application is started.
+**First built:** every question looper asks git begins `-c protocol.allow=never`.
+In a clone made without file contents a plain `git show` had gone to the remote,
+and the `git grep` the push gate runs fetched every file it needed.
 
-**The check on what may be started asked the wrong question.** It asked whether
-the allowed program was among those a file starts. It now asks for the exact
-list, per file: git; cargo and the Rust reader; Python; `dotnet` and the C#
-reader; and the shell that runs a project's own declared checks. A second
-program beside any of them fails the suite.
+**Found:** one line of the user's own configuration outranks that switch.
+`protocol.file.allow=always` is the usual cure for a submodule kept on the same
+machine, and with it git fetched again; so did `GIT_ALLOW_PROTOCOL` in the
+user's environment. Seen here as well: a clone that held 2 objects held 3.
+
+**Now:** every git looper starts is also given `GIT_ALLOW_PROTOCOL`, set and
+empty, which allows no transport and outranks the configuration. Seen: nothing
+fetched, and git stops with "transport 'file' not allowed". Three more things
+came with it.
+
+- **git is only ever asked to read.** The words looper hands git must open in
+  one of ten ways (`rev-parse`, `diff`, `grep`, `config --get` and six more), or
+  nothing is started. A list of words held in a variable went past every check
+  that read the source; this is checked when it runs.
+- **The difference is always git's own.** With a program of the user's put in
+  charge of showing differences, the gate that reads what is about to be
+  committed for credentials read nothing and passed. That was true before this
+  change. Every `diff` now refuses the outside program.
+- **The reason is git's.** A clone made without contents is said to be that,
+  where it used to be told that the scan had run out of time and to mark its
+  folders as generated. The reviewer read in git's source that an older git does
+  not stop when it cannot fetch: it answers with the files it has and exits as
+  if that were everything. No such git was run here. Its complaint on the way
+  out is now enough to call the answer unknown; the test makes a current git
+  behave that way and watches three of four files come back.
+
+### The C# build
+
+**First built:** three settings in the build's environment, "told, not seen".
+
+**Found, seen:** with those settings a first build still looked up the
+certificate authority's revocation hosts, 24 lookups. One of the three settings
+is in none of the 3,658 files of the SDK, searched as plain and as two-byte
+text; the other two are. It was written from memory and never checked against
+the SDK, and it did nothing. And the reader is built inside the user's
+project, under `node_modules`, so the user's own files above it shape the
+build: one that names an extra package source was asked about looper's
+packages (6 lookups), one that manages package versions centrally stopped the
+build, and
+one that pins another version of the tool stopped it with exit 155. An
+environment variable naming a source was asked too, 6 lookups.
+
+**Now:** the build is told not to look up revocation hosts, not to audit, to
+read only the reader's own package configuration, to take no source from
+outside, and to import nothing from the folders above; and an empty
+`global.json` beside the reader is found before the user's.
+
+| the build, seen | lookups | built |
+|---|---|---|
+| as first built, on a plain machine | 24 | yes |
+| as first built, in a project with all of the above around it | none: exit 155 | no |
+| now, on a plain machine | 0 | yes |
+| now, in that project, with the user's environment saying the opposite | 0 | yes |
+
+The last row was also run through `looper law` on a C# file, the way it really
+happens: the reader built, the file was judged, 0 lookups. Each setting was then
+taken away in turn. Three open something alone: the revocation setting (24
+lookups), the one about central package versions (the build fails), and the
+`global.json` (exit 155). Five overlap, so removing any one of them opened
+nothing; they are kept as second locks. The switch that ignores response files
+was not seen to matter.
+
+### The Rust build
+
+**Found, seen:** `cargo build --offline` keeps cargo from the network, and says
+nothing to the tool that stands in front of cargo on most machines. In a project
+that pins a compiler version nobody has installed, that tool went to download
+it: one lookup of the compiler's download host.
+
+**Now:** it is told not to install anything, and pointed at the compiler its own
+settings file names as installed. Seen: 0 lookups, and the reader builds with
+the compiler that is there. An older version of that tool may not know the first
+setting; none was run here, and the second is what holds there.
+
+### Python
+
+**Found, seen here:** a file on the user's own Python path ran inside looper's
+reader before the reader. That is how monitoring tools attach themselves to
+every Python that starts. looper's readers use nothing but the standard library,
+so Python is now started alone, with no site and no environment. A test puts
+such a file in place and checks it did not run.
+
+### What may be started, and what may be loaded
+
+**First built:** the files allowed to start a program were listed, with what
+each starts, read by a pattern.
+
+**Found:** a program that reaches the network was added in eight spellings and
+seven passed: through a variable, through another name for the starter, as a
+shell line, in a new file whose name ended like an allowed one, in single
+quotes, as a list of words handed to git, and after the switch. The scan for
+sockets looked for seven module names inside double quotes, so `fetch`, which
+needs no import, passed, and so did an import put together while running.
+
+**Now:**
+
+- **One file starts programs**, `src/start.ts`, and the module that does it is
+  named in no other. It starts six things: git, cargo, dotnet, python, the two
+  readers looper built itself, and the one line a project declared as its own
+  check. Each with its environment fixed there.
+- **The scan reads the code, not its spelling.** Any import, in any form, of
+  anything that connects or listens; an import whose name is put together; the
+  functions that connect with no import; and the ways of taking one of Node's
+  own modules without importing it. `tests/no-network.test.ts` holds seventeen
+  spellings it must refuse and five pieces of ordinary code it must leave alone,
+  and reads the installed tree the same way.
+- **What a run loads is compared with a program that only starts others.**
+  Twelve real runs of looper may load nothing that could speak beyond what that
+  program loads, so the list of what Node loads anyway is Node's own.
+- **Twenty-two changes were then made by hand, one at a time, to a copy** —
+  every one the reviewer had made, and more — and the suite stopped on each. One
+  of them found a fault in the test itself: a looper that could not load loaded
+  nothing, and passed.
 
 ### What this does not claim
 
 - **A project's own checks.** `looper loop` runs the lines a project declared.
   What those lines reach is the project's decision, and looper never runs them
   from a hook.
-- **What a started program starts.** cargo builds with `--offline` from sources
-  in this repository; Python reads one file. Neither was changed.
+- **Code written to defeat the scan.** A name hidden well enough is not found by
+  reading. The scan is against accident and against a dependency that changes;
+  the run-time check covers the roads it walks.
+- **Programs the user has told git to run.** A file-watcher or a hook of the
+  user's own is started by git when git is asked about the working tree. Those
+  are theirs, on their machine, and were not changed.
+- **What was not run:** an older git, an older version of the tool in front of
+  cargo, and any system but Linux for the measurements.
 - **That no packet leaves.** The promise is about looper and the programs it
-  starts, held by tests that can be read in five minutes.
+  starts, held by tests that can be read in ten minutes and by measurements
+  anybody with the same two tools can repeat.

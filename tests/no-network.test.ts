@@ -6,26 +6,68 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 
 import { ourFiles } from "./our-files.ts";
+import { STARTS_A_PROCESS, reachesIn } from "./reaches.ts";
 
-const SOCKET_CAPABLE: readonly string[] = [
-  "node:net",
-  "node:http",
-  "node:https",
-  "node:http2",
-  "node:tls",
-  "node:dgram",
-  "node:dns",
-];
+const MAY_START_PROGRAMS = join("src", "start.ts");
 
 test("nothing we wrote can open a socket", () => {
+  const reaching: string[] = [];
   for (const file of ourFiles()) {
-    const text = readFileSync(file, "utf8");
-    for (const banned of SOCKET_CAPABLE) {
-      assert.ok(
-        !text.includes(`"${banned}"`),
-        `${file} imports ${banned}. looper runs on every edit and every commit and must not be able to reach the network.`,
-      );
+    const named = file.slice(ROOT.length + 1);
+    for (const found of reachesIn(named, readFileSync(file, "utf8"))) {
+      if (named === MAY_START_PROGRAMS && found.what.includes(STARTS_A_PROCESS)) continue;
+      reaching.push(`${named}:${found.line} — ${found.what}`);
     }
+  }
+
+  assert.deepEqual(
+    reaching,
+    [],
+    `looper runs on every edit and every commit and must not be able to reach the network:\n${reaching.join("\n")}`,
+  );
+});
+
+const SPELLINGS_ONCE_LET_THROUGH: readonly (readonly [string, string])[] = [
+  ["a module named in single quotes", "import { connect } from 'node:net';\n"],
+  ["a module named without its prefix", 'import https from "https";\n'],
+  ["a part of a module", 'import { resolve4 } from "node:dns/promises";\n'],
+  ["an import that waits until it runs", 'export const held = await import("node:http2");\n'],
+  ["an import whose name is put together", 'export const held = await import("node:" + "https");\n'],
+  ["an import through a name held in a variable", 'const which = "node:tls";\nexport const held = await import(which);\n'],
+  ["what is passed on from another module", 'export { connect } from "node:net";\n'],
+  ["the older way of importing", 'import net = require("node:net");\nexport const held = net;\n'],
+  ["the function that connects with no import at all", 'export function send(): void {\n  void fetch("https://example.invalid/");\n}\n'],
+  ["the same function under another name", "const send = fetch;\nexport const held = send;\n"],
+  ["the same function reached through the whole program", 'export const held = globalThis.fetch("https://example.invalid/");\n'],
+  ["a connection opened by a class that needs no import", 'export const held = new WebSocket("wss://example.invalid/");\n'],
+  ["Node's own modules handed out without an import", 'export const held = process.getBuiltinModule("node:net");\n'],
+  ["the same, by its older name", 'export const held = process.binding("tcp_wrap");\n'],
+  ["a loader made for the purpose", 'import { createRequire } from "node:module";\nexport const held = createRequire(import.meta.url)("node:net");\n'],
+  ["the module that starts other programs", 'import { spawnSync as start } from "node:child_process";\nexport const held = start;\n'],
+  ["a thread that can load anything", 'import { Worker } from "node:worker_threads";\nexport const held = Worker;\n'],
+];
+
+const ORDINARY_CODE: readonly (readonly [string, string])[] = [
+  ["a method that happens to be called fetch", "export function read(store: { fetch(): string }): string {\n  return store.fetch();\n}\n"],
+  ["the word in a sentence", 'export const said = "fetch the rule set by name";\n'],
+  ["a key that happens to be called fetch", "export const held = { fetch: 1, WebSocket: 2 };\n"],
+  ["the modules looper is made of", 'import { readFileSync } from "node:fs";\nimport { join } from "node:path";\nexport const held = [readFileSync, join];\n'],
+  ["an import that waits, of something harmless", 'export const held = await import("node:fs");\n'],
+];
+
+test("the scan refuses every spelling that was once let through, and leaves ordinary code alone", () => {
+  for (const [called, source] of SPELLINGS_ONCE_LET_THROUGH) {
+    assert.ok(
+      reachesIn("src/somewhere.ts", source).length > 0,
+      `${called} passed the scan. It used to look for seven module names inside double quotes, so anything spelled another way, and anything that needs no import, went straight through:\n${source}`,
+    );
+  }
+  for (const [called, source] of ORDINARY_CODE) {
+    assert.deepEqual(
+      reachesIn("src/somewhere.ts", source).map((one) => one.what),
+      [],
+      `${called} was refused, and a scan that cries at ordinary code is one somebody switches off:\n${source}`,
+    );
   }
 });
 
@@ -49,19 +91,8 @@ function grepTree(dir: string): readonly string[] {
       continue;
     }
     if (!/\.(js|cjs|mjs)$/.test(entry)) continue;
-    const text = readFileSync(path, "utf8");
-    for (const banned of SOCKET_CAPABLE) {
-      const bare = banned.slice("node:".length);
-      if (
-        text.includes(`require("${banned}")`) ||
-        text.includes(`require('${banned}')`) ||
-        text.includes(`require("${bare}")`) ||
-        text.includes(`require('${bare}')`) ||
-        text.includes(`from "${banned}"`) ||
-        text.includes(`from '${banned}'`)
-      ) {
-        hits.push(`${path} (${banned})`);
-      }
+    for (const found of reachesIn(path, readFileSync(path, "utf8"))) {
+      hits.push(`${path.slice(ROOT.length + 1)}:${found.line} — ${found.what}`);
     }
   }
   return hits;

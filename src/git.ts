@@ -1,11 +1,35 @@
-import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { A_READER_MAY_ANSWER_WITH, A_WRITTEN_TOKEN, GIT_TIMEOUT_MS } from "./config.ts";
-import { reasonFrom } from "./fields.ts";
+import { A_WRITTEN_TOKEN } from "./config.ts";
+import { GitCouldNotAnswer } from "./errors.ts";
+import { fieldAt, reasonFrom } from "./fields.ts";
+import { askGit, type Answered } from "./start.ts";
 
-const NEVER_OVER_A_WIRE: readonly string[] = ["-c", "protocol.allow=never"];
+const NOT_ON_THIS_MACHINE = /promisor|unable to read|could not fetch|not allowed/;
+
+export const TOOK_TOO_LONG = "git did not answer in the time looper gives it";
+
+const A_REASON_HOLDS = 300;
+
+function saidOnTheWayOut(answered: Answered): string {
+  return typeof answered.stderr === "string" ? answered.stderr.trim() : "";
+}
+
+export function whyGitCouldNot(answered: Answered): string {
+  if (answered.error !== undefined) {
+    return fieldAt(answered.error, "code") === "ETIMEDOUT" ? TOOK_TOO_LONG : reasonFrom(answered.error);
+  }
+  const said = saidOnTheWayOut(answered).slice(0, A_REASON_HOLDS);
+  if (NOT_ON_THIS_MACHINE.test(said)) {
+    return `this clone was made without the contents of every file, and looper never lets git fetch them (git said: ${said})`;
+  }
+  return said.length > 0 ? `git said: ${said}` : `git answered with ${String(answered.status)} and said nothing`;
+}
+
+export function gitCouldNotAnswer(answered: Answered): boolean {
+  return answered.error !== undefined || answered.status !== 0 || NOT_ON_THIS_MACHINE.test(saidOnTheWayOut(answered));
+}
 
 const IN_HAND: readonly (readonly string[])[] = [
   ["diff", "HEAD", "--name-only", "--no-renames"],
@@ -21,13 +45,9 @@ export type Changed =
   | { readonly kind: "paths"; readonly paths: readonly string[] };
 
 function askWhole(root: string, args: readonly string[]): string {
-  return execFileSync("git", [...NEVER_OVER_A_WIRE, ...args], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: GIT_TIMEOUT_MS,
-    maxBuffer: A_READER_MAY_ANSWER_WITH,
-    stdio: ["ignore", "pipe", "ignore"],
-  });
+  const answered = askGit(root, args);
+  if (gitCouldNotAnswer(answered)) throw new GitCouldNotAnswer(whyGitCouldNot(answered));
+  return answered.stdout;
 }
 
 function ask(root: string, args: readonly string[]): readonly string[] {
@@ -324,20 +344,10 @@ export type Ancestry =
   | { readonly kind: "no" };
 
 export function isAncestorIn(root: string, earlier: string, later: string): Ancestry {
-  const answered = spawnSync("git", [...NEVER_OVER_A_WIRE, "merge-base", "--is-ancestor", earlier, later], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: GIT_TIMEOUT_MS,
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-  if (answered.error !== undefined) {
-    return { kind: "cannot-tell", why: reasonFrom(answered.error) };
-  }
-  if (answered.status === 0) return { kind: "yes" };
-  if (answered.status === 1) return { kind: "no" };
-  const said = typeof answered.stderr === "string" ? answered.stderr.trim() : "";
-  const why = said.length > 0 ? said : `git answered with ${String(answered.status)}`;
-  return { kind: "cannot-tell", why };
+  const answered = askGit(root, ["merge-base", "--is-ancestor", earlier, later]);
+  if (answered.error === undefined && answered.status === 0) return { kind: "yes" };
+  if (answered.error === undefined && answered.status === 1) return { kind: "no" };
+  return { kind: "cannot-tell", why: whyGitCouldNot(answered) };
 }
 
 export type Naming =
@@ -372,13 +382,7 @@ export type Remote =
 
 export function remoteOf(root: string): Remote {
   if (!existsSync(join(root, ".git"))) return { kind: "none" };
-  const answered = spawnSync("git", [...NEVER_OVER_A_WIRE, "config", "--get", "remote.origin.url"], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: GIT_TIMEOUT_MS,
-    maxBuffer: A_READER_MAY_ANSWER_WITH,
-    stdio: ["ignore", "pipe", "ignore"],
-  });
+  const answered = askGit(root, ["config", "--get", "remote.origin.url"]);
   const said = typeof answered.stdout === "string" ? answered.stdout.trim() : "";
   if (answered.status !== 0 || said.length === 0) return { kind: "none" };
   return { kind: "named", address: said };

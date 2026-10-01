@@ -24,6 +24,22 @@ export function isOursToFix(cause: unknown): boolean {
   return typeof code !== "string" || !THE_MACHINE_SAID_NO.includes(code);
 }
 
+export class NotSomethingLooperStarts extends Error {
+  constructor(asked: string) {
+    super(
+      `looper was about to start "${asked}", which is not on the short list of things it starts or asks. Nothing was started.`,
+    );
+    this.name = "NotSomethingLooperStarts";
+  }
+}
+
+export class GitCouldNotAnswer extends Error {
+  constructor(why: string) {
+    super(why);
+    this.name = "GitCouldNotAnswer";
+  }
+}
+
 export class SettingsUnparseable extends NotOursToFix {
   readonly path: string;
 
