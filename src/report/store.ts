@@ -12,9 +12,9 @@ const WHAT_WAS_DECIDED = "decided.json";
 
 const NAME_LENGTH = 12;
 
-export type State = "written" | "sent" | "kept";
+export type State = "written" | "released" | "sent" | "kept";
 
-const STATES: readonly State[] = ["written", "sent", "kept"];
+const STATES: readonly State[] = ["written", "released", "sent", "kept"];
 
 export type Held = {
   readonly id: string;

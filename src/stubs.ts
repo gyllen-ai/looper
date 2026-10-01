@@ -151,4 +151,10 @@ export const LAW_STUB = `# What this project concedes to looper, and nothing els
 # [rules] — a rule turned off for this project, which is rarer than it looks.
 # [rules]
 # disabled = []
+#
+# [report] offer — looper tells each session once that it can be wrong, and that
+# a report about it may leave this machine if a person says yes. "never" stops
+# the telling and the leaving. A report can still be written and stays here.
+# [report]
+# offer = "never"
 `;

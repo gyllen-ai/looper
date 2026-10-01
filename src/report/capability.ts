@@ -1,17 +1,36 @@
-import { REPORT_TOOL } from "../config.ts";
+import { RELEASE_TOOL, REPORT_PRIORITY, REPORT_TOOL } from "../config.ts";
 import { SILENT } from "../capability.ts";
 import type {
   Capability,
+  Client,
   HookEvent,
+  InjectContext,
   Injection,
   Outcome,
   ToolCall,
   ToolDef,
   ToolResult,
 } from "../capability.ts";
+import { looperRoot } from "../law/readers.ts";
+import { homeOf } from "./origin.ts";
+import { SAID_NEVER, offerIn, release, unclearSaid } from "./release.ts";
 import { A_FAULT_IN_LOOPER } from "./say.ts";
 import { decide, heldIn, type Held, type State } from "./store.ts";
 import { buildReport, type Leak, type Where, type Written } from "./write.ts";
+
+export { asksAPerson } from "./release.ts";
+
+export const THE_LINE = `looper: looper can be wrong. A rule that fires on code that is fine or misses code that is not, a check that fails, an answer that is untrue, something it should do and does not: say so with the \`${REPORT_TOOL}\` tool. It writes a file on this machine and sends nothing; only the person can let it leave.`;
+
+const A_TITLE_IN_THE_LINE = 80;
+
+function unanswered(waiting: readonly Held[]): string {
+  const [first, ...rest] = waiting;
+  if (first === undefined) return THE_LINE;
+  const title = first.title.length > A_TITLE_IN_THE_LINE ? `${first.title.slice(0, A_TITLE_IN_THE_LINE)}…` : first.title;
+  const more = rest.length === 0 ? "" : `, and ${rest.length} more`;
+  return `looper: a report about looper was written here on ${first.on} and nobody has said whether it may leave: ${title}${more}. Show it to the person (the \`${REPORT_TOOL}\` tool lists it), then ask the \`${RELEASE_TOOL}\` tool.`;
+}
 
 const NO_EVENTS: readonly HookEvent[] = [];
 
@@ -41,13 +60,26 @@ const DESCRIPTION = [
   "happened. looper writes a file on this machine and sends nothing.",
 ].join("\n");
 
+const RELEASE_DESCRIPTION = [
+  "Let one report about looper leave this machine. It becomes a public page at looper's",
+  "makers, under the person's own name, and nothing of their project is in it.",
+  "",
+  'Call it with {"id":"...","title":"..."} after showing the person the report, with the',
+  "title exactly as looper wrote it. The person is asked every time and answers for",
+  "themselves: it is not yours to answer. On a yes looper says where its makers are. On a",
+  `no, tell the \`${REPORT_TOOL}\` tool {"kept":"<id>"} so nobody is asked again.`,
+].join("\n");
+
 const WRITTEN_WITH: readonly string[] = ["kind", "about", "wrong", "instead"];
 
 const WHAT_BECAME_OF_IT: Readonly<Record<State, string>> = {
   written: "nobody has said whether to send it",
+  released: "the person said it may leave",
   sent: "sent",
   kept: "kept here",
 };
+
+export type Asker = "agent" | "person";
 
 function listed(held: readonly Held[]): string {
   if (held.length === 0) return "nothing has been written here about looper yet.";
@@ -67,15 +99,30 @@ function glance(notOurs: readonly string[]): readonly string[] {
   ];
 }
 
-function answered(written: Written): string {
+function whatNext(root: string, asker: Asker, id: string, title: string): string {
+  if (offerIn(root).kind === "never") {
+    return `It stays on this machine: ${SAID_NEVER}.`;
+  }
+  if (asker === "person") {
+    const home = homeOf(looperRoot());
+    const where = home.kind === "named" ? ` Its makers are at ${home.address}.` : "";
+    return `Whether it goes any further is yours to decide.${where}`;
+  }
+  return [
+    `Show the person the report above, as it is. Then ask whether it may leave: the \`${RELEASE_TOOL}\` tool with {"id":"${id}","title":${JSON.stringify(title)}}.`,
+    `The person is asked directly, every time, so the yes is theirs and not yours to give. If they say no, tell looper: {"kept":"${id}"}.`,
+  ].join(" ");
+}
+
+function answered(root: string, asker: Asker, written: Written): string {
   if (written.kind === "written") {
     return [
       `Written: ${written.path}`,
       ``,
       written.body,
-      `Nothing was sent, and looper cannot send it. Show the person the report above, as it is. What happens to it is theirs to decide: looper's makers want to read it, and it can only reach them through a person.`,
+      `Nothing was sent, and looper cannot send it.`,
       ...glance(written.notOurs),
-      `When they have decided, tell looper: {"sent":"${written.id}"} or {"kept":"${written.id}"}.`,
+      whatNext(root, asker, written.id, written.title),
     ].join("\n");
   }
   if (written.kind === "already") {
@@ -123,8 +170,28 @@ export class Report implements Capability {
     this.home = home;
   }
 
-  inject(): readonly Injection[] {
-    return SILENT;
+  private said(root: string): string {
+    const held = heldIn(root, this.home);
+    if (held.kind === "unreadable") {
+      return `looper: what was written here about looper could not be read (${held.why}). ${A_FAULT_IN_LOOPER}`;
+    }
+    return unanswered(held.held.filter((one) => one.state === "written"));
+  }
+
+  inject(context: InjectContext): readonly Injection[] {
+    if (context.turn.session.kind === "unknown") return SILENT;
+    const offer = offerIn(context.root);
+    if (offer.kind === "never") return SILENT;
+    return [
+      {
+        source: this.name,
+        priority: REPORT_PRIORITY,
+        required: false,
+        notice: true,
+        waits: true,
+        text: offer.kind === "unclear" ? unclearSaid(offer.said) : this.said(context.root),
+      },
+    ];
   }
 
   hooks(): readonly HookEvent[] {
@@ -154,6 +221,19 @@ export class Report implements Capability {
           },
         },
       },
+      {
+        name: RELEASE_TOOL,
+        description: RELEASE_DESCRIPTION,
+        asksThePerson: true,
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "the id of the report" },
+            title: { type: "string", description: "the report's title, exactly as looper wrote it" },
+          },
+          required: ["id", "title"],
+        },
+      },
     ];
   }
 
@@ -172,7 +252,7 @@ export class Report implements Capability {
     return { done: false, text: `looper could not record that: ${outcome.why}. Nothing was changed.` };
   }
 
-  answer(root: string, args: ReadonlyMap<string, string>): Reply {
+  answer(root: string, args: ReadonlyMap<string, string>, asker: Asker): Reply {
     const sent = args.get("sent");
     if (sent !== undefined) return this.decided(root, sent, "sent");
     const kept = args.get("kept");
@@ -204,11 +284,37 @@ export class Report implements Capability {
     }
 
     const written = buildReport({ root, home: this.home, kind, about, wrong, instead, where });
-    return { done: written.kind === "written" || written.kind === "already", text: answered(written) };
+    return {
+      done: written.kind === "written" || written.kind === "already",
+      text: answered(root, asker, written),
+    };
+  }
+
+  private released(root: string, args: ReadonlyMap<string, string>, client: Client): string {
+    const id = args.get("id");
+    const title = args.get("title");
+    if (id === undefined || title === undefined) {
+      return "looper released nothing: releasing a report needs its id and its title, exactly as looper wrote them.";
+    }
+    const outcome = release({ root, home: this.home, id, title, client });
+    if (outcome.kind === "refused") return `looper released nothing: ${outcome.why}.`;
+    return [
+      `The person said yes: ${outcome.id} may leave this machine.`,
+      ``,
+      `Send the text below as an issue at ${outcome.address}, titled:`,
+      `  ${outcome.title}`,
+      `Send it as it is, with nothing added and nothing changed, using whatever you already use for that. If the same fault is already written up there, add this to it instead of opening another.`,
+      `Then tell looper it went: the \`${REPORT_TOOL}\` tool with {"sent":"${outcome.id}"}.`,
+      ``,
+      outcome.body,
+    ].join("\n");
   }
 
   call(request: ToolCall): ToolResult {
+    if (request.tool === RELEASE_TOOL) {
+      return { kind: "text", text: this.released(request.root, request.args, request.client) };
+    }
     if (request.tool !== REPORT_TOOL) return { kind: "unknown-tool", asked: request.tool };
-    return { kind: "text", text: this.answer(request.root, request.args).text };
+    return { kind: "text", text: this.answer(request.root, request.args, "agent").text };
   }
 }

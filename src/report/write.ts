@@ -10,6 +10,7 @@ import {
   LOOK_TOOL,
   PYTHON_EXTENSION,
   RECALL_TOOL,
+  RELEASE_TOOL,
   REPORT_DEPTH,
   REPORT_TOOL,
   RUST_EXTENSION,
@@ -64,6 +65,7 @@ const TOOLS: readonly string[] = [
   ALIGN_TOOL,
   LOOK_TOOL,
   REPORT_TOOL,
+  RELEASE_TOOL,
 ];
 
 const HOOKS: readonly string[] = [
@@ -173,6 +175,7 @@ export type Written =
   | {
       readonly kind: "written";
       readonly id: string;
+      readonly title: string;
       readonly path: string;
       readonly body: string;
       readonly notOurs: readonly string[];
@@ -391,10 +394,11 @@ export function buildReport(request: Request): Written {
     instead: request.instead,
     shape,
   });
+  const title = titleOf(part.name, request.wrong);
   const kept = keep(
     request.root,
     request.home,
-    { id, state: "written", on: today(), title: titleOf(part.name, request.wrong), print: printOf(body) },
+    { id, state: "written", on: today(), title, print: printOf(body) },
     body,
   );
   if (kept.kind !== "kept") return { kind: "refused", why: kept.why };
@@ -402,6 +406,7 @@ export function buildReport(request: Request): Written {
   return {
     kind: "written",
     id,
+    title,
     path: kept.path,
     body,
     notOurs: notLoopers(`${request.wrong}\n${request.instead}`, looperWords()),

@@ -6,7 +6,9 @@ change it is here.
 
 Nothing in this file is enforced. An agent working in a project that uses looper
 will **suggest** these routes when a rule gets in the way; it will not make you
-take them, and it will not open anything on your behalf.
+take them. It opens nothing on your behalf without your yes, and the yes is not
+the agent's to give: the question comes to you from Claude Code itself, every
+time, whatever mode the session is in.
 
 ## Using it in your own project
 
@@ -47,8 +49,21 @@ looper report --kind rule --about TS-ERROR:3 --file src/a.ts --line 12 \
 It writes a file under your home folder, never in your project: the shape the
 rule fired on and nothing else of yours — no identifiers, no paths, no logic —
 and the two sentences, which are refused if a word in them is written the way a
-name is written. Read the file. If you are content with it, open an issue and
-paste it. If you are not, delete it and nothing has left your machine.
+name is written. Read the file. Nothing has left your machine.
+
+Your agent shows you the report and then asks looper to release it. That
+request is the one thing it cannot do alone: you are asked directly, and only
+after your yes does looper say where its makers are, so the agent can file it
+as an issue there under your name. Say no and the file stays, and that fault is
+not brought up again. In a shell there is nobody to ask for you: open an issue
+and paste the file, or delete it.
+
+A project that never wants the offer says so once, in `law.toml`:
+
+```toml
+[report]
+offer = "never"
+```
 
 The same route takes any other fault of looper's own: a hook that failed
 (`--kind failed`), an answer that was untrue, a rule that stayed silent on code

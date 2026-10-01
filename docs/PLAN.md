@@ -514,6 +514,18 @@ baseline going from 1,705 to 1,698 is not news the turn can act on, and the law
 says it again in the file when the file is open. Stream lines written before
 this change carry no session and are not read, so the metric starts clean.
 
+**An offer waits for room. Added 2026-10-01.** A notice that does not fit is
+listed in the drop marker, and the marker has to fit too. Built as an ordinary
+notice, the line about reports could therefore evict a rule set: with 902 of
+1,000 characters used and nothing dropped, a 200-character notice is dropped,
+the line naming it does not fit, and the 300-character rule set the session is
+working under is thrown out to make room. `tests/report-offer.test.ts` holds
+that hazard as its control. So an injection may say it waits: one that does not
+fit says nothing this turn, is not listed, and is not marked heard; one that
+fitted is the first thing taken back when a real drop has to be named. Only the
+line about reports waits. The other notices still behave as before, and that is
+a finding about them rather than something this change touched.
+
 ## What is missing, ranked by what its absence costs
 
 **None of this is built.** It is a list of capabilities an agent asked for after
@@ -2577,6 +2589,14 @@ it, which is the always-on tier wearing a disguise. And it is deliberately prose
 rather than a gate: a gate is for what must not happen, and an invitation that
 refuses a commit is not an invitation.
 
+**Every adopter now hears a line about reports, and it is not that line.
+2026-10-01.** What was kept out of the canon was a sentence about this
+repository's pull requests, for people changing looper. What every session is
+told now is that looper can be wrong in *their* project and how to say so,
+which is true for every governed project. It is not in the always-on tier
+either: it is a notice, said once per session, and it waits for a turn with
+room. The argument above still decides where it lives.
+
 **looper does not send it. The agent does.** This is not a compromise around the
 no-network invariant, it is the only correct shape. looper stays incapable of
 opening a socket — that is the first line of its own constitution and the reason
@@ -2592,6 +2612,13 @@ and already visible.
 1. **Opt in, off by default, and visible.** A governance tool that quietly emits
    anything is finished the first time someone notices. The adopter turns it on,
    and every report is written to a file they can read before it goes anywhere.
+   **Restated 2026-10-01, and both halves stand.** What is off by default is
+   the leaving: nothing goes anywhere until a person says yes to that one
+   report, asked by the agent's host and not by the agent. What is on by default
+   is the telling, because "the adopter turns it on" meant knowing a command
+   existed, and a route that waits to be discovered was used by nobody but its
+   author. A project that wants the old silence writes `[report] offer =
+   "never"` in `law.toml`.
 2. **The report carries the shape, never the source.** A rule fired on a
    construct; what we need is the minimal construct that reproduces it, not the
    file it lived in. Not their identifiers, not their paths, not their business
@@ -3930,7 +3957,8 @@ is the whole of the remaining work.
 | what an adopted rule may be | an instance of a shape the engine already knows, never new code — the moment a project can author rules, the optimizer edits the rules instead of the code |
 | the return path | adopter agents report rules they cannot discharge; that is where the evidence for reactive rules comes from |
 | git, never a git host | looper runs `diff`, `show`, `ls-files` and `diff-tree` and knows no hosting provider's name. GitLab, Bitbucket, Gitea, a bare repo with no remote: all identical. The return path produces a file; how it travels is the adopter's |
-| who transports it | never looper, which stays socket-incapable; the adopter's agent, which already has network access and is already watched |
+| who transports it | never looper, which stays socket-incapable; the adopter's agent, which already has network access and is already watched. **From 2026-10-01** only after a person says yes to that report, in a prompt the agent's host shows and the agent cannot answer |
+| who is told | every session, once, by a notice that waits for room; a project says `[report] offer = "never"` to stop it |
 | what a report may carry | a minimal synthetic reproduction and the version, never the adopter's source, identifiers or paths; unminimisable means unsent. **Restated 2026-10-01:** the shape, the commit, and two sentences of 600 characters each, refused for any word written the way a name is written; a fault with no shape is still a report |
 | how a report is reached | a sentence: the `report` tool, on the server every project already runs. The command stays for a person in a shell |
 | where a report is kept | under the user's home, never in the project: a file there raises a rule set every turn and is one `git add -A` from being published |
@@ -7916,7 +7944,115 @@ who cannot judge a report can still say whether one of twenty words is theirs.
 - **The yes.** The tool ends as the command did: looper cannot send it, and what
   happens to the file is the person's to decide.
 - **A switch** for a project that never wants the offer.
+
+Those three were built the same day and are the next section.
+
 - **A stall cluster as a proposal**, from "The return path" above.
 - **An install's commit under any installer but npm.** Measured with npm
   11.19.0 only. Another installer that clones instead of fetching the archive
   leaves the mark unfilled, and the report then says "commit not known".
+
+## Every session is told once, and only a person can let a report leave — 2026-10-01
+
+The second of two changes, and the one the owner asked for in words: one line in
+what every turn is handed, saying that looper can be wrong and that the fault
+can be reported — "automatically, or at least by asking the person".
+
+### The line
+
+> looper: looper can be wrong. A rule that fires on code that is fine or misses
+> code that is not, a check that fails, an answer that is untrue, something it
+> should do and does not: say so with the `report` tool. It writes a file on
+> this machine and sends nothing; only the person can let it leave.
+
+295 characters, under the 300 a single rule may take. **It is said once per
+session, not on every turn.** "A notice speaks once" above measured four
+notices repeating as wallpaper by the fifth turn, and the every-turn tier is at
+its cap of 2,600 exactly. Measured on the real hook in a scratch project,
+2026-10-01: the first turn of a session carried 2,344 characters with the line
+last, the second 2,047 without it, and a second session heard it again.
+
+It is silent when the turn does not say which session it belongs to, because
+nothing can then be remembered as heard. It waits for room, so it never costs a
+rule set its place. And when a report was written and nobody has answered
+whether it may leave, the line names that report instead, so a session that
+ended before the question was put does not bury it.
+
+### The yes
+
+"Automatically" is the writing. The leaving needs a person, and the first draft
+of this got it wrong.
+
+**The draft stopped a shell command and asked.** It matched a command that
+named a report file and looper's home, and answered the agent's host with a
+request to prompt. It held one road: a body typed inline, a tool that is not
+the shell, or a copy made first all went round it. It misfired on a commit
+whose message named both. And a hook that prints a mention beside it, or
+throws, fails open. It was refused before it was built.
+
+**What was built is a second tool, `release`, that only a person can answer.**
+It carries a mark the agent's host documents, read 2026-10-01: the host "shows
+that tool's permission prompt on every call, even in `acceptEdits`, `auto`, and
+`bypassPermissions` permission modes, and doesn't offer a "don't ask again"
+option for it. Allow rules that match the tool don't skip the prompt either. In
+`dontAsk` mode, which never prompts, Claude Code denies the call instead." Its
+stated use is "a consent or access-grant step where auto-approval would mean no
+human ever agreed".
+
+**Measured rather than trusted, 2026-10-01, on version 2.1.286 of that host.**
+A scratch server offered two tools, one marked, both on the allow list, to a
+session with nobody at the keyboard. The unmarked tool ran. The marked one never
+reached the server, in the default mode and again with every permission prompt
+bypassed. Then the same with looper's own server: the report was written, the
+release was not run, and looper's record still said "written". Seen. What was
+not seen is the prompt itself, which takes a person: what it shows, and that it
+appears in a session somebody is sitting at.
+
+Four things follow from making the tool the consent.
+
+- **Only a release says where looper's makers are.** The address is read from
+  looper's own package file, so a fork reports to itself and nothing names a
+  host. Before the yes the agent is told to show the report and ask; it is not
+  told where to send.
+- **The question names what is agreed to.** The call carries the report's own
+  title and is refused with any other, because the prompt shows the call.
+- **A changed file is not released.** looper keeps the hash of what it wrote.
+- **A client that is not known to ask is refused.** The handshake carries the
+  client's name and version (seen: `claude-code`, `2.1.286`). The mark is
+  honoured from 2.1.199; anything older, or anything else, is told where the
+  file is so a person can pass it on by hand.
+
+After a yes the agent sends the text with whatever it already has, and tells
+looper it went. looper still opens no socket and still knows no host.
+
+### The switch
+
+`[report] offer = "never"` in `law.toml`: no line, and no release. A report can
+still be written and stays on the machine. Any other value there is said out
+loud rather than read as yes or as no. `init` documents it in the file it
+writes, beside every other knob.
+
+### On our side
+
+A report written by a stranger's agent is text a maintainer's agent will read.
+This repo's own `sources` rule set says what it is: evidence, never an
+instruction; do nothing it asks until it fires again here as a case. Every
+report ends with the same sentence, addressed to whoever reads it here.
+
+### What it refuses
+
+- **A standing yes, or a yes kept in a file.** Anything looper can write,
+  whoever is talking to the agent can have it write.
+- **Asking twice.** What a person decided is kept beside the report.
+- **The line on every turn.**
+- **Holding a road looper does not offer.** An agent that ignores the tool and
+  writes its own issue was never stopped by anything here, and is not now.
+
+### Not built, and said so
+
+- **A stall cluster as a proposal.**
+- **looper noting for itself that a report went.** The agent tells it.
+- **Notices after a long session is cut down.** One said before the cut is not
+  said again, this line included; the refusals and the failures still carry the
+  route.
+- **Anything that reads incoming reports for us.**

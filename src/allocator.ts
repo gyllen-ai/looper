@@ -100,6 +100,7 @@ export function allocate(
   const contributors: string[] = [];
   const weighed: Weighed[] = [];
   const dropped: Weighed[] = [];
+  const waiting = new Set<string>();
   let used = 0;
 
   const take = (injection: Injection): void => {
@@ -125,8 +126,10 @@ export function allocate(
     const separator = parts.length === 0 ? 0 : INJECTION_SEPARATOR.length;
     if (used + separator + injection.text.length <= context.budget) {
       take(injection);
+      if (injection.waits === true) waiting.add(injection.source);
       continue;
     }
+    if (injection.waits === true) continue;
     dropped.push({
       source: injection.source,
       chars: injection.text.length,
@@ -151,7 +154,7 @@ export function allocate(
       break;
     }
     used -= last.length + INJECTION_SEPARATOR.length;
-    dropped.push(held);
+    if (!waiting.has(name)) dropped.push(held);
   }
 
   for (const name of contributors) {

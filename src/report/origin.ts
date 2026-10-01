@@ -96,3 +96,27 @@ export function namesOf(root: string): Names {
   const remotely = remote.kind === "named" ? [remote.address] : [];
   return { kind: "named", names: [basename(root), ...packaged.names, ...remotely] };
 }
+
+export type Home =
+  | { readonly kind: "unknown"; readonly why: string }
+  | { readonly kind: "named"; readonly address: string };
+
+const WRITTEN_FOR_GIT = /^git\+/;
+
+const A_REPOSITORY_ENDING = /\.git$/;
+
+export function homeOf(looperRoot: string): Home {
+  const path = join(looperRoot, "package.json");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (cause) {
+    return { kind: "unknown", why: `looper's own package.json could not be read (${reasonFrom(cause)})` };
+  }
+  const held = fieldAt(parsed, "repository");
+  const url = typeof held === "string" ? held : fieldAt(held, "url");
+  if (typeof url !== "string" || url.length === 0) {
+    return { kind: "unknown", why: "looper's own package.json names no repository" };
+  }
+  return { kind: "named", address: url.replace(WRITTEN_FOR_GIT, "").replace(A_REPOSITORY_ENDING, "") };
+}
