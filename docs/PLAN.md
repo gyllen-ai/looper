@@ -8268,6 +8268,11 @@ came with it.
   one of ten ways (`rev-parse`, `diff`, `grep`, `config --get` and six more), or
   nothing is started. A list of words held in a variable went past every check
   that read the source; this is checked when it runs.
+- **A revision written like an option is not one.** The command that compares
+  against a named revision takes the name from whoever typed it, and a name
+  beginning with a dash was read by git as an order: `--output=` made it write
+  a file. That was true before this change. Such a name is now refused before
+  git is started.
 - **The difference is always git's own.** With a program of the user's put in
   charge of showing differences, the gate that reads what is about to be
   committed for credentials read nothing and passed. That was true before this
@@ -8281,7 +8286,9 @@ came with it.
   the suite, stops with 128. The reviewer read in git's source that older ones
   answer anyway even when the fetch itself fails; none was run here. git's
   complaint on the way out is now enough to call the answer unknown, whatever
-  it exits with.
+  it exits with. Only a line git itself marks as a failure counts: the first
+  version listened for words anywhere in what git said, and a warning that
+  quoted a file's name, with those words in the name, threw a good answer away.
 
 ### The C# build
 
@@ -8382,6 +8389,9 @@ needs no import, passed, and so did an import put together while running.
 - **Programs the user has told git to run.** A file-watcher or a hook of the
   user's own is started by git when git is asked about the working tree. Those
   are theirs, on their machine, and were not changed.
+- **A git that speaks another language.** Its failure lines are read in
+  English. One that exits 0 with a short answer and says so in another language
+  is not noticed.
 - **What was not run:** an older git, an older version of the tool in front of
   cargo, and any system but Linux for the measurements.
 - **That no packet leaves.** The promise is about looper and the programs it

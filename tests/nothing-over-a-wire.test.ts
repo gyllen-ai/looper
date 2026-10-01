@@ -6,7 +6,17 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 
 import { searchPath } from "../src/config.ts";
-import { everyWordAt, gitCouldNotAnswer, stagedAdditions, whyGitCouldNot } from "../src/git.ts";
+import {
+  additionsAgainst,
+  additionsInHand,
+  changedLines,
+  everyWordAt,
+  gitCouldNotAnswer,
+  isAncestorIn,
+  stagedAdditions,
+  tagsPointingAt,
+  whyGitCouldNot,
+} from "../src/git.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -148,6 +158,79 @@ test("an answer git gave while saying it could not read every file is not taken 
     if (answered.status !== 0) return;
     assert.ok(String(answered.stdout).includes("upstream"), "this git is one that answers anyway, with the words of the three files it has");
     assert.ok(whyGitCouldNot(answered).includes("made without the contents"), whyGitCouldNot(answered));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("what git said when it could not answer is passed on as the one line that says why", () => {
+  const dir = mkdtempSync(join(tmpdir(), "looper-no-wire-"));
+  try {
+    const nowhere = everyWordAt(dir, "origin/main", []);
+    assert.equal(nowhere.kind, "cannot-tell");
+    if (nowhere.kind !== "cannot-tell") return;
+    assert.ok(nowhere.why.includes("not a git repository"), `the reason used to be the command line that failed, which says what looper asked and not why git refused: ${nowhere.why}`);
+
+    const staged = stagedAdditions(dir);
+    assert.equal(staged.kind, "unavailable");
+    if (staged.kind !== "unavailable") return;
+    assert.equal(staged.why.split("\n").length, 1, `outside a repository git answers a question about differences with a page of its own usage, and all of it was passed on: ${staged.why}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a revision that is written like an option is not handed to git as one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "looper-no-wire-"));
+  try {
+    const root = repository(join(dir, "project"));
+    writeFileSync(join(root, "a.txt"), "first\n");
+    git(root, "add", "a.txt");
+    git(root, "commit", "-q", "-m", "first");
+    writeFileSync(join(root, "a.txt"), "first\nsecond\n");
+    const written = join(dir, "written-by-git");
+    const asOption = `--output=${written}`;
+
+    const answers = [
+      additionsInHand(root, asOption).kind,
+      additionsAgainst(root, asOption).kind,
+      everyWordAt(root, asOption, []).kind,
+      isAncestorIn(root, asOption, "HEAD").kind,
+      isAncestorIn(root, "HEAD", asOption).kind,
+      tagsPointingAt(root, asOption).kind,
+    ];
+
+    assert.ok(
+      !existsSync(written),
+      "git was asked for the difference against a revision, the revision began with a dash, and git read it as an order to write a file. The command that compares against a named revision takes that name from whoever typed it",
+    );
+    assert.deepEqual(answers, ["unavailable", "unavailable", "cannot-tell", "cannot-tell", "cannot-tell", "cannot-tell"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a warning from git that happens to quote a file's name does not turn a good answer into no answer", () => {
+  const dir = mkdtempSync(join(tmpdir(), "looper-no-wire-"));
+  try {
+    const root = repository(join(dir, "project"));
+    git(root, "config", "core.autocrlf", "input");
+    const named = "could not fetch, unable to read, not allowed.txt";
+    writeFileSync(join(root, named), "first\n");
+    git(root, "add", ".");
+    git(root, "commit", "-q", "-m", "first");
+    writeFileSync(join(root, named), "first\r\nsecond\r\n");
+
+    const warned = spawnSync("git", ["diff", "-U0", "--", named], { cwd: root, encoding: "utf8" });
+    assert.ok(String(warned.stderr).includes("warning:") && warned.status === 0, `the control: git answers and warns in the same breath: ${String(warned.stderr)}`);
+
+    const touched = changedLines(root, named, "commit");
+
+    assert.equal(
+      touched.kind,
+      "lines",
+      `git's warning named the file, the file's name held the words looper listens for, and a good answer was thrown away: ${JSON.stringify(touched)}`,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
