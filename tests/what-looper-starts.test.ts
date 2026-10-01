@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PYTHON_COMMAND, environmentWith } from "../src/config.ts";
@@ -9,6 +11,8 @@ import { isNode, parseSource, type Node } from "../src/law/ts/parse.ts";
 import { askGit } from "../src/start.ts";
 import { ourFiles } from "./our-files.ts";
 import { STARTS_A_PROCESS, sourceOf } from "./reaches.ts";
+
+const NAMED_ANYHOW = "child_process";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -82,7 +86,7 @@ function startsIn(text: string): readonly Start[] {
 
 test("one file names the module that starts other programs, however the name is spelled", () => {
   const naming = ourFiles()
-    .filter((file) => readFileSync(file, "utf8").includes(STARTS_A_PROCESS))
+    .filter((file) => readFileSync(file, "utf8").includes(NAMED_ANYHOW))
     .map((file) => file.slice(ROOT.length + 1));
 
   assert.deepEqual(
@@ -98,11 +102,14 @@ test("that file starts six things, and nothing can be started through another na
   assert.equal(parsed.kind, "parsed");
   if (parsed.kind !== "parsed") return;
 
-  const brought = every(parsed.root, "ImportSpecifier")
-    .filter((one) => STARTERS.includes(nameOf(one["imported"])))
-    .map((one) => `${nameOf(one["imported"])} as ${nameOf(one["local"])}`)
-    .sort();
-  assert.deepEqual(brought, STARTERS.map((name) => `${name} as ${name}`), "each is brought in under its own name, once");
+  const brought = every(parsed.root, "ImportDeclaration")
+    .filter((one) => sourceOf(one["source"], text) === `"${STARTS_A_PROCESS}"`)
+    .map((one) => sourceOf(one, text));
+  assert.deepEqual(
+    brought,
+    [`import { execFileSync, spawnSync, type SpawnSyncReturns } from "${STARTS_A_PROCESS}";`],
+    "the module is brought in once, as two starters and one type, each under its own name. A third starter, or the whole module under one name, was taken in beside these and this test did not look",
+  );
 
   const started = startsIn(text);
   assert.deepEqual(
@@ -146,6 +153,11 @@ test("what looper adds to a program's environment wins over what was already the
 
 test("git is asked only to read, whatever words it is handed", () => {
   const refused: readonly (readonly string[])[] = [
+    ["merge-base", "HEAD", "HEAD"],
+    ["status"],
+    ["status", "--short"],
+    ["config", "--list"],
+    ["tag", "--list"],
     ["fetch", "origin"],
     ["pull"],
     ["push"],
@@ -158,14 +170,38 @@ test("git is asked only to read, whatever words it is handed", () => {
     [],
   ];
 
-  for (const args of refused) {
-    assert.throws(
-      () => askGit(ROOT, args),
-      NotSomethingLooperStarts,
-      `git ${args.join(" ")} was started. The words come from other files, so a list handed over as a variable went past every check that read the source`,
-    );
+  const root = mkdtempSync(join(tmpdir(), "looper-starts-"));
+  try {
+    for (const words of [["init", "-q"], ["config", "user.email", "t@example.com"], ["config", "user.name", "t"]]) {
+      execFileSync("git", words, { cwd: root, stdio: "ignore" });
+    }
+    writeFileSync(join(root, "a.txt"), "first\n");
+    execFileSync("git", ["add", "a.txt"], { cwd: root, stdio: "ignore" });
+    execFileSync("git", ["commit", "-q", "-m", "first"], { cwd: root, stdio: "ignore" });
+
+    for (const args of refused) {
+      assert.throws(
+        () => askGit(root, args),
+        NotSomethingLooperStarts,
+        `git ${args.join(" ")} was started. The words come from other files, so a list handed over as a variable went past every check that read the source`,
+      );
+    }
+    const openings: readonly (readonly string[])[] = [
+      ["rev-parse", "HEAD"],
+      ["status", "--porcelain"],
+      ["ls-files"],
+      ["diff", "--cached", "--name-only"],
+      ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+      ["show", ":a.txt"],
+      ["grep", "-h", "-o", "-E", "[a-z]+", "HEAD", "--"],
+      ["merge-base", "--is-ancestor", "HEAD", "HEAD"],
+      ["tag", "--points-at", "HEAD"],
+    ];
+    for (const args of openings) {
+      assert.equal(askGit(root, args).status, 0, `git ${args.join(" ")} is one of the ten ways looper asks, and it was refused or failed`);
+    }
+    assert.equal(askGit(root, ["config", "--get", "user.name"]).stdout.trim(), "t");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
-  const head = askGit(ROOT, ["rev-parse", "HEAD"]);
-  assert.equal(head.status, 0, String(head.stderr));
-  assert.match(String(head.stdout).trim(), /^[0-9a-f]{40}$/);
 });

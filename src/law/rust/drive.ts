@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
-import { RUST_ENGINE_DIR } from "../../config.ts";
-import { fieldAt, reasonFrom } from "../../fields.ts";
+import { A_FAILURE_IS_QUOTED_UP_TO, RUST_ENGINE_DIR } from "../../config.ts";
+import { failureOf, fieldAt, reasonFrom } from "../../fields.ts";
 import { buildRustReader, readerAt, runReader } from "../../start.ts";
 import { freshnessOf } from "../engine-age.ts";
 
@@ -41,7 +41,7 @@ export function buildEngine(looperRoot: string): Judged {
   } catch (cause) {
     return {
       kind: "unavailable",
-      detail: `looper's Rust half would not build (${reasonFrom(cause)})`,
+      detail: `looper's Rust half would not build: cargo ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}`,
     };
   }
   return { kind: "found", hits: [], names: [] };
@@ -74,7 +74,7 @@ function ranWith(looperRoot: string, args: readonly string[]): Judged {
   } catch (cause) {
     const said = fieldAt(cause, "stdout");
     if (typeof said !== "string" || said.length === 0) {
-      return { kind: "unavailable", detail: reasonFrom(cause) };
+      return { kind: "unavailable", detail: `the Rust reader ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}` };
     }
     output = said;
   }
@@ -139,7 +139,7 @@ export function shapeFromRust(
   try {
     output = runReader(looperRoot, "rust", ["--shape", path, String(line), String(depth)]);
   } catch (cause) {
-    return { kind: "unavailable", detail: `the Rust reader would not run (${reasonFrom(cause)})` };
+    return { kind: "unavailable", detail: `the Rust reader ${failureOf(cause, A_FAILURE_IS_QUOTED_UP_TO)}` };
   }
   try {
     return { kind: "found", payload: JSON.parse(output) };

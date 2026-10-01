@@ -236,37 +236,33 @@ test("a warning from git that happens to quote a file's name does not turn a goo
   }
 });
 
-const SOURCE_OF_STARTS = readFileSync(join(ROOT, "src", "start.ts"), "utf8");
+test("a file the user has git turn into text before comparing is still read as that text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "looper-no-wire-"));
+  try {
+    const root = repository(join(dir, "project"));
+    const turns = join(dir, "into-text.sh");
+    writeFileSync(turns, "#!/bin/sh\ntr -d '\\000' < \"$1\"\n");
+    chmodSync(turns, 0o755);
+    writeFileSync(join(root, ".gitattributes"), "*.dat diff=dat\n");
+    git(root, "config", "diff.dat.textconv", turns);
+    writeFileSync(join(root, "held.dat"), "first\u0000\n");
+    git(root, "add", ".");
+    git(root, "commit", "-q", "-m", "first");
+    writeFileSync(join(root, "held.dat"), "first\u0000\nthe line that was added\n");
+    git(root, "add", "held.dat");
 
-test("git is told in two ways that no transport is allowed, because the first way can be outranked", () => {
-  assert.ok(SOURCE_OF_STARTS.includes('["-c", "protocol.allow=never"]'), "the switch every version of git understands");
-  assert.ok(
-    SOURCE_OF_STARTS.includes('GIT_ALLOW_PROTOCOL: ""'),
-    "set and empty, this allows no transport and outranks the user's configuration; left unset, one line of that configuration switches a transport back on",
-  );
-});
+    const staged = stagedAdditions(root);
 
-const WHAT_THE_BUILD_IS_TOLD: readonly (readonly [string, string])[] = [
-  ['DOTNET_CLI_TELEMETRY_OPTOUT: "1"', "the SDK sends usage data to its maker on every build unless it is told not to"],
-  ['DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE: "true"', "and looks for newer workload manifests in the background"],
-  ['NUGET_CERT_REVOCATION_MODE: "offline"', "restoring a signed package looks up the signer's revocation hosts: 24 lookups on a first build, seen"],
-  ['"-p:NuGetAudit=false"', "the audit asks every source for known vulnerabilities, and a source can arrive from the environment"],
-  ['"-p:RestoreAdditionalProjectSources="', "an environment variable of that name is a source: 6 lookups, seen"],
-  ['"-p:RestoreConfigFile=NuGet.config"', "only the reader's own configuration is read, so the user's sources are never asked"],
-  ['"-p:ImportDirectoryBuildProps=false"', "a file in the user's project, above node_modules, is otherwise part of this build"],
-  ['"-p:ImportDirectoryBuildTargets=false"', "and so is its twin"],
-  ['"-p:ImportDirectoryPackagesProps=false"', "a project that manages its package versions in one place otherwise stops this build"],
-  ['"-noAutoResponse"', "switches in a file above are otherwise added to this command line"],
-];
-
-test("the C# build is started with every word that was measured to keep it at home", () => {
-  for (const [word, why] of WHAT_THE_BUILD_IS_TOLD) {
-    assert.ok(SOURCE_OF_STARTS.includes(word), `${word} is gone from the build: ${why}`);
+    assert.equal(staged.kind, "lines");
+    if (staged.kind !== "lines") return;
+    assert.deepEqual(
+      staged.added.map((one) => one.text),
+      ["the line that was added"],
+      "the first cure for a user's own difference program also switched off the user's way of reading a binary file as text, and the gate that reads a commit for credentials then read nothing in such a file",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  assert.ok(
-    !SOURCE_OF_STARTS.includes("DOTNET_SDK_VULNERABILITY_CHECK_DISABLE"),
-    "that name was set by the first version of this change and is in no file of the SDK: it did nothing, and a guard that does nothing is worse than none because somebody believes it",
-  );
 });
 
 test("the C# reader's folder shields its build from the project it is installed in", () => {
@@ -279,14 +275,6 @@ test("the C# reader's folder shields its build from the project it is installed 
   );
   const config = readFileSync(join(engine, "NuGet.config"), "utf8");
   assert.match(config, /<auditSources>\s*<clear \/>\s*<\/auditSources>/, "the user's audit sources are otherwise asked about looper's packages");
-});
-
-test("cargo is started so that the tool in front of it cannot go and download a compiler", () => {
-  assert.ok(
-    SOURCE_OF_STARTS.includes('RUSTUP_AUTO_INSTALL: "0"'),
-    "a project that pins a compiler version nobody has installed made looper's build fetch it: one lookup of the compiler's download host, seen",
-  );
-  assert.ok(SOURCE_OF_STARTS.includes("RUSTUP_TOOLCHAIN"), "and the build is pointed at the compiler that is installed, so it still builds");
 });
 
 function looper(args: readonly string[], cwd: string, more: Readonly<Record<string, string>>): string {
@@ -345,6 +333,8 @@ function loadedBy(script: readonly string[], input: string, cwd: string, home: s
 
 const A_PROGRAM_THAT_ONLY_STARTS_OTHERS = ["--input-type=module", "-e", 'await import("node:child_process"); await import("node:readline");'];
 
+const A_PROGRAM_THAT_COULD_SPEAK = ["--input-type=module", "-e", 'await import("node:child_process"); await import("node:https");'];
+
 test("no looper run loads a module that could speak, beyond what Node loads for any program that starts another", () => {
   const dir = mkdtempSync(join(tmpdir(), "looper-loaded-"));
   try {
@@ -362,15 +352,26 @@ test("no looper run loads a module that could speak, beyond what Node loads for 
       [["hook", "PreToolUse"], JSON.stringify({ session_id: "s", tool_name: "Bash", tool_input: { command: "git push" } })],
       [["hook", "Stop"], JSON.stringify({ session_id: "s" })],
       [["hook", "PreCommit"], ""],
-      [["serve"], `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n${call("report")}${call("recall")}${call("decisions")}`],
+      [
+        ["serve"],
+        `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n${["report", "release", "recall", "decisions", "doctrine", "align", "look"].map(call).join("")}`,
+      ],
       [["report", "--list"], ""],
       [["status"], ""],
       [["law"], ""],
       [["loop"], ""],
       [["strangers"], ""],
       [["init"], ""],
+      [["adopt"], ""],
+      [["align"], ""],
+      [["look"], ""],
     ];
     const anyway = new Set(loadedBy(A_PROGRAM_THAT_ONLY_STARTS_OTHERS, "", project, home));
+    assert.ok(anyway.size > 0, "the control loaded nothing this test knows how to name, so the names have changed and every comparison below is against nothing");
+    assert.ok(
+      loadedBy(A_PROGRAM_THAT_COULD_SPEAK, "", project, home).some((name) => !anyway.has(name)),
+      "a program that does load a module that speaks was not noticed. Whatever this test reads has changed its names, and it would pass every looper there could be",
+    );
 
     for (const [args, input] of runs) {
       const spoke = loadedBy([join(ROOT, "bin", "looper.js"), ...args], input, project, home).filter((name) => !anyway.has(name));

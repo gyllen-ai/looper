@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 import {
   A_READER_MAY_ANSWER_WITH,
@@ -13,11 +13,10 @@ import {
   RUST_ENGINE_DIR,
   RUST_ENGINE_NAME,
   environmentWith,
+  saidByTheUser,
   whereRustupLives,
 } from "./config.ts";
 import { NotSomethingLooperStarts } from "./errors.ts";
-import { reasonFrom } from "./fields.ts";
-import { ROOT_SECTION, parseToml, tableIn } from "./toml.ts";
 
 export type Answered = SpawnSyncReturns<string>;
 
@@ -46,7 +45,7 @@ const GIT_ONLY_READS: readonly (readonly string[])[] = [
   ["status", "--porcelain"],
 ];
 
-const THE_DIFFERENCE_ITSELF: readonly string[] = ["diff", "--no-ext-diff", "--no-textconv"];
+const THE_DIFFERENCE_ITSELF: readonly string[] = ["diff", "--no-ext-diff"];
 
 function opensWith(args: readonly string[], opening: readonly string[]): boolean {
   return opening.every((word, at) => args[at] === word);
@@ -75,31 +74,29 @@ export function readerAt(looperRoot: string, which: Reader): string {
     : join(looperRoot, CSHARP_ENGINE_DIR, "bin", "Release", "net10.0", CSHARP_ENGINE_NAME);
 }
 
-type Compiler =
-  | { readonly kind: "not-known"; readonly why: string }
-  | { readonly kind: "installed"; readonly name: string };
-
 const RUSTUP_SETTINGS = "settings.toml";
 
-function installedCompiler(): Compiler {
+const THE_USERS_OWN_CHOICE = "RUSTUP_TOOLCHAIN";
+
+const WHERE_SECTIONS_BEGIN = /^\s*\[/m;
+
+const NAMES_THE_COMPILER = /^default_toolchain\s*=\s*"([A-Za-z0-9._-]+)"\s*$/m;
+
+function installedCompiler(): string {
   const home = whereRustupLives();
   const settings = join(home, RUSTUP_SETTINGS);
-  if (!existsSync(settings)) return { kind: "not-known", why: `there is no ${settings}` };
-  try {
-    const named = tableIn(parseToml(readFileSync(settings, "utf8"), settings), ROOT_SECTION).get("default_toolchain");
-    if (typeof named !== "string" || !existsSync(join(home, "toolchains", named))) {
-      return { kind: "not-known", why: `${settings} names no compiler that is installed` };
-    }
-    return { kind: "installed", name: named };
-  } catch (cause) {
-    return { kind: "not-known", why: reasonFrom(cause) };
-  }
+  if (!isAbsolute(home) || !existsSync(settings)) return "";
+  const written = readFileSync(settings, "utf8");
+  const sections = WHERE_SECTIONS_BEGIN.exec(written);
+  const named = NAMES_THE_COMPILER.exec(sections === null ? written : written.slice(0, sections.index))?.[1];
+  if (named === undefined || !existsSync(join(home, "toolchains", named))) return "";
+  return named;
 }
 
 function rustStaysHome(): Readonly<Record<string, string>> {
-  const installed = installedCompiler();
-  if (installed.kind === "not-known") return { RUSTUP_AUTO_INSTALL: "0" };
-  return { RUSTUP_AUTO_INSTALL: "0", RUSTUP_TOOLCHAIN: installed.name };
+  const pointAt = saidByTheUser(THE_USERS_OWN_CHOICE).length > 0 ? "" : installedCompiler();
+  if (pointAt.length === 0) return { RUSTUP_AUTO_INSTALL: "0" };
+  return { RUSTUP_AUTO_INSTALL: "0", RUSTUP_TOOLCHAIN: pointAt };
 }
 
 export function buildRustReader(looperRoot: string): void {

@@ -8276,7 +8276,10 @@ came with it.
 - **The difference is always git's own.** With a program of the user's put in
   charge of showing differences, the gate that reads what is about to be
   committed for credentials read nothing and passed. That was true before this
-  change. Every `diff` now refuses the outside program.
+  change. Every `diff` now refuses the outside program. The first cure also
+  switched off the user's way of having git read a binary file as text, and the
+  second reviewer showed what that cost: a key inside such a file had been
+  read, and no longer was. That half was taken back out.
 - **The reason is git's.** A clone made without contents is said to be that,
   where it used to be told that the scan had run out of time and to mark its
   folders as generated. And some versions of git do not stop when they cannot
@@ -8336,7 +8339,16 @@ it: one lookup of the compiler's download host.
 **Now:** it is told not to install anything, and pointed at the compiler its own
 settings file names as installed. Seen: 0 lookups, and the reader builds with
 the compiler that is there. An older version of that tool may not know the first
-setting; none was run here, and the second is what holds there.
+setting; none was run here, and the second is what holds there. A compiler the
+user has named in their own environment is left as they named it: it already
+outranks a project's pin, and if it is not installed nothing is fetched and the
+Rust half says it could not be built. The settings file is read for its one
+line; read whole, a folder name with an equals sign in it stopped the reading
+and no compiler was named at all.
+
+What the reader says when it fails is quoted at its end and up to 600
+characters, as the C# reader's always was. Keeping what it said on the way out
+had made one failure 32,484 characters where it had been 193.
 
 ### Python
 
@@ -8358,34 +8370,70 @@ quotes, as a list of words handed to git, and after the switch. The scan for
 sockets looked for seven module names inside double quotes, so `fetch`, which
 needs no import, passed, and so did an import put together while running.
 
+**Then:** one file starts programs, `src/start.ts`, and the module that does it
+is named in no other. The scan was rewritten to read the code and not its
+spelling, as a list of what must not be written. Twenty-two changes were made
+by hand to a copy, one at a time, and the suite stopped on each.
+
+**Found again, by a second reviewer, with a listener on the same machine:** a
+connection still got through the scan, the run-time check and the whole suite.
+A list of what must not be written is as long as the reviewer's patience. The
+module that loads looper's own source can also load anything by name, and was
+reached through its own name; `process` was held in a variable and asked for a
+module; a file ending `.mjs` was put beside the others, which the scan did not
+read; the first line of a Python reader became `import socket`; and the package
+file was given a table that makes a harmless name stand for the socket module.
+In the one file that starts programs, a third starter was brought in beside the
+two the test knew. And a dozen changes passed every test, because several tests
+checked that a word was written in the file and not that the program was
+handed it: git started without the switch, Python with one flag of two, the
+build with other words.
+
 **Now:**
 
-- **One file starts programs**, `src/start.ts`, and the module that does it is
-  named in no other. It starts six things: git, cargo, dotnet, python, the two
-  readers looper built itself, and the one line a project declared as its own
-  check. Each with its environment fixed there.
-- **The scan reads the code, not its spelling.** Any import, in any form, of
-  anything that connects or listens; an import whose name is put together; the
-  functions that connect with no import; and the ways of taking one of Node's
-  own modules without importing it. `tests/no-network.test.ts` holds seventeen
-  spellings it must refuse and five pieces of ordinary code it must leave alone,
-  and reads the installed tree the same way.
-- **What a run loads is compared with a program that only starts others.**
-  Twelve real runs of looper may load nothing that could speak beyond what that
-  program loads, so the list of what Node loads anyway is Node's own.
-- **Twenty-two changes were then made by hand, one at a time, to a copy** —
-  every one the reviewer had made, and more — and the suite stopped on each. One
-  of them found a fault in the test itself: a looper that could not load loaded
-  nothing, and passed.
+- **The scan is a list of what may be written.** Six modules may be loaded
+  anywhere, one more only in `src/start.ts` and one only in `bin/looper.js`,
+  where it is used for two things. A file of looper's own may be imported if it
+  is one, in `src` or `bin`, of a kind the scan reads. `process` may be asked
+  for eleven things and held in nothing. Thirteen names are never written.
+  Reaching for a function's constructor is refused. Everything else is, too.
+  `tests/no-network.test.ts` holds thirty-eight ways round it that must be
+  refused, eleven pieces of ordinary code that must pass, and one sample for
+  every name on every list, so none can be dropped unnoticed.
+- **The folders hold only kinds of file something reads**, the package file
+  gives no name a second meaning, and the two Python readers load five modules
+  of the standard library and nothing else.
+- **What each program is handed is written down by a stand-in.** A test puts its
+  own `git`, `cargo`, `dotnet` and `python3` first on the path, each of which
+  records its words, its environment and its folder, and looper's real code is
+  run against them. The words that were measured are the words that arrive.
+- **What a run loads is compared with a program that only starts others**, over
+  fifteen real runs and seven tools. A program that does load a module that
+  speaks must be noticed, or the test fails: without that, a Node that renamed
+  its modules would have passed every looper there could be.
+- **Thirty-seven more changes were made by hand to a copy** — every way through
+  the second reviewer found, each change that had passed, and changes to the
+  scan itself — and the suite stopped on each.
+
+The scan refuses some ordinary code: a variable called `fetch`, a type imported
+from a module that connects. Nothing in looper is called that, and the price of
+naming things otherwise is small.
 
 ### What this does not claim
 
 - **A project's own checks.** `looper loop` runs the lines a project declared.
   What those lines reach is the project's decision, and looper never runs them
   from a hook.
-- **Code written to defeat the scan.** A name hidden well enough is not found by
-  reading. The scan is against accident and against a dependency that changes;
-  the run-time check covers the roads it walks.
+- **Code written to defeat the scan.** A property asked for by a name put
+  together, on an object that is not one of the few the scan watches, is not
+  found by reading. The scan is against accident and against a dependency that
+  changes. The run-time check covers the roads it walks, which are every
+  command and seven tools with nothing in hand; a module loaded only deep in
+  one branch of one of them is not walked. And it cannot see the two modules
+  that open a socket, because Node loads both for any program that starts
+  another.
+- **Programs the user has told git to run to read a file as text.** They are
+  theirs, and the credential gate reads what they print.
 - **Programs the user has told git to run.** A file-watcher or a hook of the
   user's own is started by git when git is asked about the working tree. Those
   are theirs, on their machine, and were not changed.

@@ -425,8 +425,12 @@ export function environmentWith(more: Readonly<Record<string, string>>): NodeJS.
   return { ...process.env, ...more };
 }
 
+export function saidByTheUser(name: string): string {
+  return process.env[name] || "";
+}
+
 export function whereRustupLives(): string {
-  return process.env["RUSTUP_HOME"] || join(homedir(), ".rustup");
+  return saidByTheUser("RUSTUP_HOME") || join(homedir(), ".rustup");
 }
 
 export function searchPath(): readonly string[] {
