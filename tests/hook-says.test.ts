@@ -10,6 +10,7 @@ import { NO_TURN } from "../src/capability.ts";
 import type { Capability, HookEvent, Injection, Outcome, ToolDef, ToolResult } from "../src/capability.ts";
 import { answerTo } from "../src/commands/hook.ts";
 import { NOT_A_WAY_THROUGH } from "../src/config.ts";
+import { TomlMalformed } from "../src/errors.ts";
 import { Law } from "../src/law/capability.ts";
 import { dispatchHook } from "../src/registry.ts";
 import type { Dispatch } from "../src/registry.ts";
@@ -72,6 +73,18 @@ class Speaks implements Capability {
   }
 }
 
+class TheirFileIsBroken extends Broken {
+  override readonly name = "law";
+
+  override inject(): readonly Injection[] {
+    throw new TomlMalformed("law.toml", 1, "expected a number, found five hundred");
+  }
+
+  override onHook(): Outcome {
+    throw new TomlMalformed("law.toml", 1, "expected a number, found five hundred");
+  }
+}
+
 function dispatched(capabilities: readonly Capability[], event: HookEvent): Dispatch {
   return dispatchHook(capabilities, { root: ".", event, payload: { kind: "none" } });
 }
@@ -97,6 +110,21 @@ test("a capability that fails on a tool hook is named to the agent, because a ho
   assert.ok(context.includes("law.toml, line 3"));
   assert.ok(context.includes(A_FAULT_IN_LOOPER));
   assert.equal(answer.warned.length, 1, "the person at the terminal is still told");
+});
+
+test("a file of the project's that looper cannot read is the project's to fix, and is not called a fault in looper", () => {
+  const answer = answerTo("PostToolUse", dispatched([new TheirFileIsBroken()], "PostToolUse"));
+  const context = contextIn(first(answer.said));
+
+  assert.ok(context.includes("law.toml, line 1"), "the agent still has to be told that nothing was checked, and why");
+  assert.ok(
+    !context.includes(A_FAULT_IN_LOOPER),
+    "a mistyped line in the project's own law.toml would be sent to looper's makers as looper's fault, by every project that ever mistyped one",
+  );
+
+  const turn = allocate([new TheirFileIsBroken(), new Speaks("router")], { root: ".", budget: 9800, turn: NO_TURN, said: NEVER_SAID });
+  assert.ok(turn.allocation.text.includes("law.toml, line 1"));
+  assert.ok(!turn.allocation.text.includes(A_FAULT_IN_LOOPER));
 });
 
 test("two things said on one hook arrive as one object", () => {
@@ -133,7 +161,7 @@ test("a refusal still refuses, and what failed beside it is on the same channel"
   const answer = answerTo("PostToolUse", {
     refusals: [{ capability: "law", reason: "looper found 1 problem." }],
     mentions: [],
-    complaints: [{ capability: "broken", detail: "law.toml, line 3" }],
+    complaints: [{ capability: "broken", detail: "law.toml, line 3", ours: true }],
   });
 
   assert.equal(answer.code, 2);

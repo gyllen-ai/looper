@@ -22,7 +22,7 @@ export function answerTo(event: HookEvent, result: Dispatch): Answer {
     return { code: 2, said: [], warned: [...warned, ...result.refusals.map((held) => held.reason)] };
   }
   const failed = THE_AGENT_IS_LISTENING_ON.includes(event)
-    ? result.complaints.map((held) => couldNotJudge(held.capability, held.detail))
+    ? result.complaints.map((held) => couldNotJudge(held.capability, held.detail, held.ours))
     : [];
   const context = [...result.mentions.map((held) => held.note), ...failed];
   if (context.length === 0) return { code: 0, said: [], warned };

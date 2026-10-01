@@ -7,7 +7,8 @@ import {
 import type { Capability, ToolResult } from "./capability.ts";
 import { ageOfOurCode, agingSaid, type Age } from "./code-age.ts";
 import { reasonFrom } from "./fields.ts";
-import { A_FAULT_IN_LOOPER } from "./report/say.ts";
+import { NotOursToFix } from "./errors.ts";
+import { couldNotAnswer } from "./report/say.ts";
 
 export type Request = {
   readonly id: string | number | null;
@@ -142,7 +143,7 @@ function invoke(
         content: [
           {
             type: "text",
-            text: `looper's ${asked} tool failed (${reasonFrom(cause)}), so it did nothing. ${A_FAULT_IN_LOOPER}`,
+            text: couldNotAnswer(asked, reasonFrom(cause), !(cause instanceof NotOursToFix)),
           },
         ],
         isError: true,

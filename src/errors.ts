@@ -1,4 +1,11 @@
-export class SettingsUnparseable extends Error {
+export class NotOursToFix extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotOursToFix";
+  }
+}
+
+export class SettingsUnparseable extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, detail: string) {
@@ -10,7 +17,7 @@ export class SettingsUnparseable extends Error {
   }
 }
 
-export class SettingsNotAnObject extends Error {
+export class SettingsNotAnObject extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, found: string) {
@@ -34,7 +41,7 @@ export class RuleOnTheWrongPass extends Error {
   }
 }
 
-export class TomlMalformed extends Error {
+export class TomlMalformed extends NotOursToFix {
   readonly what: string;
   readonly line: number;
 
@@ -49,7 +56,7 @@ export class TomlMalformed extends Error {
   }
 }
 
-export class AtomicWriteFailed extends Error {
+export class AtomicWriteFailed extends NotOursToFix {
   readonly path: string;
 
   constructor(path: string, detail: string) {
@@ -61,7 +68,7 @@ export class AtomicWriteFailed extends Error {
   }
 }
 
-export class HookGroupsNotAnArray extends Error {
+export class HookGroupsNotAnArray extends NotOursToFix {
   readonly path: string;
   readonly event: string;
 

@@ -1,5 +1,6 @@
 import { HOOK_OUTPUT_CEILING, HOOK_PREVIEW_CHARS, INJECTION_SEPARATOR } from "./config.ts";
 import type { Capability, InjectContext, Injection } from "./capability.ts";
+import { NotOursToFix } from "./errors.ts";
 import { reasonFrom } from "./fields.ts";
 import { couldNotSpeak } from "./report/say.ts";
 import { heardBefore, noteSaid } from "./said.ts";
@@ -23,6 +24,7 @@ export type Allocation = {
 export type Complaint = {
   readonly capability: string;
   readonly detail: string;
+  readonly ours: boolean;
 };
 
 export type AllocationRun = {
@@ -41,7 +43,7 @@ function gather(
       injections.push(...capability.inject(context));
     } catch (cause) {
       const detail = reasonFrom(cause);
-      complaints.push({ capability: capability.name, detail });
+      complaints.push({ capability: capability.name, detail, ours: !(cause instanceof NotOursToFix) });
     }
   }
   return { injections, complaints };
@@ -161,7 +163,7 @@ export function allocate(
   if (requiredAlone) parts.push(overBudgetMarker(used, context.budget));
 
   const spoken = parts.join(INJECTION_SEPARATOR);
-  const failed = complaints.map((held) => couldNotSpeak(held.capability, held.detail));
+  const failed = complaints.map((held) => couldNotSpeak(held.capability, held.detail, held.ours));
   const text = clamp([...(spoken.length === 0 ? [] : [spoken]), ...failed].join(INJECTION_SEPARATOR));
   return {
     allocation: {

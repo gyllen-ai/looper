@@ -5,6 +5,7 @@ import { Recall } from "./recall/capability.ts";
 import { Router } from "./router.ts";
 import { Secrets } from "./secrets/capability.ts";
 import type { Capability, HookContext, Outcome } from "./capability.ts";
+import { NotOursToFix } from "./errors.ts";
 import { reasonFrom } from "./fields.ts";
 import { whereTheUserLives } from "./config.ts";
 import { Look } from "./look/capability.ts";
@@ -21,6 +22,7 @@ export type Refusal = {
 export type Complaint = {
   readonly capability: string;
   readonly detail: string;
+  readonly ours: boolean;
 };
 
 export type Mention = {
@@ -74,7 +76,7 @@ export function dispatchHook(
       }
     } catch (cause) {
       const detail = reasonFrom(cause);
-      complaints.push({ capability: capability.name, detail });
+      complaints.push({ capability: capability.name, detail, ours: !(cause instanceof NotOursToFix) });
     }
   }
 

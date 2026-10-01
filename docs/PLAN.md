@@ -7840,7 +7840,12 @@ holds the list to the code, so a part that exists can always be named.
 
 **looper's own failures reach the agent.** A capability that throws on a tool
 hook is put in that hook's context, and one that throws while a turn is built
-becomes a part of the turn, each ending with the route. The hook prints one
+becomes a part of the turn, each ending with the route. **Unless the failure is
+a file of the project's own that could not be read** — a mistyped line in
+`law.toml`, a settings file that is not JSON — which is said just as loudly and
+ends with "that is this project's to fix". Found on the real hook the same day:
+the first version called a mistyped `law.toml` a fault in looper, which every
+project that ever mistyped one would then have reported. The hook prints one
 object. The Stop hook is left as it was: context there continues the
 conversation, so a failure that repeats would never let a session end.
 
