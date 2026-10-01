@@ -139,13 +139,14 @@ test("an answer git gave while saying it could not read every file is not taken 
       env: { PATH: searchPath().join(delimiter), HOME: dir, GIT_NO_LAZY_FETCH: "1" },
     });
 
-    assert.equal(answered.status, 0, "the control: this git was told not to fetch and not to stop, and it answers as if all were well");
-    assert.ok(String(answered.stdout).includes("upstream") && !String(answered.stdout).includes("fourth"), "with the words of three files and not of the fourth");
+    assert.ok(!String(answered.stdout).includes("fourth"), "the control: the fourth file is not on this machine, and this git was told not to go and get it");
     assert.equal(
       gitCouldNotAnswer(answered),
       true,
-      "an older git does not stop when it cannot fetch a file it needs: it skips the file and exits as if it had read everything. Words that are upstream would then be counted as new, with nothing to say the count was short",
+      `some versions of git do not stop when they cannot read a file they need: they skip it and exit as if they had read everything (2.53 does, told not to fetch; 2.55 stops). Words that are upstream would then be counted as new, with nothing to say the count was short. This git exited ${String(answered.status)} saying: ${String(answered.stderr).slice(0, 200)}`,
     );
+    if (answered.status !== 0) return;
+    assert.ok(String(answered.stdout).includes("upstream"), "this git is one that answers anyway, with the words of the three files it has");
     assert.ok(whyGitCouldNot(answered).includes("made without the contents"), whyGitCouldNot(answered));
   } finally {
     rmSync(dir, { recursive: true, force: true });

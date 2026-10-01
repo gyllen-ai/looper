@@ -8274,11 +8274,14 @@ came with it.
   change. Every `diff` now refuses the outside program.
 - **The reason is git's.** A clone made without contents is said to be that,
   where it used to be told that the scan had run out of time and to mark its
-  folders as generated. The reviewer read in git's source that an older git does
-  not stop when it cannot fetch: it answers with the files it has and exits as
-  if that were everything. No such git was run here. Its complaint on the way
-  out is now enough to call the answer unknown; the test makes a current git
-  behave that way and watches three of four files come back.
+  folders as generated. And some versions of git do not stop when they cannot
+  read a file they need: they answer with the files they have and exit as if
+  that were everything. Seen on two: 2.53, told not to fetch, came back with the
+  words of three files out of four and exit 0; 2.55, on the machines that run
+  the suite, stops with 128. The reviewer read in git's source that older ones
+  answer anyway even when the fetch itself fails; none was run here. git's
+  complaint on the way out is now enough to call the answer unknown, whatever
+  it exits with.
 
 ### The C# build
 
