@@ -202,3 +202,44 @@ test("a compiler that is named and not installed is not pointed at", () => {
     rmSync(held.dir, { recursive: true, force: true });
   }
 });
+
+const NOBODY_CAN_BE_SHUT_OUT = process.getuid !== undefined && process.getuid() === 0
+  ? "a root user can read a file with no read bit"
+  : false;
+
+test("a settings file that cannot be read does not stop the build, it only leaves no compiler pointed at", { skip: NOBODY_CAN_BE_SHUT_OUT }, () => {
+  const held = scene();
+  try {
+    installs(held, "stable-here", AS_RUSTUP_WRITES_IT);
+    chmodSync(join(held.rustup, "settings.toml"), 0o000);
+    asked(held, {});
+
+    const said = environmentOf(held, "cargo");
+    assert.deepEqual([...wordsTo(held, "cargo")], ["build", "--offline", "--release"], "the build threw before cargo was started, and the user was told cargo could not be started");
+    assert.equal(said.has("RUSTUP_TOOLCHAIN"), false);
+    assert.equal(said.get("RUSTUP_AUTO_INSTALL"), "0");
+  } finally {
+    chmodSync(join(held.rustup, "settings.toml"), 0o644);
+    rmSync(held.dir, { recursive: true, force: true });
+  }
+});
+
+test("a place for rustup that is not a whole path is not read, because rustup would read it from another folder", () => {
+  const held = scene();
+  try {
+    const spelled = "rustup-beside";
+    mkdirSync(join(held.dir, spelled, "toolchains", "stable-here"), { recursive: true });
+    writeFileSync(join(held.dir, spelled, "settings.toml"), AS_RUSTUP_WRITES_IT);
+    const env: Record<string, string> = { PATH: join(held.dir, "tools"), HOME: join(held.dir, "home"), RECORD: held.record, RUSTUP_HOME: spelled };
+    const ran = spawnSync(process.execPath, ["--input-type=module", "-e", ASKS_EACH_ONCE, held.root], { cwd: held.dir, encoding: "utf8", env });
+    assert.equal(ran.status, 0, `${String(ran.stdout)}${String(ran.stderr)}`);
+
+    assert.equal(
+      environmentOf(held, "cargo").has("RUSTUP_TOOLCHAIN"),
+      false,
+      "looper read the settings relative to where it stood and cargo is started in another folder, so the compiler looper named could be one rustup has never heard of",
+    );
+  } finally {
+    rmSync(held.dir, { recursive: true, force: true });
+  }
+});

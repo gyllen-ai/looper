@@ -8337,7 +8337,8 @@ that pins a compiler version nobody has installed, that tool went to download
 it: one lookup of the compiler's download host.
 
 **Now:** it is told not to install anything, and pointed at the compiler its own
-settings file names as installed. Seen: 0 lookups, and the reader builds with
+settings file names as installed, when that file can be read; when it cannot,
+the build goes ahead with the first setting alone. Seen: 0 lookups, and the reader builds with
 the compiler that is there. An older version of that tool may not know the first
 setting; none was run here, and the second is what holds there. A compiler the
 user has named in their own environment is left as they named it: it already
@@ -8415,23 +8416,55 @@ build with other words.
   the second reviewer found, each change that had passed, and changes to the
   scan itself — and the suite stopped on each.
 
+**Found a third time, by the same reviewer checking its own findings.** Seven of
+ten were closed. But a connection still passed, and the reviewer said why it
+always would: any function leads to the thing that makes code out of text, and
+there is no end to the ways of asking for it. It took a function's constructor
+out by its key, where the scan looked for it after a dot. It took the socket
+that sits under the output when the output is piped. It added text to looper's
+source as the source was loaded, and it wrote a file while running and imported
+it. None of those is an accident; each is written to get past a reader.
+
+**So what a run does is watched, as well as how it is written.** A test loads a
+watcher before looper that writes down every connection, every listener, every
+datagram, every lookup of an address and every program started, whatever the
+code that did it is spelled like. Sixteen real runs of looper may do none of
+those except start git and python, and both are seen being started. A program
+that does connect and does start another must be seen doing both, or the test
+fails. The four ways above, and two more written to leave no word at all for
+the scan to read, were each put in a copy and called on every run: the scan,
+tightened, stopped two of them, and the watcher stopped all six.
+
+**The scan was tightened where that cost little:** a constructor taken by its
+key is refused, and the output and the input may each be used for one thing.
+The Python readers are now read by Python itself, since a scan that looked for
+`import` at the start of a line was passed by `import ast, socket`. One sample
+now stands for each kind of code the scan sees through, as one already stood
+for each name.
+
+Fifty-eight changes in all were made by hand to a copy at this point, one at a
+time, and the suite stopped on each.
+
 The scan refuses some ordinary code: a variable called `fetch`, a type imported
-from a module that connects. Nothing in looper is called that, and the price of
-naming things otherwise is small.
+from a module that connects, a module of Node's that looper does not use yet.
+Adding one to the list is one line, argued for like a dependency.
 
 ### What this does not claim
 
 - **A project's own checks.** `looper loop` runs the lines a project declared.
   What those lines reach is the project's decision, and looper never runs them
   from a hook.
-- **Code written to defeat the scan.** A property asked for by a name put
-  together, on an object that is not one of the few the scan watches, is not
-  found by reading. The scan is against accident and against a dependency that
-  changes. The run-time check covers the roads it walks, which are every
-  command and seven tools with nothing in hand; a module loaded only deep in
-  one branch of one of them is not walked. And it cannot see the two modules
-  that open a socket, because Node loads both for any program that starts
-  another.
+- **That reading the code can stop somebody who means to get past it.** It
+  cannot, and three readings in a row showed it. The scan is against accident
+  and against a dependency that changes, and it is strict enough that an
+  accident has to look deliberate. What stops the rest is that every change to
+  looper is read by a person before it is merged.
+- **Roads nobody walked.** The watcher sees what happens on sixteen runs: every
+  command and seven tools, in a project with almost nothing in it. Code that
+  connects only deep in one branch of one of them is not run, so it is not
+  seen. And the watcher sits in Node: a connection made beneath it, by a
+  program looper starts, is what the measurements with the network taken away
+  are for, and those were taken by hand, once.
 - **Programs the user has told git to run to read a file as text.** They are
   theirs, and the credential gate reads what they print.
 - **Programs the user has told git to run.** A file-watcher or a hook of the

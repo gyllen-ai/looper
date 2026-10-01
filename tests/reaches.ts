@@ -47,6 +47,14 @@ const OF_PROCESS: readonly string[] = [
 
 const OF_THIS_MODULE: readonly string[] = ["dirname", "filename", "url"];
 
+const THE_OUTPUT = "stdout";
+
+const THE_INPUT = "stdin";
+
+const OF_THE_OUTPUT: readonly string[] = ["write"];
+
+const THE_INPUT_IS_HANDED_OVER_AS = "input";
+
 const NEVER_NAMED: readonly string[] = [
   "globalThis",
   "global",
@@ -229,7 +237,23 @@ function reachedThrough(node: Node, parent: Node | undefined, allowed: readonly 
   return named !== undefined && allowed.includes(named);
 }
 
-function whyNotThisName(node: Node, parent: Node | undefined, reading: Reading): string {
+function isHandedOverAs(node: Node, above: Node | undefined, key: string): boolean {
+  return above !== undefined && above.type === "ObjectProperty" && above["value"] === node && nameOf(above["key"]) === key;
+}
+
+function whyNotThisStream(parent: Node | undefined, above: Node | undefined): string {
+  if (parent === undefined) return "";
+  const stream = nameOf(parent["property"]);
+  if (stream === THE_OUTPUT && !reachedThrough(parent, above, OF_THE_OUTPUT)) {
+    return "it uses process.stdout for something other than writing to it. Piped, the output is a socket, and a socket connects";
+  }
+  if (stream === THE_INPUT && !isHandedOverAs(parent, above, THE_INPUT_IS_HANDED_OVER_AS)) {
+    return "it uses process.stdin for something other than handing it to the reader of lines. Piped, the input is a socket, and a socket connects";
+  }
+  return "";
+}
+
+function whyNotThisName(node: Node, parent: Node | undefined, above: Node | undefined, reading: Reading): string {
   const name = nameOf(node);
   if (name === undefined || isOnlyAName(node, parent)) return "";
   if (reading.held === "installed") {
@@ -241,6 +265,7 @@ function whyNotThisName(node: Node, parent: Node | undefined, reading: Reading):
   if (name === "process" && !reachedThrough(node, parent, OF_PROCESS)) {
     return `it uses process for something other than ${OF_PROCESS.join(", ")}. Held in a variable or asked for anything else, it hands out Node's own modules without an import`;
   }
+  if (name === "process") return whyNotThisStream(parent, above);
   if (reading.loader.has(name) && parent?.type !== "ImportDefaultSpecifier" && !reachedThrough(node, parent, OF_THE_LOADER)) {
     return `it uses ${LOADS_OUR_SOURCE} for something other than ${OF_THE_LOADER.join(" and ")}, and that module can load anything by name`;
   }
@@ -276,7 +301,13 @@ function whyNotThisImport(node: Node, reading: Reading): string {
   return "";
 }
 
-function whyNot(node: Node, parent: Node | undefined, reading: Reading): string {
+function whyNotThisKey(node: Node): string {
+  const key = node["key"];
+  const named = node["computed"] === true ? textOf(key) : nameOf(key) === undefined ? textOf(key) : nameOf(key);
+  return named === MAKES_CODE_FROM_TEXT ? "it takes a constructor out by name, and a function's constructor makes code out of text" : "";
+}
+
+function whyNot(node: Node, parent: Node | undefined, above: Node | undefined, reading: Reading): string {
   if (IMPORTS_FROM.includes(node.type)) {
     const source = node["source"];
     if (source === null || source === undefined) return "";
@@ -298,7 +329,8 @@ function whyNot(node: Node, parent: Node | undefined, reading: Reading): string 
       : `it uses import.meta for something other than ${OF_THIS_MODULE.join(", ")}`;
   }
   if (NAMES_A_MEMBER.includes(node.type)) return whyNotThisMember(node, reading);
-  if (node.type === "Identifier") return whyNotThisName(node, parent, reading);
+  if (node.type === "ObjectProperty" && reading.held === "ours") return whyNotThisKey(node);
+  if (node.type === "Identifier") return whyNotThisName(node, parent, above, reading);
   return "";
 }
 
@@ -306,22 +338,24 @@ function isOnlyAboutTypes(node: Node): boolean {
   return node.type.startsWith("TS") && !WRAPS_AN_EXPRESSION.includes(node.type) && !HOLDS_CODE_THOUGH_NAMED_FOR_TYPES.includes(node.type);
 }
 
-function visit(node: Node, parent: Node | undefined, reading: Reading): void {
+function visit(node: Node, parent: Node | undefined, above: Node | undefined, reading: Reading): void {
   if (isOnlyAboutTypes(node)) return;
-  const why = whyNot(node, parent, reading);
+  const why = whyNot(node, parent, above, reading);
   if (why.length > 0) reading.found.push({ line: lineOf(node), what: why });
   if (node.type === "MetaProperty") return;
-  const within = WRAPS_AN_EXPRESSION.includes(node.type) || node.type === "ParenthesizedExpression" ? parent : node;
+  const seenThrough = WRAPS_AN_EXPRESSION.includes(node.type) || node.type === "ParenthesizedExpression";
+  const within = seenThrough ? parent : node;
+  const over = seenThrough ? above : parent;
   for (const key of Object.keys(node)) {
     if (key === "loc" || ONLY_ABOUT_TYPES.includes(key)) continue;
     const held = node[key];
     if (Array.isArray(held)) {
       for (const item of held) {
-        if (isNode(item)) visit(item, within, reading);
+        if (isNode(item)) visit(item, within, over, reading);
       }
       continue;
     }
-    if (isNode(held)) visit(held, within, reading);
+    if (isNode(held)) visit(held, within, over, reading);
   }
 }
 
@@ -331,7 +365,7 @@ export function reachesIn(file: string, text: string, held: Held, aliases: Alias
     return [{ line: parsed.line, what: `it could not be read as code (${parsed.detail}), so nothing can be said about what it loads` }];
   }
   const reading: Reading = { file, held, aliases, loader: new Set<string>(), found: [] };
-  visit(parsed.root, undefined, reading);
+  visit(parsed.root, undefined, undefined, reading);
   return reading.found;
 }
 

@@ -4,7 +4,10 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { execFileSync } from "node:child_process";
+
 import { RUST_ENGINE_DIR } from "../src/config.ts";
+import { failureOf } from "../src/fields.ts";
 import { judgeRust } from "../src/law/rust/drive.ts";
 
 const BINARY = "target/release/looper-rust";
@@ -45,4 +48,18 @@ test("a Rust reader that fails after saying a great deal is quoted briefly, with
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a program stopped for taking too long is said to have taken too long", () => {
+  let said = "";
+  try {
+    execFileSync(process.execPath, ["-e", "setTimeout(() => {}, 5000)"], { encoding: "utf8", timeout: 100, stdio: ["ignore", "pipe", "pipe"] });
+  } catch (cause) {
+    said = failureOf(cause, 600);
+  }
+
+  assert.ok(
+    said.includes("took too long"),
+    `a reader that ran past its time was said to have been "stopped by SIGTERM and said nothing", which is what happened to it and not why: ${said}`,
+  );
 });

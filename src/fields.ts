@@ -16,7 +16,10 @@ export function reasonFrom(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
+const RAN_OUT_OF_TIME = "ETIMEDOUT";
+
 function endedWith(cause: unknown): string | undefined {
+  if (fieldAt(cause, "code") === RAN_OUT_OF_TIME) return "took too long and was stopped";
   const signal = fieldAt(cause, "signal");
   if (typeof signal === "string") return `was stopped by ${signal}`;
   const status = fieldAt(cause, "status");

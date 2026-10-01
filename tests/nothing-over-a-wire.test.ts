@@ -307,6 +307,86 @@ test("python is started alone, so nothing the user's environment loads at startu
   }
 });
 
+const WATCHES_WHAT_IS_DONE = join(ROOT, "tests", "watch-effects.ts");
+
+function doneBy(script: readonly string[], input: string, cwd: string, home: string): readonly string[] {
+  const ran = spawnSync(process.execPath, ["--import", WATCHES_WHAT_IS_DONE, ...script], {
+    cwd,
+    input,
+    encoding: "utf8",
+    env: { PATH: searchPath().join(delimiter), HOME: home },
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const said = `${String(ran.stdout)}${String(ran.stderr)}`;
+  const line = String(ran.stderr).split("\n").find((one) => one.startsWith("EFFECTS "));
+  assert.ok(line !== undefined, `the run did not say what it did: ${String(ran.stderr).slice(0, 300)}`);
+  assert.ok(!said.includes("could not be loaded"), `a looper that cannot load does nothing, and would pass by doing nothing: ${said.slice(0, 300)}`);
+  const done: unknown = JSON.parse(line.slice("EFFECTS ".length));
+  assert.ok(Array.isArray(done));
+  return done.map(String);
+}
+
+const CONNECTS_AND_STARTS = [
+  "--input-type=module",
+  "-e",
+  'import { connect } from "node:net"; import { spawnSync } from "node:child_process"; connect(9, "127.0.0.1").on("error", () => {}); spawnSync("sh", ["-c", "true"]);',
+];
+
+const LOOPER_MAY_START: readonly string[] = ["start git", "start python3"];
+
+test("no looper run connects, listens, looks up an address or starts a program that is not on its list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "looper-done-"));
+  try {
+    const project = join(dir, "project");
+    const home = join(dir, "home");
+    mkdirSync(join(project, "src"), { recursive: true });
+    mkdirSync(join(project, ".looper"), { recursive: true });
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(project, "src", "a.ts"), "export const held = 1;\n");
+    writeFileSync(join(project, "a.py"), "def held():\n    return 1\n");
+    const edit = JSON.stringify({ session_id: "s", tool_name: "Edit", tool_input: { file_path: join(project, "src", "a.ts") } });
+    const call = (name: string): string => `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: {} } })}\n`;
+    const runs: readonly (readonly [readonly string[], string])[] = [
+      [["inject"], JSON.stringify({ session_id: "s", prompt: "hello" })],
+      [["hook", "PostToolUse"], edit],
+      [["hook", "PreToolUse"], JSON.stringify({ session_id: "s", tool_name: "Bash", tool_input: { command: "git push" } })],
+      [["hook", "Stop"], JSON.stringify({ session_id: "s" })],
+      [["hook", "PreCommit"], ""],
+      [["serve"], `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n${["report", "release", "recall", "decisions", "doctrine", "align", "look"].map(call).join("")}`],
+      [["report", "--list"], ""],
+      [["status"], ""],
+      [["law"], ""],
+      [["law", "a.py"], ""],
+      [["loop"], ""],
+      [["strangers"], ""],
+      [["init"], ""],
+      [["adopt"], ""],
+      [["align"], ""],
+      [["look"], ""],
+    ];
+
+    const control = doneBy(CONNECTS_AND_STARTS, "", project, home);
+    assert.ok(
+      control.some((one) => one.startsWith("connect ")) && control.includes("start sh"),
+      `a program that does connect and does start another was not seen doing either, so nothing below means anything: ${control.join(" | ")}`,
+    );
+
+    const walked = new Set<string>();
+    for (const [args, input] of runs) {
+      const done = doneBy([join(ROOT, "bin", "looper.js"), ...args], input, project, home);
+      for (const one of done) walked.add(one);
+      assert.deepEqual(
+        done.filter((one) => !LOOPER_MAY_START.includes(one)),
+        [],
+        `looper ${args.join(" ")} did something other than start git or python. The scan reads how code is spelled, and two reviewers in turn wrote a connection it could not see; this watches what a run does, whatever it is spelled like, on the roads it walks`,
+      );
+    }
+    assert.deepEqual([...walked].sort(), [...LOOPER_MAY_START].sort(), "and both programs really were started on these roads, so the watching was watching something");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 const COULD_SPEAK = /^NativeModule (?:internal\/)?(?:deps\/undici|https?|_http_|http2|tls|_tls_|dns|net|dgram|quic|inspector|cluster|worker)/;
 
 const TELL_WHAT_LOADED =

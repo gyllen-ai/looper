@@ -17,6 +17,7 @@ import {
   whereRustupLives,
 } from "./config.ts";
 import { NotSomethingLooperStarts } from "./errors.ts";
+import { reasonFrom } from "./fields.ts";
 
 export type Answered = SpawnSyncReturns<string>;
 
@@ -82,21 +83,34 @@ const WHERE_SECTIONS_BEGIN = /^\s*\[/m;
 
 const NAMES_THE_COMPILER = /^default_toolchain\s*=\s*"([A-Za-z0-9._-]+)"\s*$/m;
 
-function installedCompiler(): string {
+type Compiler =
+  | { readonly kind: "not-known"; readonly why: string }
+  | { readonly kind: "installed"; readonly name: string };
+
+function installedCompiler(): Compiler {
   const home = whereRustupLives();
   const settings = join(home, RUSTUP_SETTINGS);
-  if (!isAbsolute(home) || !existsSync(settings)) return "";
-  const written = readFileSync(settings, "utf8");
+  if (!isAbsolute(home)) return { kind: "not-known", why: `${home} is not a whole path, and rustup would read it from another folder` };
+  if (!existsSync(settings)) return { kind: "not-known", why: `there is no ${settings}` };
+  let written: string;
+  try {
+    written = readFileSync(settings, "utf8");
+  } catch (cause) {
+    return { kind: "not-known", why: reasonFrom(cause) };
+  }
   const sections = WHERE_SECTIONS_BEGIN.exec(written);
   const named = NAMES_THE_COMPILER.exec(sections === null ? written : written.slice(0, sections.index))?.[1];
-  if (named === undefined || !existsSync(join(home, "toolchains", named))) return "";
-  return named;
+  if (named === undefined || !existsSync(join(home, "toolchains", named))) {
+    return { kind: "not-known", why: `${settings} names no compiler that is installed` };
+  }
+  return { kind: "installed", name: named };
 }
 
 function rustStaysHome(): Readonly<Record<string, string>> {
-  const pointAt = saidByTheUser(THE_USERS_OWN_CHOICE).length > 0 ? "" : installedCompiler();
-  if (pointAt.length === 0) return { RUSTUP_AUTO_INSTALL: "0" };
-  return { RUSTUP_AUTO_INSTALL: "0", RUSTUP_TOOLCHAIN: pointAt };
+  if (saidByTheUser(THE_USERS_OWN_CHOICE).length > 0) return { RUSTUP_AUTO_INSTALL: "0" };
+  const compiler = installedCompiler();
+  if (compiler.kind === "not-known") return { RUSTUP_AUTO_INSTALL: "0" };
+  return { RUSTUP_AUTO_INSTALL: "0", RUSTUP_TOOLCHAIN: compiler.name };
 }
 
 export function buildRustReader(looperRoot: string): void {
