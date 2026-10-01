@@ -2622,10 +2622,11 @@ looper has no reader for that kind of file. `tests/report-tool.test.ts` holds it
    **It named 0.1.0, which had not moved in two hundred commits. Built
    2026-10-01.** A report now carries the commit and a hash of looper's own
    shipped files. The commit comes from looper's own tree, never the project's:
-   `src/built-from` holds a mark that a git archive replaces with the commit
-   (measured 2026-10-01 on another repository's tarball from the same host, and
-   npm 11.19's own source fetches a hosted dependency as that tarball), and a
-   real checkout asks git. It asks git only when looper's own folder holds
+   `src/built-from` holds a mark that a git archive replaces with the commit,
+   and a real checkout asks git. Measured 2026-10-01 with npm 11.19.0: commit
+   `d70eafa` installed from its host into an empty project arrived with its own
+   forty characters in that file and no `.git`, and `looper status` there and
+   in the checkout of the same commit print the same hash of files. It asks git only when looper's own folder holds
    `.git`: asked from inside `node_modules`, git answers with the commit of the
    project around it (measured 2026-10-01), which is somebody else's
    repository printed as looper's own. Anything else says "commit not known".
@@ -7911,5 +7912,6 @@ who cannot judge a report can still say whether one of twenty words is theirs.
   happens to the file is the person's to decide.
 - **A switch** for a project that never wants the offer.
 - **A stall cluster as a proposal**, from "The return path" above.
-- **An install's commit, on a real install.** The mark is filled on a tarball
-  and npm fetches one; nobody here has yet installed this branch and read it.
+- **An install's commit under any installer but npm.** Measured with npm
+  11.19.0 only. Another installer that clones instead of fetching the archive
+  leaves the mark unfilled, and the report then says "commit not known".
