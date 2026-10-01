@@ -1,5 +1,6 @@
 [tests]
 reach = "internal"
+patience = 120
 run = "npm test"
 
 [evasion]

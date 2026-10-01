@@ -302,7 +302,7 @@ test("a Python file gets a report too, for the same reason", () => {
   }
 });
 
-test("a line with nothing on it is refused in Rust as well, rather than guessed at", () => {
+test("a line with nothing on it is refused in Rust as well, rather than guessed at", WITHOUT_THE_RUST_ENGINE, () => {
   const root = rustProject();
   try {
     const written = fired({
@@ -314,6 +314,11 @@ test("a line with nothing on it is refused in Rust as well, rather than guessed 
     });
 
     assert.equal(written.kind, "no-shape");
+    if (written.kind !== "no-shape") return;
+    assert.ok(
+      written.why.includes("line 400"),
+      `a reader that could not start answers with no shape as well, so the kind alone passed on a machine with no Rust engine at all: ${written.why}`,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { RELEASE_TOOL, REPORT_PRIORITY, REPORT_TOOL } from "../config.ts";
 import { SILENT } from "../capability.ts";
 import type {
@@ -126,7 +128,8 @@ function answered(root: string, asker: Asker, written: Written): string {
     ].join("\n");
   }
   if (written.kind === "already") {
-    const said = `This was already written here on ${written.held.on}, and ${WHAT_BECAME_OF_IT[written.held.state]}: ${written.path}. Nothing new was written.`;
+    const where = existsSync(written.path) ? written.path : "its file has since been deleted";
+    const said = `This was already written here on ${written.held.on}, and ${WHAT_BECAME_OF_IT[written.held.state]}: ${where}. Nothing new was written.`;
     if (written.held.state !== "written") return said;
     return `${said}\n${whatNext(root, asker, written.held.id, written.held.title)}`;
   }

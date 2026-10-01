@@ -7,7 +7,7 @@ import {
 import { NOBODY_KNOWN, type Capability, type Client, type ToolResult } from "./capability.ts";
 import { ageOfOurCode, agingSaid, type Age } from "./code-age.ts";
 import { fieldAt, reasonFrom } from "./fields.ts";
-import { NotOursToFix } from "./errors.ts";
+import { isOursToFix } from "./errors.ts";
 import { couldNotAnswer } from "./report/say.ts";
 
 export type Request = {
@@ -168,7 +168,7 @@ function invoke(
         content: [
           {
             type: "text",
-            text: couldNotAnswer(asked, reasonFrom(cause), !(cause instanceof NotOursToFix)),
+            text: couldNotAnswer(asked, reasonFrom(cause), isOursToFix(cause)),
           },
         ],
         isError: true,

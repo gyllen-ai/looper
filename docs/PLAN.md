@@ -7870,11 +7870,15 @@ holds the list to the code, so a part that exists can always be named.
 hook is put in that hook's context, and one that throws while a turn is built
 becomes a part of the turn, each ending with the route. **Unless the failure is
 a file of the project's own that could not be read** — a mistyped line in
-`law.toml`, a settings file that is not JSON — which is said just as loudly and
-ends with "that is this project's to fix". Found on the real hook the same day:
-the first version called a mistyped `law.toml` a fault in looper, which every
-project that ever mistyped one would then have reported. The hook prints one
-object. The Stop hook is left as it was: context there continues the
+`law.toml`, a settings file that is not JSON — **or the machine saying no**: a
+folder with no write bit, a disk that is full. Those are said just as loudly and
+end with "that is this project's or this machine's to fix, not looper's". Found
+on the real hook the same day: the first version called a mistyped `law.toml` a
+fault in looper, which every project that ever mistyped one would then have
+reported; the review below found a file somebody had shut was called one too.
+The notice is counted inside the turn's budget, so it costs what may be dropped
+before it costs a rule, and a failure's own words are cut at 400 characters. The
+hook prints one object. The Stop hook is left as it was: context there continues the
 conversation, so a failure that repeats would never let a session end.
 
 **Every refusal names the route**, in every language. The commit refusal no
@@ -7888,7 +7892,16 @@ in the adopter's own repository. Beside each report looper keeps what became of
 it — written, sent, kept — so a fault a person has answered is not raised again.
 The same rule on the same shape is one report, however many sessions find it; a
 fault with no shape is identified by its two sentences, which no two sessions
-write alike, and nothing here claims otherwise.
+write alike, and nothing here claims otherwise. A report deleted before anybody
+decided is forgotten, so it can be written again in better words; one a person
+answered stays answered.
+
+**The suite is given two minutes instead of thirty seconds.** A declared check
+that says nothing about how long it may take is stopped at 30 seconds and read
+as broken, which refuses the next commit. Measured 2026-10-01 on one machine:
+the suite ran in 19.0 seconds on a quiet moment and in 30.8 and 33.2 with other
+work running beside it. A check that passes or fails by what else the machine
+is doing is not a check, so `.looper/loop.toml` gives it 120.
 
 ### The check on the two sentences, measured before it was pinned
 
@@ -7922,10 +7935,62 @@ brackets, `I'd`, `e.g.`, an issue reference, a size with a sign, a version with
 a plus, a file looper ships, words joined by hyphens — and each was fixed in the
 check, with a case in `audit/report-cases.ts`, rather than excused.
 
+**Measured again after the review below tightened it, 2026-10-01.** Run one
+sentence at a time over the same bodies: 71 of 1,668 sentences on 55 distinct
+words before the tightening and the same after it, and over the other tracker
+241 of 844 on 133 words where it had been 131. (The first figures above were
+taken earlier in the day; looper's own vocabulary had grown by then.) Closing
+those leaks cost no sentence that passed before.
+
 **What it does not guarantee, said in every report.** A name spelled as plain
 words passes. So does a vendor looper itself happens to name. The tool answers
 with the words in the two sentences that are not looper's own, because a person
 who cannot judge a report can still say whether one of twenty words is theirs.
+
+### What a second reader found, the same day
+
+A reviewer who had seen none of the reasoning was given the branch and told to
+break it. Everything below was run by that reviewer against a copy of the
+branch, then given a case or a test here before it was fixed.
+
+- **One file name held the server past a minute.** A pattern for a number with
+  a unit tried every way of dividing a run of letters. Measured here: a digit
+  followed by 33 letters took 35.2 seconds, and the reviewer's run on 39 was
+  killed at 60. The server answers one thing at a time, so every other tool
+  waited. All 54 cases now take 65 ms together, and a test holds each awkward
+  word under a second.
+- **Names the check let through.** A word in another alphabet counted as
+  punctuation; so did an address made of numbers, digits in groups like a
+  telephone or a card, and a name with a number in front. A capital passed after
+  a colon, after `e.g.`, and at the start of any line. Each is refused now. A
+  number is a count, a version of two or three parts, a share, a time, a size, a
+  date, a range of two, or a count with a unit of at most three letters.
+- **The way a project is fetched was taken for its name.** Every piece of the
+  remote address was, so "https" was refused as naming the project. What names
+  it is the machine it is kept on, the group and its own name.
+- **A home that cannot be written.** The command announced that looper could not
+  load its own code and that every verdict was absent. It is a refusal that
+  names the folder.
+- **The old command line stopped writing.** `--rule --file --line` with nothing
+  about what was tried wrote a report before this change and was refused after
+  it.
+- **A link inside the project was followed out of it**, a hand-edited record
+  could name a file outside its folder, a title could be two paragraphs or half
+  a character, and a `package.json` that opens with a byte-order mark refused
+  every report.
+- **A turn could lose its failure notice.** It was added after the budget was
+  spent, so near the hook's ceiling it was the first thing cut, with rules that
+  would otherwise have arrived. And a notice cut on the way out was recorded as
+  heard.
+- **Three tests could not fail**: one read the word it looked for out of the
+  report's own echo, one passed with no Rust engine at all, and nothing drove
+  the command. `tests/report-command.test.ts` runs it as a person would.
+
+Left as it is, and said: a count with a unit of three letters or fewer passes
+whatever the letters are; a capitalised word that opens a sentence passes; the
+first report on a Rust file builds the Rust reader inside the call, 19 seconds
+on the reviewer's machine; and the file hash is spelled the same on every
+system now, which no machine here could check.
 
 ### What it refuses
 

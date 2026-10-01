@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
-import { commitOf, originOf, treeOf } from "../src/report/origin.ts";
+import { commitOf, namesOf, originOf, treeOf } from "../src/report/origin.ts";
+import { looperWords, refusedIn } from "../src/report/words.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -112,4 +113,58 @@ test("where a report came from is said in one line a person can read", () => {
   assert.match(said, /^looper \d+\.\d+\.\d+, commit [0-9a-f]{40}/);
   assert.ok(said.includes(`files ${treeOf(ROOT)}`));
   assert.ok(said.includes(process.version));
+});
+
+function projectKeptAt(address: string): string {
+  const root = mkdtempSync(join(tmpdir(), "looper-"));
+  gitAt(root, "init", "-q");
+  gitAt(root, "remote", "add", "origin", address);
+  return root;
+}
+
+const KEPT_AT: readonly string[] = [
+  "https://code.acmecorp.example/ledgerteam/widgets.git",
+  "ssh://git@code.acmecorp.example:2222/ledgerteam/widgets.git",
+  "git@code.acmecorp.example:ledgerteam/widgets.git",
+];
+
+test("the address a project is kept at names the project, and not the way it is fetched", () => {
+  const ours = looperWords();
+
+  for (const address of KEPT_AT) {
+    const root = projectKeptAt(address);
+    try {
+      const names = namesOf(root);
+      assert.equal(names.kind, "named");
+      if (names.kind !== "named") return;
+
+      assert.deepEqual(
+        refusedIn("The check failed while fetching over https and passed over ssh on port 2222.", ours, names.names).map((one) => one.word),
+        [],
+        `with ${address} every piece of the address was taken for the project's name, so a sentence about https was refused as naming the project, in every project kept on a server`,
+      );
+      assert.deepEqual(
+        refusedIn("The acmecorp build, the ledgerteam build and the widgets build were all blocked.", ours, names.names).map((one) => one.word),
+        ["acmecorp", "ledgerteam", "widgets"],
+        `with ${address} the machine it is kept on, the group that keeps it and its own name are the three things that say whose it is`,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a package.json that opens with a byte-order mark is still read", () => {
+  const root = mkdtempSync(join(tmpdir(), "looper-"));
+  try {
+    writeFileSync(join(root, "package.json"), `\uFEFF${JSON.stringify({ name: "ledgerworks" })}`);
+
+    assert.deepEqual(
+      namesOf(root),
+      { kind: "named", names: [basename(root), "ledgerworks"] },
+      "editors on one system write that mark and every tool that reads the file accepts it, so refusing it refused every report from such a project",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

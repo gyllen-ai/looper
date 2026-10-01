@@ -85,3 +85,44 @@ test("looper's own words come from the files it ships, so the list cannot fall b
   }
   assert.ok(!ours.has("acmebillinggateway"), "a word looper never wrote is not one of its words");
 });
+
+const SLOWEST_A_SENTENCE_MAY_BE_MS = 1000;
+
+test("no word, however it is written, makes the check take longer than a person would wait", () => {
+  const ours = looperWords();
+  const awkward = [
+    "0007-use-postgres-for-tenant-ledger.md",
+    `7${"a".repeat(33)}!x`,
+    `9,580${"-word".repeat(9)}.x`,
+    `${"a-".repeat(60)}A.b`,
+    `${"1.".repeat(80)}x`,
+    `${"(".repeat(40)}word${")".repeat(39)}`,
+    `${"'".repeat(120)}x${"'".repeat(120)}`,
+  ];
+
+  for (const word of awkward) {
+    const began = performance.now();
+    refusedIn(`The rule fired on ${word} and the code is fine.`, ours, NOBODY);
+    const took = performance.now() - began;
+
+    assert.ok(
+      took < SLOWEST_A_SENTENCE_MAY_BE_MS,
+      `${word} took ${Math.round(took)} ms to judge. One pattern here tried every way of dividing a run of letters, which doubles with each letter: a file name beginning with a number, 39 letters long, held the server past a minute, and the server answers one thing at a time`,
+    );
+  }
+});
+
+test("a word that opens the second of the two sentences opens a sentence", () => {
+  const ours = looperWords();
+
+  assert.deepEqual(
+    [...refusedIn("Reconciling stopped half way.", ours, NOBODY)],
+    [],
+    "the two sentences are judged one at a time, so the first word of each may carry the capital every sentence opens with",
+  );
+  assert.deepEqual(
+    refusedIn("It stopped while\nReconciling the totals.", ours, NOBODY).map((one) => one.word),
+    ["Reconciling"],
+    "a new line is not a new sentence: a name could be carried through on its own line",
+  );
+});

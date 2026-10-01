@@ -51,6 +51,9 @@ export function allocationFor(out: Out, turn: Turn): Allocation {
       `looper: ${complaint.capability} could not contribute (${complaint.detail}); continuing without it`,
     );
   }
+  for (const why of run.unrecorded) {
+    out.warn(`looper: what this session was told could not be recorded (${why}); notices will repeat`);
+  }
   return run.allocation;
 }
 

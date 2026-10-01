@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 
 import { SERVER_VERSION } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
@@ -45,13 +45,25 @@ function filesUnder(dir: string): readonly string[] {
   return found;
 }
 
+type Shipped = { readonly name: string; readonly path: string };
+
+function byName(left: Shipped, right: Shipped): number {
+  if (left.name === right.name) return 0;
+  return left.name < right.name ? -1 : 1;
+}
+
+function shipped(looperRoot: string): readonly Shipped[] {
+  return SHIPPED.flatMap((part) => filesUnder(join(looperRoot, part)))
+    .map((path) => ({ path, name: relative(looperRoot, path).split(sep).join("/") }))
+    .sort(byName);
+}
+
 export function treeOf(looperRoot: string): string {
   const hash = createHash("sha256");
-  const files = SHIPPED.flatMap((part) => filesUnder(join(looperRoot, part))).sort();
-  for (const path of files) {
-    hash.update(relative(looperRoot, path));
+  for (const held of shipped(looperRoot)) {
+    hash.update(held.name);
     hash.update("\0");
-    hash.update(readFileSync(path));
+    hash.update(readFileSync(held.path));
     hash.update("\0");
   }
   return hash.digest("hex").slice(0, SHORT);
@@ -76,12 +88,14 @@ export type Names =
   | { readonly kind: "unreadable"; readonly why: string }
   | { readonly kind: "named"; readonly names: readonly string[] };
 
+const A_BYTE_ORDER_MARK = /^\uFEFF/;
+
 function packageNamed(root: string): Names {
   const path = join(root, "package.json");
   if (!existsSync(path)) return { kind: "named", names: [] };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(readFileSync(path, "utf8").replace(A_BYTE_ORDER_MARK, ""));
   } catch (cause) {
     return { kind: "unreadable", why: `package.json could not be read (${reasonFrom(cause)})` };
   }
@@ -89,11 +103,39 @@ function packageNamed(root: string): Names {
   return { kind: "named", names: typeof name === "string" ? [name] : [] };
 }
 
+const HOW_IT_IS_FETCHED = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+const WHO_ASKS = /^[^@/]*@/;
+
+const WHICH_DOOR = /:[0-9]+$/;
+
+const A_MACHINE_THEN_A_PATH = /^([^/:]+):(.*)$/;
+
+function machineNamed(host: string): readonly string[] {
+  const labels = host.split(".");
+  return labels.length > 1 ? labels.slice(0, -1) : labels;
+}
+
+function keptAt(address: string): readonly string[] {
+  const rest = address.replace(HOW_IT_IS_FETCHED, "");
+  if (rest !== address) {
+    const cut = rest.indexOf("/");
+    const machine = cut === -1 ? rest : rest.slice(0, cut);
+    const path = cut === -1 ? "" : rest.slice(cut);
+    return [...machineNamed(machine.replace(WHO_ASKS, "").replace(WHICH_DOOR, "")), path];
+  }
+  const found = A_MACHINE_THEN_A_PATH.exec(rest.replace(WHO_ASKS, ""));
+  const machine = found?.[1];
+  const path = found?.[2];
+  if (machine === undefined || path === undefined) return [address];
+  return [...machineNamed(machine), path];
+}
+
 export function namesOf(root: string): Names {
   const packaged = packageNamed(root);
   if (packaged.kind === "unreadable") return packaged;
   const remote = remoteOf(root);
-  const remotely = remote.kind === "named" ? [remote.address] : [];
+  const remotely = remote.kind === "named" ? keptAt(remote.address) : [];
   return { kind: "named", names: [basename(root), ...packaged.names, ...remotely] };
 }
 
