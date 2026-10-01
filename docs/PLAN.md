@@ -7975,8 +7975,9 @@ last, the second 2,047 without it, and a second session heard it again.
 It is silent when the turn does not say which session it belongs to, because
 nothing can then be remembered as heard. It waits for room, so it never costs a
 rule set its place. And when a report was written and nobody has answered
-whether it may leave, the line names that report instead, so a session that
-ended before the question was put does not bury it.
+whether it may leave, the line names that report instead and has the agent ask
+in words, so a session that ended before the question was settled does not bury
+it.
 
 ### The yes
 
@@ -8004,9 +8005,27 @@ A scratch server offered two tools, one marked, both on the allow list, to a
 session with nobody at the keyboard. The unmarked tool ran. The marked one never
 reached the server, in the default mode and again with every permission prompt
 bypassed. Then the same with looper's own server: the report was written, the
-release was not run, and looper's record still said "written". Seen. What was
-not seen is the prompt itself, which takes a person: what it shows, and that it
-appears in a session somebody is sitting at.
+release was not run, and looper's record still said "written".
+
+**Then with somebody at the keyboard, the same day.** Four interactive sessions
+in a scratch project, driven through tmux so the screen could be read: manual
+mode, accept-edits mode with `release` on the allow list, bypass-permissions
+mode, and auto mode. In the last two the report was written with no prompt at
+all. In all four the release prompt appeared, and it was the same prompt: the
+tool's name, the id, the report's own title, the first two lines of the tool's
+description, and two answers, yes and no. No "don't ask again". Three were
+answered no and looper's record stayed "written". One was answered yes: the
+record became "released" and the agent was handed the address. Nothing was
+posted.
+
+Two things the screen taught, and both changed the code. **The prompt shows the
+first two lines of the description and folds the rest away**, so those two lines
+are the question, and they are written to the person rather than about them;
+`tests/report-release.test.ts` holds what they must say. **And a no ends the
+agent's turn where it stands.** It cannot tell looper the report was kept until
+the person speaks again, so a session that ends on a no leaves the report
+unanswered. The next session's line therefore asks in words — send it or keep
+it — rather than putting the same prompt in front of the same person.
 
 Four things follow from making the tool the consent.
 

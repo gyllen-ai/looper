@@ -122,7 +122,11 @@ test("a report nobody has answered is named instead of the line", () => {
       told.text.includes("PostToolUse") && told.text.includes(`\`${RELEASE_TOOL}\``),
       `a session that ended before anyone was asked leaves a report nobody will ever see, unless the next session is told it is there: ${told.text}`,
     );
-    assert.ok(told.text.length < BULLET_CEILING);
+    assert.ok(
+      told.text.includes("send it or keep it"),
+      `a person who already said no at the prompt must be asked in words, not shown the same prompt again: ${told.text}`,
+    );
+    assert.ok(told.text.length < BULLET_CEILING, `${told.text.length} characters`);
   } finally {
     strike(held);
   }

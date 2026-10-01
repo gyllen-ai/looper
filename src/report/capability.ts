@@ -22,14 +22,14 @@ export { asksAPerson } from "./release.ts";
 
 export const THE_LINE = `looper: looper can be wrong. A rule that fires on code that is fine or misses code that is not, a check that fails, an answer that is untrue, something it should do and does not: say so with the \`${REPORT_TOOL}\` tool. It writes a file on this machine and sends nothing; only the person can let it leave.`;
 
-const A_TITLE_IN_THE_LINE = 80;
+const A_TITLE_IN_THE_LINE = 60;
 
 function unanswered(waiting: readonly Held[]): string {
   const [first, ...rest] = waiting;
   if (first === undefined) return THE_LINE;
   const title = first.title.length > A_TITLE_IN_THE_LINE ? `${first.title.slice(0, A_TITLE_IN_THE_LINE)}…` : first.title;
   const more = rest.length === 0 ? "" : `, and ${rest.length} more`;
-  return `looper: a report about looper was written here on ${first.on} and nobody has said whether it may leave: ${title}${more}. Show it to the person (the \`${REPORT_TOOL}\` tool lists it), then ask the \`${RELEASE_TOOL}\` tool.`;
+  return `looper: a report about looper was written here on ${first.on} and nobody has said whether it may leave: ${title}${more}. Ask the person in words: send it or keep it? Then the \`${RELEASE_TOOL}\` tool, or \`${REPORT_TOOL}\` with {"kept":"${first.id}"}.`;
 }
 
 const NO_EVENTS: readonly HookEvent[] = [];
@@ -61,13 +61,13 @@ const DESCRIPTION = [
 ].join("\n");
 
 const RELEASE_DESCRIPTION = [
-  "Let one report about looper leave this machine. It becomes a public page at looper's",
-  "makers, under the person's own name, and nothing of their project is in it.",
+  "Let one report about looper leave this machine? A yes makes it a public page at",
+  "looper's makers, under your name. Nothing of your project is in it.",
   "",
-  'Call it with {"id":"...","title":"..."} after showing the person the report, with the',
-  "title exactly as looper wrote it. The person is asked every time and answers for",
-  "themselves: it is not yours to answer. On a yes looper says where its makers are. On a",
-  `no, tell the \`${REPORT_TOOL}\` tool {"kept":"<id>"} so nobody is asked again.`,
+  'For the agent: call it with {"id":"...","title":"..."} after showing the report, with',
+  "the title exactly as looper wrote it. Whoever is at the keyboard is asked every time",
+  "and answers for themselves: it is not yours to answer. On a yes looper says where its",
+  `makers are. On a no, tell the \`${REPORT_TOOL}\` tool {"kept":"<id>"} so nobody is asked again.`,
 ].join("\n");
 
 const WRITTEN_WITH: readonly string[] = ["kind", "about", "wrong", "instead"];
@@ -126,7 +126,9 @@ function answered(root: string, asker: Asker, written: Written): string {
     ].join("\n");
   }
   if (written.kind === "already") {
-    return `This was already written here on ${written.held.on}, and ${WHAT_BECAME_OF_IT[written.held.state]}: ${written.path}. Nothing new was written.`;
+    const said = `This was already written here on ${written.held.on}, and ${WHAT_BECAME_OF_IT[written.held.state]}: ${written.path}. Nothing new was written.`;
+    if (written.held.state !== "written") return said;
+    return `${said}\n${whatNext(root, asker, written.held.id, written.held.title)}`;
   }
   if (written.kind === "would-leak") {
     return [

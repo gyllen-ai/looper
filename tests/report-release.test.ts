@@ -91,6 +91,39 @@ test("the release tool is marked so that only a person can answer it", () => {
   assert.equal(metaOf(REPORT_TOOL), undefined, "writing the file needs nobody's yes: nothing leaves");
 });
 
+test("the two lines a person is shown when asked carry the whole question, and speak to them", () => {
+  const release = new Report("/nowhere").tools().find((tool) => tool.name === RELEASE_TOOL);
+  assert.ok(release !== undefined);
+  const shown = release.description.split("\n").slice(0, 2).join(" ");
+
+  for (const said of ["leave this machine", "public", "your name", "Nothing of your project"]) {
+    assert.ok(
+      shown.includes(said),
+      `the prompt shows the first two lines of the description and folds the rest away, and they do not say "${said}": ${shown}`,
+    );
+  }
+  assert.ok(!shown.includes("the person"), "the reader of those two lines is the person, so they are not spoken of in the third person");
+});
+
+test("a report that was written and never answered says what to do next, when it is asked for again", () => {
+  const held = scene();
+  try {
+    const report = drafted(held);
+    const again = said(held, REPORT_TOOL, A_FAILED_HOOK, ASKS);
+
+    assert.ok(again.includes("already written"), again);
+    assert.ok(
+      again.includes(`\`${RELEASE_TOOL}\``) && again.includes(report.id),
+      `the first session may have ended before anybody was asked, and this answer is all the second one has: ${again}`,
+    );
+
+    said(held, REPORT_TOOL, { kept: report.id }, ASKS);
+    assert.ok(!said(held, REPORT_TOOL, A_FAILED_HOOK, ASKS).includes(`\`${RELEASE_TOOL}\``), "a report the person kept is not offered again");
+  } finally {
+    strike(held);
+  }
+});
+
 test("only a release hands out where looper's makers are", () => {
   const held = scene();
   try {
