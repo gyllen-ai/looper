@@ -151,3 +151,22 @@ test("what a report is called is one line, and never half a character", () => {
     strike(held);
   }
 });
+
+test("a project reached by a link and by its real path keeps one set of reports", () => {
+  const held = scene();
+  const linked = `${held.root}-linked`;
+  try {
+    symlinkSync(held.root, linked);
+    said({ root: linked, home: held.home }, A_FAILED_HOOK);
+
+    const listed = said(held, {});
+
+    assert.ok(
+      listed.includes("nobody has said"),
+      `the folder a report is kept in was named after the path as it was spelled, so the hook and the server, started in the same project by two spellings of its path, each kept reports the other never saw: ${listed}`,
+    );
+  } finally {
+    rmSync(linked, { force: true });
+    strike(held);
+  }
+});

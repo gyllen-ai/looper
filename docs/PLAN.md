@@ -8177,6 +8177,13 @@ yes or no. The marked tool was called zero times. Not run: a program built on
 the host's own kit that supplies its own answer; looper cannot tell that apart
 from a person and does not claim to.
 
+**And one that only another system found.** The suite failed on a Mac the
+first time it ran there: that system reaches its temporary folder through a
+link, so the server, started inside the project, and the test, naming the same
+project, kept reports in two folders. The hook and the server are started by
+two different roads in real use too. A report's folder is now named after where
+the project really is, and a test that fails on any system holds it.
+
 Left as it is, and said: a file that never ends, put where `law.toml` or the
 record is, would hold whatever reads it; and what a session was told cannot be
 written down in a home that cannot be written, so there the line repeats on

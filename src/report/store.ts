@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
@@ -60,8 +60,13 @@ export function printOf(body: string): string {
   return createHash("sha256").update(body).digest("hex");
 }
 
+function whereItReallyIs(root: string): string {
+  return existsSync(root) ? realpathSync(root) : root;
+}
+
 export function reportsIn(root: string, home: string): string {
-  return join(home, REPORTS_DIR, `${basename(root)}-${shortHash(root)}`);
+  const real = whereItReallyIs(root);
+  return join(home, REPORTS_DIR, `${basename(real)}-${shortHash(real)}`);
 }
 
 export function pathOf(root: string, home: string, id: string): string {
