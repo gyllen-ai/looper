@@ -8899,3 +8899,40 @@ cut by the next line written.
   the user's own settings — are not kept current.
 - Noticed and not changed: "one command repeated" still counts a test run
   after each edit as a stall.
+
+## A single fix of what was just written was counted as a guess — 2026-10-05
+
+#205 made a rewrite mean a write that changes characters another write put
+there in the last five minutes. The same day, five agents working in parallel
+in one session gave that rule its first real measurement: 132 writes, every one
+placed, and the notice named 8 files as *acting on a guess*. One was an undo:
+two lines put in and then both taken out again. The rest were one fix of text
+written a minute before, mostly answering the law or a test — the feedback loop
+working, not a guess.
+
+So the shape is now what the fingerprint table names, read strictly: **an edit
+reverted, or the same place rewritten again and again.**
+
+- **Undone.** A change that takes out exactly what an earlier change put in and
+  puts back exactly what that one took out, at the same place, within five
+  minutes; or a write that leaves the file exactly as it was before an earlier
+  write. Every change now records a print of the text it removed and of the text
+  it added, so an undo is recognised by its text rather than by where it landed.
+- **Written over again.** The same place written three times, each within five
+  minutes of the one before.
+- **Not counted.** One fix of what was just written, wherever it is.
+
+On the same 132 writes the stricter reading names 1 file, the undo. That count
+used whole-file prints and places written three times; an undo of part of a
+write could not be measured there, because those lines carried no change prints.
+Through `looper hook PostToolUse` and `looper inject` with a scratch home, `main`
+names a single fix *2 times … acting on a guess* and this change names nothing,
+while a place written three times and a line put in and taken out again are both
+still named. The cases came first: switching undo detection off fails 4 of them,
+and letting two writes be enough fails 3.
+
+Stream lines written by #205's version carry changes without prints. They are
+read as unplaced, so the metric starts clean once more.
+
+Not measured: whether three is the right number. It is the smallest that is not
+one fix.

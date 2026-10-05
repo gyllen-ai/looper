@@ -102,9 +102,29 @@ function longReadRun(held: readonly Reached[]): readonly Fingerprint[] {
 
 const REWRITTEN_WITHIN_MINUTES = 5;
 
-type Written = { readonly from: number; readonly to: number; readonly by: Reached };
+const WRITTEN_OVER_ENOUGH = 3;
+
+type Made = { readonly kind: "whole"; readonly change: Change } | { readonly kind: "cut" };
+
+const CUT: Made = { kind: "cut" };
+
+type Written = {
+  readonly from: number;
+  readonly to: number;
+  readonly by: Reached;
+  readonly chain: readonly Reached[];
+  readonly made: Made;
+};
 
 type Chain = { readonly kind: "broken" } | { readonly kind: "at"; readonly after: string };
+
+function soonAfter(earlier: Reached, later: Reached): boolean {
+  return later.at - earlier.at <= REWRITTEN_WITHIN_MINUTES * MINUTE;
+}
+
+function inTurn(writes: readonly Reached[]): readonly Reached[] {
+  return [...new Set(writes)].sort((one, other) => one.at - other.at);
+}
 
 function touches(span: Written, change: Change): boolean {
   const end = change.at + change.removed;
@@ -116,21 +136,37 @@ function touches(span: Written, change: Change): boolean {
   return change.at < span.to && span.from < end;
 }
 
+function undoes(change: Change, span: Written): boolean {
+  if (span.made.kind !== "whole") return false;
+  const made = span.made.change;
+  return (
+    change.at === span.from &&
+    change.removed === span.to - span.from &&
+    change.removedPrint === made.addedPrint &&
+    change.addedPrint === made.removedPrint
+  );
+}
+
 function carried(span: Written, change: Change): readonly Written[] {
   const end = change.at + change.removed;
   const shift = change.added - change.removed;
   if (!touches(span, change)) {
     if (span.to <= change.at) return [span];
-    return [{ from: span.from + shift, to: span.to + shift, by: span.by }];
+    return [{ from: span.from + shift, to: span.to + shift, by: span.by, chain: span.chain, made: span.made }];
   }
   const kept: Written[] = [];
-  if (span.from < change.at) kept.push({ from: span.from, to: Math.min(span.to, change.at), by: span.by });
-  if (span.to > end) kept.push({ from: Math.max(span.from, end) + shift, to: span.to + shift, by: span.by });
+  if (span.from < change.at) {
+    kept.push({ from: span.from, to: Math.min(span.to, change.at), by: span.by, chain: span.chain, made: CUT });
+  }
+  if (span.to > end) {
+    kept.push({ from: Math.max(span.from, end) + shift, to: span.to + shift, by: span.by, chain: span.chain, made: CUT });
+  }
   return kept;
 }
 
-function rewritesIn(writes: readonly Reached[]): ReadonlySet<Reached> {
-  const involved = new Set<Reached>();
+function guessesIn(writes: readonly Reached[]): ReadonlySet<Reached> {
+  const guessed = new Set<Reached>();
+  const placedSoFar: Reached[] = [];
   let chain: Chain = { kind: "broken" };
   let written: readonly Written[] = [];
   for (const write of writes) {
@@ -140,34 +176,43 @@ function rewritesIn(writes: readonly Reached[]): ReadonlySet<Reached> {
       written = [];
       continue;
     }
+    for (const earlier of placedSoFar) {
+      if (earlier.placed.kind !== "placed" || earlier.placed.before !== placed.after || !soonAfter(earlier, write)) continue;
+      guessed.add(earlier);
+      guessed.add(write);
+    }
+    placedSoFar.push(write);
     if (chain.kind === "broken" || chain.after !== placed.before) written = [];
-    written = written.filter((span) => write.at - span.by.at <= REWRITTEN_WITHIN_MINUTES * MINUTE);
+    written = written.filter((span) => soonAfter(span.by, write));
     for (const change of placed.changes) {
-      for (const span of written) {
-        if (span.by === write || !touches(span, change)) continue;
-        involved.add(span.by);
-        involved.add(write);
+      const hit = written.filter((span) => span.by !== write && touches(span, change));
+      for (const span of hit) {
+        if (!undoes(change, span)) continue;
+        guessed.add(span.by);
+        guessed.add(write);
       }
+      const over = inTurn([...hit.flatMap((span) => span.chain), write]);
+      if (over.length >= WRITTEN_OVER_ENOUGH) for (const one of over) guessed.add(one);
       written = [
         ...written.flatMap((span) => carried(span, change)),
-        { from: change.at, to: change.at + change.added, by: write },
+        { from: change.at, to: change.at + change.added, by: write, chain: over, made: { kind: "whole", change } },
       ];
     }
     chain = { kind: "at", after: placed.after };
   }
-  return involved;
+  return guessed;
 }
 
 function rewrittenSoon(held: readonly Reached[]): readonly Fingerprint[] {
   const found: Fingerprint[] = [];
   for (const writes of byPrint(held, (one) => WRITING.includes(one.tool)).values()) {
-    const involved = [...rewritesIn(writes)].sort((one, other) => one.at - other.at);
-    const earliest = involved[0];
+    const guessed = inTurn([...guessesIn(writes)]);
+    const earliest = guessed[0];
     if (earliest === undefined) continue;
     found.push({
       shape: earliest.shape,
-      times: involved.length,
-      minutes: spanOf(involved),
+      times: guessed.length,
+      minutes: spanOf(guessed),
       means: "acting on a guess, because looking was too expensive",
     });
   }
