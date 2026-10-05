@@ -60,6 +60,30 @@ export function heardFrom(payload: string, at: number): Heard {
   };
 }
 
+export function recorded(root: string, reached: Reached): Outcome {
+  const noted = note(root, whereTheUserLives(), reached);
+  if (noted.kind === "not-noted") {
+    return {
+      kind: "mention",
+      note: `looper: what this session reached for was not written down (${noted.why}), so the stall metric is measuring less than happened.`,
+    };
+  }
+  if (noted.kind === "kept-long") {
+    return {
+      kind: "mention",
+      note: `looper: what this session reached for was written down, but the stream it went into could not be cut short (${noted.why}), so it will keep growing.`,
+    };
+  }
+  const placed = reached.placed;
+  if (placed.kind === "unplaced") {
+    return {
+      kind: "mention",
+      note: `looper: ${placed.why}, so the stall metric cannot tell whether it rewrote what was written just before it.`,
+    };
+  }
+  return { kind: "pass" };
+}
+
 export function saidAbout(stalls: readonly Fingerprint[]): string {
   return [
     `looper: ${stalls.length} shape(s) in this session's last forty minutes look like being stuck, not like working.`,
@@ -100,21 +124,7 @@ export class Stall implements Capability {
     const heard = heardFrom(context.payload.text, Date.now());
     if (heard.kind === "nothing") return { kind: "pass" };
     if (heard.kind === "not-counted") return { kind: "mention", note: heard.note };
-    const noted = note(context.root, whereTheUserLives(), heard.reached);
-    if (noted.kind === "not-noted") {
-      return {
-        kind: "mention",
-        note: `looper: what this session reached for was not written down (${noted.why}), so the stall metric is measuring less than happened.`,
-      };
-    }
-    const placed = heard.reached.placed;
-    if (placed.kind === "unplaced") {
-      return {
-        kind: "mention",
-        note: `looper: ${placed.why}, so the stall metric cannot tell whether it rewrote what was written just before it.`,
-      };
-    }
-    return { kind: "pass" };
+    return recorded(context.root, heard.reached);
   }
 
   tools(): readonly ToolDef[] {

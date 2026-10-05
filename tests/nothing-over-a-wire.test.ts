@@ -345,10 +345,12 @@ test("no looper run connects, listens, looks up an address or starts a program t
     writeFileSync(join(project, "src", "a.ts"), "export const held = 1;\n");
     writeFileSync(join(project, "a.py"), "def held():\n    return 1\n");
     const edit = JSON.stringify({ session_id: "s", tool_name: "Edit", tool_input: { file_path: join(project, "src", "a.ts") } });
+    const read = JSON.stringify({ session_id: "s", tool_name: "Read", tool_input: { file_path: join(project, "src", "a.ts") } });
     const call = (name: string): string => `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: {} } })}\n`;
     const runs: readonly (readonly [readonly string[], string])[] = [
       [["inject"], JSON.stringify({ session_id: "s", prompt: "hello" })],
       [["hook", "PostToolUse"], edit],
+      [["reached"], read],
       [["hook", "PreToolUse"], JSON.stringify({ session_id: "s", tool_name: "Bash", tool_input: { command: "git push" } })],
       [["hook", "Stop"], JSON.stringify({ session_id: "s" })],
       [["hook", "PreCommit"], ""],
@@ -425,10 +427,12 @@ test("no looper run loads a module that could speak, beyond what Node loads for 
     mkdirSync(home, { recursive: true });
     writeFileSync(join(project, "src", "a.ts"), "export const held = 1;\n");
     const edit = JSON.stringify({ session_id: "s", tool_name: "Edit", tool_input: { file_path: join(project, "src", "a.ts") } });
+    const read = JSON.stringify({ session_id: "s", tool_name: "Read", tool_input: { file_path: join(project, "src", "a.ts") } });
     const call = (name: string): string => `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: {} } })}\n`;
     const runs: readonly (readonly [readonly string[], string])[] = [
       [["inject"], JSON.stringify({ session_id: "s", prompt: "hello" })],
       [["hook", "PostToolUse"], edit],
+      [["reached"], read],
       [["hook", "PreToolUse"], JSON.stringify({ session_id: "s", tool_name: "Bash", tool_input: { command: "git push" } })],
       [["hook", "Stop"], JSON.stringify({ session_id: "s" })],
       [["hook", "PreCommit"], ""],

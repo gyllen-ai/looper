@@ -90,12 +90,14 @@ const CAPABILITIES: readonly string[] = [
   "pins",
   "stall",
   "report",
+  "wiring",
 ];
 
 const COMMANDS: readonly string[] = [
   "looper init",
   "looper inject",
   "looper hook",
+  "looper reached",
   "looper status",
   "looper serve",
   "looper law",

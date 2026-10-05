@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, statSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -8,7 +8,16 @@ import { NO_TURN } from "../src/capability.ts";
 import { NEVER_SAID } from "../src/said.ts";
 import { Stall } from "../src/stall/capability.ts";
 import { metricOf, type Fingerprint } from "../src/stall/fingerprints.ts";
-import { note, reachedFor, shapeOf, streamPath, type Reached } from "../src/stall/stream.ts";
+import {
+  A_STREAM_HOLDS,
+  A_STREAM_IS_CUT_AT_BYTES,
+  note,
+  olderStreamPath,
+  reachedFor,
+  shapeOf,
+  streamPath,
+  type Reached,
+} from "../src/stall/stream.ts";
 import { first } from "./helpers.ts";
 import { MINUTE, SECOND, captured, edited, editedInTurn, opened, ran, reachedBy } from "./stall-scene.ts";
 
@@ -251,4 +260,116 @@ test("the same long command four times is one question asked four times, and its
   assert.equal(said.length, 1);
   assert.equal(first(said).times, 4);
   assert.ok(first(said).shape.endsWith("…"));
+});
+
+const DUMP = "a dump where a view was needed";
+
+test("a file read again after it was edited is a look at the edit, not a dump", () => {
+  const now = Date.now();
+  const reached: Reached[] = [];
+  let text = PARTS;
+  for (let at = 0; at < 4; at += 1) {
+    reached.push(reachedBy(opened("s", FILE), now - (10 - 2 * at) * MINUTE));
+    reached.push(reachedBy(edited(FILE, text, `part_${at}_value()`, `part_${at}_value() + 1`), now - (9 - 2 * at) * MINUTE));
+    text = text.replace(`part_${at}_value()`, () => `part_${at}_value() + 1`);
+  }
+  reached.push(reachedBy(opened("s", FILE), now - MINUTE));
+  assert.deepEqual([...named(reached, now, DUMP)], []);
+});
+
+test("one file read four times with nothing written to it in between is the dump shape, whatever else was written", () => {
+  const now = Date.now();
+  const reached = [
+    reachedBy(opened("s", FILE), now - 9 * MINUTE),
+    reachedBy(opened("s", FILE), now - 8 * MINUTE),
+    reachedBy(edited("/project/src/other.rs", "let a = 1;\n", "1", "2"), now - 7 * MINUTE),
+    reachedBy(opened("s", FILE), now - 6 * MINUTE),
+    reachedBy(opened("s", FILE), now - 5 * MINUTE),
+  ];
+  const said = named(reached, now, DUMP);
+  assert.equal(said.length, 1);
+  assert.equal(first(said).times, 4);
+  assert.equal(first(said).shape, FILE);
+});
+
+const PADDING = "x".repeat(150);
+
+function noteUntilCut(root: string, home: string, from: number): number {
+  let written = from;
+  while (!existsSync(olderStreamPath(root, home)) && written < from + 20000) {
+    note(root, home, reachedBy(ran("s", `echo ${written} ${PADDING}`), written));
+    written += 1;
+  }
+  assert.ok(existsSync(olderStreamPath(root, home)), "the stream was never cut");
+  return written;
+}
+
+function atsBack(root: string, home: string): readonly number[] {
+  const back = reachedFor(root, home, "s");
+  assert.equal(back.kind, "reached");
+  if (back.kind !== "reached") return [];
+  return back.reached.map((one) => one.at);
+}
+
+function counting(from: number, upTo: number): readonly number[] {
+  return Array.from({ length: upTo - from }, (_, at) => from + at);
+}
+
+test("the stream is cut once it passes its size, and a session still reads back the last lines it wrote, in order", () => {
+  const home = mkdtempSync(join(tmpdir(), "looper-stream-"));
+  try {
+    const root = "/some/project";
+    let written = noteUntilCut(root, home, 0);
+    for (const more of [1, 2, 3]) note(root, home, reachedBy(ran("s", `echo after ${more}`), written + more - 1));
+    written += 3;
+    assert.ok(statSync(streamPath(root, home)).size < A_STREAM_IS_CUT_AT_BYTES);
+    assert.deepEqual(atsBack(root, home), counting(written - A_STREAM_HOLDS, written));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a line written by a hook that had the stream open while it was cut still arrives", () => {
+  const home = mkdtempSync(join(tmpdir(), "looper-stream-"));
+  try {
+    const root = "/some/project";
+    note(root, home, reachedBy(ran("s", "first"), 0));
+    const held = openSync(streamPath(root, home), "a");
+    let written = 0;
+    try {
+      written = noteUntilCut(root, home, 1);
+      writeSync(held, `${written}\tBash\tlate\ts\tabcdefabcdef\t-\n`);
+    } finally {
+      closeSync(held);
+    }
+    const back = reachedFor(root, home, "s");
+    assert.equal(back.kind, "reached");
+    if (back.kind !== "reached") return;
+    assert.equal(back.reached[back.reached.length - 1]?.shape, "late");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a stream an older looper let grow is cut by the next line written, and nothing within the window is lost", () => {
+  const home = mkdtempSync(join(tmpdir(), "looper-stream-"));
+  try {
+    const root = "/some/project";
+    const path = streamPath(root, home);
+    mkdirSync(dirname(path), { recursive: true });
+    const lines: string[] = [];
+    let size = 0;
+    for (let at = 0; size < 3 * A_STREAM_IS_CUT_AT_BYTES; at += 1) {
+      const line = `${at}\tBash\techo ${at} ${PADDING}\ts\tabcdefabcdef\t-\n`;
+      lines.push(line);
+      size += line.length;
+    }
+    appendFileSync(path, lines.join(""));
+    assert.deepEqual(atsBack(root, home), counting(lines.length - A_STREAM_HOLDS, lines.length));
+    note(root, home, reachedBy(ran("s", "the next line"), lines.length));
+    assert.ok(existsSync(olderStreamPath(root, home)));
+    assert.deepEqual(atsBack(root, home), counting(lines.length + 1 - A_STREAM_HOLDS, lines.length + 1));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });

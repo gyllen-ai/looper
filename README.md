@@ -28,7 +28,9 @@ npx looper init
 ```
 
 That is the whole setup. `init` adds its hooks beside any you already have,
-never over them, and running it twice leaves the project byte-identical.
+never over them, and running it twice leaves the project byte-identical. After
+an upgrade, the next prompt brings looper's own entries up to date and says
+what it changed; a session already open keeps its old hooks until it restarts.
 
 ## What it actually does
 

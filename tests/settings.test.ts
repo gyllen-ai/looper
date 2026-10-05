@@ -151,3 +151,91 @@ test("settings that are not an object refuse loudly", () => {
     SettingsNotAnObject,
   );
 });
+
+const NOW: readonly HookSpec[] = [
+  {
+    event: "UserPromptSubmit",
+    matcher: { kind: "all" },
+    command: "looper inject",
+  },
+  {
+    event: "PostToolUse",
+    matcher: { kind: "match", pattern: "Edit|MultiEdit|Write|Bash" },
+    command: "looper hook PostToolUse",
+  },
+];
+
+function groupsUnder(text: string, event: string): readonly Record<string, unknown>[] {
+  const events = parse(text)["hooks"];
+  assert.ok(events !== null && typeof events === "object" && !Array.isArray(events));
+  const groups: unknown = Object.getOwnPropertyDescriptor(events, event)?.value;
+  assert.ok(Array.isArray(groups));
+  return groups.map((group: unknown) => {
+    assert.ok(group !== null && typeof group === "object" && !Array.isArray(group));
+    return { ...group };
+  });
+}
+
+const OLD_MATCHER = {
+  hooks: {
+    UserPromptSubmit: [{ hooks: [{ type: "command", command: "looper inject" }] }],
+    PostToolUse: [
+      {
+        matcher: "Edit|MultiEdit|Write",
+        hooks: [
+          { type: "command", command: "their-formatter" },
+          { type: "command", command: "looper hook PostToolUse", timeout: 30 },
+        ],
+      },
+    ],
+  },
+};
+
+test("looper's entry under a matcher this looper no longer asks for is moved to the one it does, and the merge says what it was", () => {
+  const result = mergeSettings(present(OLD_MATCHER), NOW);
+  assert.equal(result.kind, "merged");
+  if (result.kind !== "merged") return;
+  assert.deepEqual(result.moved, [
+    { event: "PostToolUse", command: "looper hook PostToolUse", was: "Edit|MultiEdit|Write", now: "Edit|MultiEdit|Write|Bash" },
+  ]);
+  const ours = groupsUnder(result.text, "PostToolUse").filter((group) => JSON.stringify(group).includes("looper hook PostToolUse"));
+  assert.equal(ours.length, 1);
+  assert.equal(ours[0]?.["matcher"], "Edit|MultiEdit|Write|Bash");
+});
+
+test("a hook of somebody else's that shared looper's old group stays in it, under the matcher it was given", () => {
+  const result = mergeSettings(present(OLD_MATCHER), NOW);
+  assert.equal(result.kind, "merged");
+  if (result.kind !== "merged") return;
+  const theirs = groupsUnder(result.text, "PostToolUse").filter((group) => group["matcher"] === "Edit|MultiEdit|Write");
+  assert.equal(theirs.length, 1);
+  assert.deepEqual(theirs[0]?.["hooks"], [{ type: "command", command: "their-formatter" }]);
+});
+
+test("an entry already under the matcher looper asks for is left exactly as it was written", () => {
+  const current = {
+    hooks: {
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: "looper inject", timeout: 99 }] }],
+      PostToolUse: [{ matcher: "Edit|MultiEdit|Write|Bash", hooks: [{ type: "command", command: "looper hook PostToolUse", timeout: 99 }] }],
+    },
+  };
+  assert.equal(mergeSettings(present(current), NOW).kind, "unchanged");
+});
+
+test("looper's entry written twice, under two matchers, ends as one", () => {
+  const twice = {
+    hooks: {
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: "looper inject" }] }],
+      PostToolUse: [
+        { matcher: "Edit|MultiEdit|Write|Bash", hooks: [{ type: "command", command: "looper hook PostToolUse" }] },
+        { matcher: "Edit|Write", hooks: [{ type: "command", command: "looper hook PostToolUse" }] },
+      ],
+    },
+  };
+  const result = mergeSettings(present(twice), NOW);
+  assert.equal(result.kind, "merged");
+  if (result.kind !== "merged") return;
+  const carrying = groupsUnder(result.text, "PostToolUse").filter((group) => JSON.stringify(group).includes("looper hook PostToolUse"));
+  assert.equal(carrying.length, 1);
+  assert.equal(carrying[0]?.["matcher"], "Edit|MultiEdit|Write|Bash");
+});

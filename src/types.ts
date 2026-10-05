@@ -24,7 +24,23 @@ export type Existing =
   | { readonly kind: "absent" }
   | { readonly kind: "present"; readonly text: string };
 
+export type Moved = {
+  readonly event: string;
+  readonly command: string;
+  readonly was: string;
+  readonly now: string;
+};
+
+export type Wired = {
+  readonly text: string;
+  readonly wired: readonly string[];
+  readonly rewired: readonly string[];
+  readonly moved: readonly Moved[];
+  readonly added: readonly string[];
+  readonly folded: readonly string[];
+};
+
 export type Merge =
-  | { readonly kind: "created"; readonly text: string; readonly wired: readonly string[] }
-  | { readonly kind: "merged"; readonly text: string; readonly wired: readonly string[] }
+  | ({ readonly kind: "created" } & Wired)
+  | ({ readonly kind: "merged" } & Wired)
   | { readonly kind: "unchanged" };

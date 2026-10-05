@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { first } from "./helpers.ts";
-import { DEV, INSTALLED, LOCAL, PROJECT_DIR, gitHookEntryFor, inside, launchFor, looperHooks, projectRoot } from "../src/config.ts";
+import { DEV, INSTALLED, LOCAL, PROJECT_DIR, gitHookEntryFor, inside, launchFor, projectRoot } from "../src/config.ts";
+import { looperHooks } from "../src/wiring/hooks.ts";
 import { reachedFrom } from "../src/init.ts";
 import { AFTER_INIT } from "../src/announce.ts";
 import assert from "node:assert/strict";
