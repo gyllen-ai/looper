@@ -5064,7 +5064,7 @@ is nowhere, which is why this is a removal rather than a rewrite.
 `<Nullable>enable</Nullable>` stays in STACK.md. The setting is worth having and
 the gate on its escape hatch is not, which is a distinction the rest of this
 document should probably be asked about more often.
-||||||| 4bc7aa8
+
 ### `looper law` and the gates answered the same question two different ways
 
 Adopter issue #94. `looper law` called a problem written one minute ago
@@ -5251,8 +5251,6 @@ judging anything in this session … treat every verdict as absent rather than
 clean."* Nothing was judged for the minutes it took to fix. That announcement is
 the only reason it was caught immediately, and it is finding 74's fix earning its
 place a second time.
-
-||||||| parent of b4af769 (C# has no comments either)
 
 ### Calibrated against four codebases nobody here wrote
 
@@ -6462,7 +6460,6 @@ publishing it.
 file for the moment between being written and being read, where before it went
 through a pipe and touched no disk.
 
-||||||| parent of b415348 (A project that declared no checks was never told, and the design said it would be)
 ### A project that declared no checks was never told, and the design said it would be
 
 An adopting .NET codebase installed looper on 2026-08-19 and worked in it for a
@@ -9193,3 +9190,33 @@ in a child process (`tests/copied-src.ts`). The walk itself now passes over a
 file that is listed and then gone: that is what `npm install` does under a
 running server, the moment the walk exists for, and it used to fail the whole
 answer with `ENOENT`. A directory that vanishes mid-walk still throws.
+
+## The last of the plain reads, and the counts the README stopped keeping — 2026-10-06
+
+**The law's own reads.** #210 and #214 left the law's reads to the changes that
+were rewriting it. With those merged, the rest went the same way: `law.toml`,
+`package.json` (read for entry files and for the project's shape), the decisions
+file as the law reads it, `.gitmodules`, the baseline, the files a whole-project
+run and the edit hook judge, the lines compared when a problem's age is decided,
+and the module graph's manifests and sources. Six cases, written first, waited
+the full five seconds on `main`; each now answers and names the pipe. The
+project's shape used to swallow an unreadable `package.json` as a dependency
+called `unreadable: …` that matched nothing, so it never said so; its sentence
+now says the manifest could not be read, and why. Left as it is: looper's own
+rule-help text, which an install ships.
+
+**The README's numbers.** They were last set on 2026-08-29 (#177) and nothing
+held them: 90 rules, 619 cases, 826 tests, "four tests" reading this document,
+and "a hundred and five" findings. Counted from the code on 2026-10-06: 96 rules
+(37 in the TypeScript and JavaScript row, which has always counted the React,
+Next, Node, Tauri, data and stack rules with it; 31 Rust; 14 Python; 8 C#; 5
+CSS; 1 for every language at once), 753 cases across the six case files, six
+tests in `tests/plan-is-true.test.ts` that read this document, and 120 findings.
+`tests/readme-counts.test.ts` now holds the rules row by row, the cases and the
+findings against the code, and fails when one moves. The number of tests left
+the headline, because nothing can hold it, and the sentence about this document
+names the file whose tests read it instead of how many there are.
+
+**Three lines of merge debris** (`||||||| …`) that earlier conflict resolutions
+left in this document are gone. Nothing beside them was duplicated: measured
+2026-10-06, no line longer than sixty characters appears twice in the file.

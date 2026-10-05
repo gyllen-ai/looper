@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 
@@ -7,6 +7,7 @@ import { asItWasAt, headCommit, lastAdded, namesAt, type Landed } from "../git.t
 import { countIn } from "../present.ts";
 import { foundIn } from "./one-file.ts";
 import type { Violation } from "./rule.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 const MARKS_OF_ARRIVING: readonly string[] = [BASELINE_PATH, CONSTITUTION_PATH];
 
@@ -121,7 +122,7 @@ export function linesOnDisk(root: string): LineNow {
   return (file, line) => {
     const held = read.get(file);
     if (held !== undefined) return lineIn(held, line);
-    const text = readFileSync(join(root, file), "utf8");
+    const text = textOfOrdinary(join(root, file));
     read.set(file, text);
     return lineIn(text, line);
   };

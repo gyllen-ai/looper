@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { parseSource, walk, type Node } from "./parse.ts";
 import { fieldAt, reasonFrom } from "../../fields.ts";
+import { readOrdinary, textOfOrdinary } from "../../ordinary.ts";
 
 const CANDIDATE_SUFFIXES: readonly string[] = [
   "",
@@ -33,7 +34,7 @@ function manifestOf(dir: string): Manifest {
   if (!existsSync(path)) return { kind: "none", why: "there is no package.json" };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(textOfOrdinary(path));
   } catch (cause) {
     const detail = reasonFrom(cause);
     return { kind: "none", why: `its package.json is not readable (${detail})` };
@@ -139,8 +140,9 @@ export function promisingNamesIn(root: Node): ReadonlySet<string> {
 }
 
 function namesIn(path: string, extract: (root: Node) => ReadonlySet<string>): ReadonlySet<string> {
-  if (!existsSync(path)) return new Set();
-  const parsed = parseSource(path, readFileSync(path, "utf8"));
+  const read = readOrdinary(path);
+  if (read.kind !== "text") return new Set();
+  const parsed = parseSource(path, read.text);
   if (parsed.kind === "unreadable") return new Set();
   return extract(parsed.root);
 }

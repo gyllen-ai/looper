@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { parseDecisions } from "../decisions/store.ts";
@@ -25,6 +25,7 @@ import {
   type TomlDocument,
 } from "../toml.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 const DISABLED_SECTION = "rules";
 
@@ -91,7 +92,7 @@ function declaredEntries(root: string): readonly string[] {
   if (!existsSync(path)) return [];
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(textOfOrdinary(path));
   } catch (cause) {
     const detail = reasonFrom(cause);
     return [`unreadable package.json (${detail})`];
@@ -115,7 +116,7 @@ function backedFilesIn(root: string): readonly string[] {
   const path = join(root, DECISIONS_PATH);
   if (!existsSync(path)) return [];
   const found: string[] = [];
-  for (const one of parseDecisions(readFileSync(path, "utf8"))) {
+  for (const one of parseDecisions(textOfOrdinary(path))) {
     for (const file of one.depends) found.push(file);
   }
   return found;
@@ -151,7 +152,7 @@ export function readConcessions(root: string): Concessions {
     };
   }
 
-  const document = parseToml(readFileSync(path, "utf8"), LAW_PATH);
+  const document = parseToml(textOfOrdinary(path), LAW_PATH);
   const css = tableIn(document, CSS_SECTION);
   const ts = tableIn(document, TS_SECTION);
   const shared = tableIn(document, SHARED_TRUTH_SECTION);

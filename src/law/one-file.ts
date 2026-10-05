@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { PYTHON_EXTENSION, RUST_EXTENSION } from "../config.ts";
@@ -12,6 +11,7 @@ import { judge } from "./engine.ts";
 import { isCsharp, judgeCsharpIn, judgePythonIn, judgeRustIn } from "./readers.ts";
 import type { Violation } from "./rule.ts";
 import { roleOf, shapeOf } from "./shape.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 export type Law = "rust" | "python" | "csharp" | "css" | "typescript";
 
@@ -55,7 +55,7 @@ export function foundIn(where: Where, relative: string): Found {
   const law = lawFor(relative);
   const concessions = readConcessions(where.settings);
   const copied = variantsIn(where.content, [relative], concessions);
-  const text = (): string => readFileSync(join(where.content, relative), "utf8");
+  const text = (): string => textOfOrdinary(join(where.content, relative));
   const styled = isStyling(relative)
     ? judge(CSS_CHECKS, "fast", { file: relative, text: text() }, concessions).violations
     : [];

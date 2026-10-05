@@ -1,6 +1,6 @@
 import { BASELINE_HEADER } from "../stubs.ts";
 import { countIn } from "../present.ts";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeAtomically } from "../atomic.ts";
@@ -12,6 +12,7 @@ import { changedLines, type Against, type Touched } from "../git.ts";
 import { parseToml, tableIn } from "../toml.ts";
 import type { AlreadyThere } from "./arrival.ts";
 import type { Violation } from "./rule.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 export type Counts = ReadonlyMap<string, number>;
 
@@ -23,7 +24,7 @@ export function readBaseline(root: string): Baseline {
   const path = join(root, BASELINE_PATH);
   if (!existsSync(path)) return NOTHING_FORGIVEN;
 
-  const document = parseToml(readFileSync(path, "utf8"), BASELINE_PATH);
+  const document = parseToml(textOfOrdinary(path), BASELINE_PATH);
   const baseline = new Map<string, Counts>();
   for (const [file] of document) {
     if (file.length === 0) continue;
