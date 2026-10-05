@@ -2,10 +2,12 @@ import { test } from "node:test";
 import { INDEX_CEILING } from "../src/config.ts";
 import { doctrineFilesUnder, lineFor, oversizedIn } from "../src/size.ts";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { canonBranch, canonBranchNames, canonGoverns, pulledByName } from "../src/canon.ts";
+import { fieldAt } from "../src/fields.ts";
+import { answeredByACopy } from "./copied-src.ts";
 import { branchIndex, isABranchName, listBranches } from "../src/doctrine.ts";
 
 const CANON = join(import.meta.dirname, "..", "src", "canon");
@@ -119,22 +121,22 @@ test("the index is bounded, because it is paid on every single message", () => {
 });
 
 test("a canon branch on disk is served even when this build's list has never heard of it", () => {
-  const path = join(ROOT, "src", "canon", "added-after-this-process-started.md");
-  writeFileSync(path, "A branch added after this process started.\n\n- **Served from disk.**\n");
-  try {
-    assert.equal(
-      canonBranchNames().includes("added-after-this-process-started"),
-      false,
-      "the fixture has to be absent from the compiled list, or it proves nothing",
-    );
-    assert.equal(
-      canonBranch("added-after-this-process-started").kind,
-      "found",
-      "a long-lived server holds its branch names in a compiled constant while bodies are read from disk, so denying a branch whose file is right there tells the reader a rule does not exist when it does",
-    );
-  } finally {
-    rmSync(path, { force: true });
-  }
+  const added = "added-after-this-process-started";
+  const said = answeredByACopy(
+    { written: { [`canon/${added}.md`]: "A branch added after this process started.\n\n- **Served from disk.**\n" }, gone: [] },
+    "canon.ts",
+    `{ listed: copied.canonBranchNames().includes("${added}"), served: copied.canonBranch("${added}").kind }`,
+  );
+  assert.equal(
+    fieldAt(said, "listed"),
+    false,
+    "the fixture has to be absent from the compiled list, or it proves nothing",
+  );
+  assert.equal(
+    fieldAt(said, "served"),
+    "found",
+    "a long-lived server holds its branch names in a compiled constant while bodies are read from disk, so denying a branch whose file is right there tells the reader a rule does not exist when it does. Written into a copy: tests run in parallel and another one walks src/",
+  );
 });
 
 test("serving from disk did not open a path out of the canon folder", () => {

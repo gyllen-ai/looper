@@ -9096,3 +9096,100 @@ still stops at a broken file it *is* handed, and `looper law` names it and
 leaves every file read with it unjudged. `RUST-ERROR:9`'s reason, its row in the
 rule table and finding 120 now say both, and `tests/rust.test.ts` holds the
 second half.
+
+## Old problems came back as new, a reader that could not start said nothing, and a test wrote into src/ — 2026-10-05
+
+Three faults, one change. The second closes the last line of #209's entry.
+
+### A problem looper could not see when it arrived was called new
+
+The baseline is the list of problems already there when looper arrived, but a
+problem counted as older only when its file and rule were in the counts of
+`.looper/baseline.toml`. Whatever looper could not see when that file was
+written — a file its reader skipped, a rule added later — came back as new the
+first time a later looper saw it, and nothing ever adds to the baseline. The
+Rust reader skipped files outside `src/` until #186, and again from #189 until
+#209.
+
+**Measured on a scratch crate, 2026-10-05**, its baseline written by a reader
+that never saw `examples/`, one more file committed after looper arrived. At
+`9311b7b`: `looper law` exited 2 and called all five problems in `examples/`
+new and blocking, the three that were there before looper and the two written
+after it; an edit to line 4 of the older file was refused for all three of its
+problems, and so was its commit. With this change: those three are older, the
+two written after looper arrived still block, and the edit and the commit are
+refused for line 4 alone.
+
+**What changed.** A problem that is neither recorded nor on a line touched now
+is checked against the code as it stood when looper arrived: the most recent
+commit that added `.looper/baseline.toml`, or the doctrine's constitution when
+there is no baseline, or `HEAD` while that file is not committed yet. looper
+takes the file as it was at that commit, lays it in a temporary folder with
+the manifests a reader looks for and the names beside it, and judges it with
+today's rules and today's settings. The problem is older when the same rule
+found the same line text then. The baseline file is still never written: it
+only shrinks. `looper law` says how many of the older problems it does not list.
+
+**Why the text then and not the age of the line.** A later change can put a
+problem on a line nobody touched. A file that grew past its cap is reported on
+the line the cap falls on, which is an old line pushed down; a crate root whose
+deputies were taken out is reported on its first line. Asking whether that line
+changed calls both old. Judged as it was, the file had neither, so they stay
+yours. A case holds each direction, and blessing everything fails two of them.
+
+**Measured on this machine's adopting projects, read-only, counts only.** One
+Rust project: 57 problems, 49 called new; this change finds 1 of the 49 already
+there when looper arrived. The other 48 are all in Rust files outside `src/`
+that were created after looper arrived, on lines written after it: code written
+under looper that its reader never saw. A file created after adoption is judged
+in full from its first line, and that stays: they are the project's to fix, and
+touching one of those files is refused until its problems are. Calling them
+older would bless code written under looper, and telling them apart from a
+problem that slipped past a gate needs a record of what each earlier looper
+could see, which nothing keeps. Of four other projects, three moved 3, 1 and 3
+problems from new to older and one did not move.
+
+**Cost.** `looper law` on this repository, where every old problem is recorded:
+2,794 ms against 2,746 on `main`, medians of five. On the scratch crate, with
+two files judged as they were: 241 ms against 204.
+
+Not covered: a file renamed since looper arrived is judged as a new file; the
+per-turn notice still counts only what the baseline lists; where git cannot
+answer — no history, a shallow clone, a commit no longer present — unrecorded
+stays new, as before. Two read-only questions were added to what looper may ask
+git, each in exactly the form it asks: `log -n 1 --diff-filter=A --format=%H --`
+and `ls-tree --name-only`.
+
+### An edited file whose reader could not start passed in silence
+
+The edit hook kept a reader's findings and dropped what it could not read, so
+an edited Rust, Python or C# file whose reader could not start passed without a
+word, exactly as a clean one does. The commit gate named the files it could not
+judge only when it refused nothing.
+
+**Measured 2026-10-05**, a scratch crate with the Rust half unbuilt and `cargo`
+off the `PATH`, through `looper hook PostToolUse`: `main` said nothing about the
+file. Now: *looper: could not judge src/lib.rs (looper's Rust half would not
+build: cargo could not be started (spawnSync cargo ENOENT)), so what is there now
+was not judged, which is not the same as being clean.* The cases run the real
+hook with `python3` off the `PATH`, for an edit and for a refused commit.
+
+One function now answers what the law finds in one file, with what it could not
+judge (`src/law/one-file.ts`), and the edit hook, the files a shell command
+wrote and the commit gate each say it in one sentence. TypeScript cannot fail
+this way: a file it cannot parse is TS-ERROR:8.
+
+### A test wrote into src/ while another walked it
+
+`tests/canon-tree.test.ts` wrote a branch file into `src/canon` and removed it,
+while `tests/code-age.test.ts` walked `src/` in another process: the walk saw a
+file the next walk did not, or stat'ed one already gone. The suite failed once in
+three runs on 2026-10-05.
+
+**Measured** with four loops of each file running at once for a minute: 12 of
+837 code-age runs and 18 of 748 canon-tree runs failed before, 0 of 717 and 0 of
+719 after. Both tests now work on their own copy of `src/` in a temporary folder,
+in a child process (`tests/copied-src.ts`). The walk itself now passes over a
+file that is listed and then gone: that is what `npm install` does under a
+running server, the moment the walk exists for, and it used to fail the whole
+answer with `ENOENT`. A directory that vanishes mid-walk still throws.
