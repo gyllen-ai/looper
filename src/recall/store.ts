@@ -1,5 +1,4 @@
 import { RECALL_HEADER } from "../stubs.ts";
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
@@ -7,6 +6,7 @@ import { required } from "../present.ts";
 import {
   RECALL_PATH,
 } from "../config.ts";
+import { readOrdinaryOrSay } from "../ordinary.ts";
 
 export type Note = {
   readonly learned: string;
@@ -43,9 +43,9 @@ export function parseNotes(source: string): readonly Note[] {
 }
 
 export function readNotes(root: string): readonly Note[] {
-  const path = join(root, RECALL_PATH);
-  if (!existsSync(path)) return [];
-  return parseNotes(readFileSync(path, "utf8"));
+  const read = readOrdinaryOrSay(join(root, RECALL_PATH));
+  if (read.kind === "absent") return [];
+  return parseNotes(read.text);
 }
 
 export function render(notes: readonly Note[]): string {

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
 import { JSON_INDENT } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
+import { readOrdinary } from "../ordinary.ts";
 
 const REPORTS_DIR = join(".looper", "reports");
 
@@ -119,10 +120,12 @@ function stillStands(root: string, home: string, one: Held): boolean {
 
 export function heldIn(root: string, home: string): Read {
   const path = decidedAt(root, home);
-  if (!existsSync(path)) return { kind: "read", held: [] };
+  const read = readOrdinary(path);
+  if (read.kind === "absent") return { kind: "read", held: [] };
+  if (read.kind === "unreadable") return { kind: "unreadable", why: read.why };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(read.text);
   } catch (cause) {
     return { kind: "unreadable", why: `${path} could not be read (${reasonFrom(cause)})` };
   }

@@ -5,6 +5,7 @@ import { basename, join, relative, sep } from "node:path";
 import { SERVER_VERSION } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
 import { headOf, remoteOf, type Head } from "../git.ts";
+import { readOrdinary } from "../ordinary.ts";
 
 const A_COMMIT = /^[0-9a-f]{40}$/;
 
@@ -19,10 +20,9 @@ const NOT_PART_OF_THE_CODE: readonly string[] = [BUILT_FROM, "__pycache__"];
 const SHORT = 12;
 
 export function commitOf(looperRoot: string): Head {
-  const marked = join(looperRoot, WHERE_THE_MARK_IS);
-  if (existsSync(marked)) {
-    const written = readFileSync(marked, "utf8").trim();
-    if (A_COMMIT.test(written)) return { kind: "known", commit: written, changed: false };
+  const marked = readOrdinary(join(looperRoot, WHERE_THE_MARK_IS));
+  if (marked.kind === "text" && A_COMMIT.test(marked.text.trim())) {
+    return { kind: "known", commit: marked.text.trim(), changed: false };
   }
   if (!existsSync(join(looperRoot, ".git"))) {
     return {
@@ -94,11 +94,12 @@ export type Names =
 const A_BYTE_ORDER_MARK = /^\uFEFF/;
 
 function packageNamed(root: string): Names {
-  const path = join(root, "package.json");
-  if (!existsSync(path)) return { kind: "named", names: [] };
+  const read = readOrdinary(join(root, "package.json"));
+  if (read.kind === "absent") return { kind: "named", names: [] };
+  if (read.kind === "unreadable") return { kind: "unreadable", why: read.why };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8").replace(A_BYTE_ORDER_MARK, ""));
+    parsed = JSON.parse(read.text.replace(A_BYTE_ORDER_MARK, ""));
   } catch (cause) {
     return { kind: "unreadable", why: `package.json could not be read (${reasonFrom(cause)})` };
   }
@@ -151,10 +152,14 @@ const WRITTEN_FOR_GIT = /^git\+/;
 const A_REPOSITORY_ENDING = /\.git$/;
 
 export function homeOf(looperRoot: string): Home {
-  const path = join(looperRoot, "package.json");
+  const read = readOrdinary(join(looperRoot, "package.json"));
+  if (read.kind !== "text") {
+    const why = read.kind === "absent" ? "it is not there" : read.why;
+    return { kind: "unknown", why: `looper's own package.json could not be read (${why})` };
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(read.text);
   } catch (cause) {
     return { kind: "unknown", why: `looper's own package.json could not be read (${reasonFrom(cause)})` };
   }

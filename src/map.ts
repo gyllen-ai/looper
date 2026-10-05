@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { FRESHNESS_SECTION, GOVERNS_SECTION, MAP_PATH } from "./config.ts";
 import { parseToml, stringsAt, tableIn } from "./toml.ts";
+import { readOrdinaryOrSay } from "./ordinary.ts";
 
 export type Governs = ReadonlyMap<string, readonly string[]>;
 
@@ -80,15 +80,15 @@ export function parseFreshnessMap(source: string): Governs {
 }
 
 export function readFreshnessMap(root: string): DoctrineMap {
-  const path = join(root, MAP_PATH);
-  if (!existsSync(path)) return { kind: "absent" };
-  return { kind: "present", governs: parseFreshnessMap(readFileSync(path, "utf8")) };
+  const read = readOrdinaryOrSay(join(root, MAP_PATH));
+  if (read.kind === "absent") return { kind: "absent" };
+  return { kind: "present", governs: parseFreshnessMap(read.text) };
 }
 
 export function readMap(root: string): DoctrineMap {
-  const path = join(root, MAP_PATH);
-  if (!existsSync(path)) return { kind: "absent" };
-  return { kind: "present", governs: parseMap(readFileSync(path, "utf8")) };
+  const read = readOrdinaryOrSay(join(root, MAP_PATH));
+  if (read.kind === "absent") return { kind: "absent" };
+  return { kind: "present", governs: parseMap(read.text) };
 }
 
 function segmentMatches(pattern: string, segment: string): boolean {

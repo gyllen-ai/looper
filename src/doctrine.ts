@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { canonBranch, canonBranchNames, canonConstitution } from "./canon.ts";
@@ -9,6 +9,7 @@ import {
   branchHeading,
   isABranchName,
 } from "./config.ts";
+import { readOrdinaryOrSay } from "./ordinary.ts";
 
 export { isABranchName };
 
@@ -23,9 +24,9 @@ export type Assembly = {
 };
 
 export function readProjectConstitution(root: string): ProjectHalf {
-  const path = join(root, CONSTITUTION_PATH);
-  if (!existsSync(path)) return { kind: "absent" };
-  const text = readFileSync(path, "utf8").trim();
+  const read = readOrdinaryOrSay(join(root, CONSTITUTION_PATH));
+  if (read.kind === "absent") return { kind: "absent" };
+  const text = read.text.trim();
   if (text.length === 0) return { kind: "empty" };
   return { kind: "present", text };
 }
@@ -61,9 +62,9 @@ export type BranchLookup =
 
 export function readProjectBranch(root: string, name: string): ProjectHalf {
   if (!isABranchName(name)) return { kind: "absent" };
-  const path = join(root, DOCTRINE_DIR, `${name}.md`);
-  if (!existsSync(path)) return { kind: "absent" };
-  const text = readFileSync(path, "utf8").trim();
+  const read = readOrdinaryOrSay(join(root, DOCTRINE_DIR, `${name}.md`));
+  if (read.kind === "absent") return { kind: "absent" };
+  const text = read.text.trim();
   if (text.length === 0) return { kind: "empty" };
   return { kind: "present", text };
 }

@@ -1,14 +1,17 @@
+import { randomBytes } from "node:crypto";
 import {
   closeSync,
   copyFileSync,
-  existsSync,
+  fstatSync,
   fsyncSync,
+  linkSync,
   mkdirSync,
   openSync,
   renameSync,
   statSync,
   unlinkSync,
   writeSync,
+  type Stats,
 } from "node:fs";
 import { dirname } from "node:path";
 
@@ -34,18 +37,91 @@ const LOCK_SUFFIX = ".looper-lock";
 
 const A_WRITE: Patience = { waitMs: 20, giveUpMs: 1000, staleMs: 5000 };
 
+const UNIQUE_BYTES = 8;
+
 function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function takeLock(path: string): boolean {
+function codeOf(cause: unknown): unknown {
+  return fieldAt(cause, "code");
+}
+
+function ownNameBeside(path: string): string {
+  return `${path}.${randomBytes(UNIQUE_BYTES).toString("hex")}${TEMP_SUFFIX}`;
+}
+
+type Identity = { readonly device: number; readonly inode: number; readonly writtenMs: number };
+
+function identityOf(held: Stats): Identity {
+  return { device: held.dev, inode: held.ino, writtenMs: held.mtimeMs };
+}
+
+function same(left: Identity, right: Identity): boolean {
+  return left.device === right.device && left.inode === right.inode && left.writtenMs === right.writtenMs;
+}
+
+type Taken = { readonly kind: "taken"; readonly mine: Identity } | { readonly kind: "held-by-another" };
+
+function takeLock(path: string): Taken {
+  let handle: number;
   try {
-    closeSync(openSync(path, "wx"));
-    return true;
+    handle = openSync(path, "wx");
   } catch (cause) {
-    if (fieldAt(cause, "code") !== "EEXIST") throw cause;
-    return false;
+    if (codeOf(cause) !== "EEXIST") throw cause;
+    return { kind: "held-by-another" };
   }
+  try {
+    return { kind: "taken", mine: identityOf(fstatSync(handle)) };
+  } finally {
+    closeSync(handle);
+  }
+}
+
+type Look = { readonly kind: "gone" } | { readonly kind: "there"; readonly who: Identity };
+
+function lookAt(path: string): Look {
+  let held: Stats;
+  try {
+    held = statSync(path);
+  } catch (cause) {
+    if (codeOf(cause) === "ENOENT") return { kind: "gone" };
+    throw cause;
+  }
+  return { kind: "there", who: identityOf(held) };
+}
+
+function forget(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch (cause) {
+    if (codeOf(cause) !== "ENOENT") throw cause;
+  }
+}
+
+function putBack(aside: string, path: string): void {
+  try {
+    linkSync(aside, path);
+  } catch (cause) {
+    if (codeOf(cause) !== "EEXIST") throw cause;
+  }
+  forget(aside);
+}
+
+function removeIfStill(path: string, who: Identity): void {
+  const look = lookAt(path);
+  if (look.kind === "gone" || !same(look.who, who)) return;
+  const aside = ownNameBeside(path);
+  try {
+    renameSync(path, aside);
+  } catch (cause) {
+    if (codeOf(cause) === "ENOENT") return;
+    throw cause;
+  }
+  const moved = lookAt(aside);
+  if (moved.kind === "gone") return;
+  if (same(moved.who, who)) forget(aside);
+  else putBack(aside, path);
 }
 
 function abandonedFor(lockWrittenMs: number, arrivedMs: number, staleMs: number): boolean {
@@ -56,26 +132,26 @@ export function abandonedBefore(lockWrittenMs: number, arrivedMs: number): boole
   return abandonedFor(lockWrittenMs, arrivedMs, A_WRITE.staleMs);
 }
 
-function leftBehind(path: string, arrivedMs: number, staleMs: number): boolean {
-  if (!existsSync(path)) return false;
-  return abandonedFor(statSync(path).mtimeMs, arrivedMs, staleMs);
-}
-
 export function withLockFor<T>(path: string, patience: Patience, body: () => T): Locked<T> {
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}${LOCK_SUFFIX}`;
   const arrived = Date.now();
 
   do {
-    if (takeLock(lock)) {
+    const taken = takeLock(lock);
+    if (taken.kind === "taken") {
       try {
         return { kind: "held", result: body() };
       } finally {
-        if (existsSync(lock)) unlinkSync(lock);
+        removeIfStill(lock, taken.mine);
       }
     }
-    if (leftBehind(lock, arrived, patience.staleMs)) unlinkSync(lock);
-    else sleep(patience.waitMs);
+    const look = lookAt(lock);
+    if (look.kind === "there" && abandonedFor(look.who.writtenMs, arrived, patience.staleMs)) {
+      removeIfStill(lock, look.who);
+    } else if (look.kind === "there") {
+      sleep(patience.waitMs);
+    }
   } while (Date.now() - arrived < patience.giveUpMs);
 
   return {
@@ -98,15 +174,21 @@ export type Written = {
   readonly backup: Backup;
 };
 
+const NO_BACKUP: Backup = { kind: "none" };
+
 function keepPrior(path: string): Backup {
-  if (!existsSync(path)) return { kind: "none" };
   const kept = `${path}${BACKUP_SUFFIX}`;
-  copyFileSync(path, kept);
+  try {
+    copyFileSync(path, kept);
+  } catch (cause) {
+    if (codeOf(cause) === "ENOENT") return NO_BACKUP;
+    throw cause;
+  }
   return { kind: "kept", path: kept };
 }
 
 function flushToDisk(temp: string, text: string): void {
-  const handle = openSync(temp, "w");
+  const handle = openSync(temp, "wx");
   try {
     writeSync(handle, text);
     fsyncSync(handle);
@@ -115,22 +197,16 @@ function flushToDisk(temp: string, text: string): void {
   }
 }
 
-function discard(temp: string): void {
-  if (existsSync(temp)) unlinkSync(temp);
-}
-
 function written(path: string, text: string, keeping: boolean): Written {
-  const temp = `${path}${TEMP_SUFFIX}`;
+  const temp = ownNameBeside(path);
   try {
     mkdirSync(dirname(path), { recursive: true });
-    const backup = keepPrior(path);
+    const backup = keeping ? keepPrior(path) : NO_BACKUP;
     flushToDisk(temp, text);
     renameSync(temp, path);
-    if (keeping) return { path, backup };
-    if (backup.kind === "kept") unlinkSync(backup.path);
-    return { path, backup: { kind: "none" } };
+    return { path, backup };
   } catch (cause) {
-    discard(temp);
+    forget(temp);
     const detail = reasonFrom(cause);
     throw new AtomicWriteFailed(path, detail);
   }

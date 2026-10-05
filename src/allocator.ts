@@ -54,14 +54,43 @@ function byPriority(left: Injection, right: Injection): number {
   return left.priority - right.priority;
 }
 
+const A_RULE_SET = "doctrine:";
+
+const NAMED_AS_DROPPED = "dropped:";
+
+const A_SUMMARY_AT_MOST = 100;
+
+function firstLineOf(text: string): string {
+  const [first] = text.trim().split("\n", 1);
+  const line = first === undefined ? "" : first.trim();
+  return line.length <= A_SUMMARY_AT_MOST ? line : `${line.slice(0, A_SUMMARY_AT_MOST)}…`;
+}
+
+function asDropped(injection: Injection): Weighed {
+  return {
+    source: injection.source,
+    chars: injection.text.length,
+    notice: injection.notice,
+    summary: injection.summary === undefined ? firstLineOf(injection.text) : injection.summary,
+  };
+}
+
+function howItArrives(one: Weighed): string {
+  if (one.source.startsWith(A_RULE_SET)) {
+    return `the doctrine tool serves it as ${one.source.slice(A_RULE_SET.length)}`;
+  }
+  if (one.notice) return "a notice: said on a later turn it fits while it still applies, and named here once";
+  return "said again on the next turn it fits";
+}
+
+function lineFor(one: Weighed): string {
+  const said = one.summary === undefined ? "" : `: ${one.summary}`;
+  return `  ${one.source} (${one.chars} chars)${said} — ${howItArrives(one)}`;
+}
+
 function droppedMarker(dropped: readonly Weighed[]): string {
-  const named = dropped
-    .map((one) => {
-      const said = one.summary === undefined ? "" : `: ${one.summary}`;
-      return `\n  ${one.source} (${one.chars} chars)${said}`;
-    })
-    .join("");
-  return `[looper: ${dropped.length} contribution(s) dropped for budget. Each is listed with what it holds, so this is an index and not a silence: pull the one your work touches by name with the doctrine tool, and run looper law for the outstanding-work count.${named}\n]`;
+  const named = dropped.map((one) => `\n${lineFor(one)}`).join("");
+  return `[looper: ${dropped.length} contribution(s) dropped for budget, each named with what it holds and how it arrives, so this is an index and not a silence:${named}\n]`;
 }
 
 function overBudgetMarker(chars: number, budget: number): string {
@@ -110,7 +139,9 @@ export function allocate(
   const parts: string[] = [];
   const contributors: string[] = [];
   const weighed: Weighed[] = [];
+  const taken: Injection[] = [];
   const dropped: Weighed[] = [];
+  const droppedNotices: Injection[] = [];
   const waiting = new Set<string>();
   let used = 0;
 
@@ -119,6 +150,7 @@ export function allocate(
     const separator = parts.length === 0 ? 0 : INJECTION_SEPARATOR.length;
     parts.push(injection.text);
     contributors.push(injection.source);
+    taken.push(injection);
     weighed.push({
       source: injection.source,
       chars: width,
@@ -128,25 +160,28 @@ export function allocate(
     used += separator + width;
   };
 
+  const drop = (injection: Injection): void => {
+    dropped.push(asDropped(injection));
+    if (injection.notice) droppedNotices.push(injection);
+  };
+
   for (const injection of ordered) {
     if (injection.notice && heardBefore(context.said, injection.source, injection.text)) continue;
     if (injection.required) {
       take(injection);
       continue;
     }
+    const waits =
+      injection.waits === true ||
+      (injection.notice && heardBefore(context.said, `${NAMED_AS_DROPPED}${injection.source}`, injection.text));
     const separator = parts.length === 0 ? 0 : INJECTION_SEPARATOR.length;
     if (used + separator + injection.text.length <= room) {
       take(injection);
-      if (injection.waits === true) waiting.add(injection.source);
+      if (waits) waiting.add(injection.source);
       continue;
     }
-    if (injection.waits === true) continue;
-    dropped.push({
-      source: injection.source,
-      chars: injection.text.length,
-      notice: injection.notice,
-      summary: injection.summary,
-    });
+    if (waits) continue;
+    drop(injection);
   }
 
   const requiredAlone = used > room;
@@ -157,15 +192,17 @@ export function allocate(
     const last = parts.pop();
     const name = contributors.pop();
     const held = weighed.pop();
-    if (last === undefined || name === undefined || held === undefined) break;
-    if (ordered.some((one) => one.source === name && one.required)) {
+    const injection = taken.pop();
+    if (last === undefined || name === undefined || held === undefined || injection === undefined) break;
+    if (injection.required) {
       parts.push(last);
       contributors.push(name);
       weighed.push(held);
+      taken.push(injection);
       break;
     }
     used -= last.length + INJECTION_SEPARATOR.length;
-    if (!waiting.has(name)) dropped.push(held);
+    if (!waiting.has(name)) drop(injection);
   }
 
   const heard = contributors.flatMap((name) => ordered.filter((one) => one.source === name && one.notice));
@@ -177,13 +214,18 @@ export function allocate(
   const text = withWhatFailed(spoken, failed.join(INJECTION_SEPARATOR));
 
   const unrecorded: string[] = [];
-  for (const notice of heard) {
-    if (!text.includes(notice.text)) continue;
+  const remember = (source: string, said: string): void => {
     try {
-      noteSaid(context.said, notice.source, notice.text);
+      noteSaid(context.said, source, said);
     } catch (cause) {
       unrecorded.push(reasonFrom(cause));
     }
+  };
+  for (const notice of heard) {
+    if (text.includes(notice.text)) remember(notice.source, notice.text);
+  }
+  for (const notice of droppedNotices) {
+    if (text.includes(lineFor(asDropped(notice)))) remember(`${NAMED_AS_DROPPED}${notice.source}`, notice.text);
   }
 
   return {

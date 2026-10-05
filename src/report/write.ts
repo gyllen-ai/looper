@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 
 import { canonBranchNames } from "../canon.ts";
@@ -15,9 +15,9 @@ import {
   REPORT_TOOL,
   RUST_EXTENSION,
 } from "../config.ts";
-import { reasonFrom } from "../fields.ts";
 import { knownRuleIds } from "../law/checks.ts";
 import { looperRoot } from "../law/readers.ts";
+import { readOrdinary } from "../ordinary.ts";
 import { gistOf } from "../said.ts";
 import { bodyOf, onOneLine, titleOf, unsaid, type Shape, type Told } from "./body.ts";
 import { A_SOURCE, namesOf, originOf } from "./origin.ts";
@@ -226,13 +226,10 @@ function drawn(at: Placed): Drawn {
   if (at.kind === "nowhere") return { kind: "none" };
   if (!hasAReader(at.path)) return { kind: "no-reader" };
 
-  let source: string;
-  try {
-    source = readFileSync(at.path, "utf8");
-  } catch (cause) {
-    return { kind: "refused", why: `the file could not be read (${reasonFrom(cause)})` };
-  }
-  const located = shapeFor(looperRoot(), at.path, source, at.line, REPORT_DEPTH);
+  const read = readOrdinary(at.path);
+  if (read.kind === "absent") return { kind: "refused", why: "the file was gone by the time it was read" };
+  if (read.kind === "unreadable") return { kind: "refused", why: read.why };
+  const located = shapeFor(looperRoot(), at.path, read.text, at.line, REPORT_DEPTH);
   if (located.kind === "not-found") return { kind: "no-shape", why: located.why };
 
   return {

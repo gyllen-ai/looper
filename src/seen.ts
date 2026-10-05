@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { JSON_INDENT } from "./config.ts";
 import { fieldAt, reasonFrom } from "./fields.ts";
 import { writeAtomically } from "./atomic.ts";
+import { readOrdinary } from "./ordinary.ts";
 
 export type Run = {
   readonly event: string;
@@ -64,9 +64,11 @@ function runFrom(value: unknown): Run | null {
 
 export function lastRun(root: string, home: string): Seen {
   const path = seenPath(root, home);
-  if (!existsSync(path)) return NOTHING;
+  const read = readOrdinary(path);
+  if (read.kind === "absent") return NOTHING;
+  if (read.kind === "unreadable") return unreadable(read.why);
   try {
-    const held: unknown = JSON.parse(readFileSync(path, "utf8"));
+    const held: unknown = JSON.parse(read.text);
     if (held === null || typeof held !== "object") return unreadable(`${path} holds no record`);
     return {
       last: runFrom(fieldAt(held, "last")),

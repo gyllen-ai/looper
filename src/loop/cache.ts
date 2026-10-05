@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { JSON_INDENT } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
 import { writeAtomically } from "../atomic.ts";
+import { readOrdinary } from "../ordinary.ts";
 
 const KEPT_DIR = join(".looper", "seen");
 
@@ -45,11 +45,13 @@ function numberAt(held: unknown, key: string): number | undefined {
 
 export function lastSeen(root: string, home: string): Read {
   const path = keptPath(root, home);
-  if (!existsSync(path)) return { kind: "never" };
+  const read = readOrdinary(path);
+  if (read.kind === "absent") return { kind: "never" };
+  if (read.kind === "unreadable") return { kind: "unreadable", why: read.why };
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(read.text);
   } catch (cause) {
     return { kind: "unreadable", why: reasonFrom(cause) };
   }

@@ -1,10 +1,11 @@
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Client } from "../capability.ts";
 import { LAW_PATH } from "../config.ts";
 import { reasonFrom } from "../fields.ts";
 import { looperRoot } from "../law/readers.ts";
+import { readOrdinary } from "../ordinary.ts";
 import { parseToml, type TomlDocument, type TomlValue } from "../toml.ts";
 import { titleOf, toldIn } from "./body.ts";
 import { homeOf } from "./origin.ts";
@@ -84,10 +85,16 @@ function offerSaid(document: TomlDocument): Offer {
 }
 
 export function offerIn(root: string): Offer {
-  const path = join(root, LAW_PATH);
-  if (!existsSync(path)) return { kind: "on" };
+  const read = readOrdinary(join(root, LAW_PATH));
+  if (read.kind === "absent") return { kind: "on" };
+  if (read.kind === "unreadable") {
+    return {
+      kind: "unclear",
+      why: `${LAW_PATH} could not be read, so looper cannot tell whether this project lets reports about it leave (${read.why})`,
+    };
+  }
   try {
-    return offerSaid(parseToml(readFileSync(path, "utf8"), LAW_PATH));
+    return offerSaid(parseToml(read.text, LAW_PATH));
   } catch (cause) {
     return {
       kind: "unclear",

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { withLock, writeAtomically } from "../atomic.ts";
 import { reasonFrom } from "../fields.ts";
 import { required } from "../present.ts";
+import { readOrdinaryOrSay } from "../ordinary.ts";
 
 export const HASH_LENGTH = 12;
 
@@ -94,9 +95,9 @@ export function parseDecisions(source: string): readonly Decision[] {
 }
 
 export function readDecisions(root: string): readonly Decision[] {
-  const path = join(root, DECISIONS_PATH);
-  if (!existsSync(path)) return [];
-  return parseDecisions(readFileSync(path, "utf8"));
+  const read = readOrdinaryOrSay(join(root, DECISIONS_PATH));
+  if (read.kind === "absent") return [];
+  return parseDecisions(read.text);
 }
 
 function hashInto(digest: Hash, root: string, rel: string): void {

@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 
 import { STACK_PATH } from "../config.ts";
+import { readOrdinaryOrSay } from "../ordinary.ts";
 import {
   A_LANGUAGE_BY_EXTENSION,
   A_MANIFEST_BY_NAME,
@@ -96,15 +97,15 @@ const NOT_A_LANGUAGE: readonly string[] = ["language", "---"];
 const NEITHER_HALF_NAMED = "";
 
 export function languagesListedIn(root: string): Written {
-  const path = join(root, STACK_PATH);
-  if (!existsSync(path)) return { kind: "absent" };
+  const read = readOrdinaryOrSay(join(root, STACK_PATH));
+  if (read.kind === "absent") return { kind: "absent" };
 
   const listed = new Set<string>();
   const frontend = new Set<string>();
   const backend = new Set<string>();
   let half = NEITHER_HALF_NAMED;
 
-  for (const line of readFileSync(path, "utf8").split("\n")) {
+  for (const line of read.text.split("\n")) {
     const heading = A_HALF.exec(line);
     if (heading !== null) {
       const named = heading[1];

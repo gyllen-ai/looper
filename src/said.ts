@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { JSON_INDENT } from "./config.ts";
 import { writeAtomically } from "./atomic.ts";
 import { reasonFrom } from "./fields.ts";
+import { readOrdinary } from "./ordinary.ts";
 
 export interface SaidStore {
   readonly trouble: string;
@@ -52,10 +52,12 @@ type Gists =
 
 function readGists(path: string): Gists {
   const gists = new Map<string, string>();
-  if (!existsSync(path)) return { kind: "read", gists };
+  const read = readOrdinary(path);
+  if (read.kind === "absent") return { kind: "read", gists };
+  if (read.kind === "unreadable") return { kind: "unreadable", why: read.why };
   let held: unknown;
   try {
-    held = JSON.parse(readFileSync(path, "utf8"));
+    held = JSON.parse(read.text);
   } catch (cause) {
     return { kind: "unreadable", why: reasonFrom(cause) };
   }
