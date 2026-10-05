@@ -3292,7 +3292,7 @@ document until they were written down.
 | `RUST-DEAD:4` | `use x::*` | nobody can tell where a name came from |
 | `RUST-LOG:2` | taking `io::stdout()` or `Stdout` in a type, outside the entry point | the printing decision, one level down where the printing rule cannot see it |
 | `RUST-TESTS:1` | `#[test]` and `#[cfg(test)]` under `src/` | a test inside the module tests the inside rather than the promise |
-| `RUST-ERROR:9` | a file that cannot be read as Rust at all | looper's own, not the engine's. The engine judges a crate at a time, so one unparseable file takes the whole crate down and the report would otherwise say nothing to fix. Ids 1 to 8 are the engine's; 9 upward are ours |
+| `RUST-ERROR:9` | a file that cannot be read as Rust at all | looper's own, not the engine's. A file nobody can parse produces no findings, exactly as a clean file does, and the Rust half stops at it, so every file read with it goes unjudged too; it is named rather than passed in silence. A file not handed to the reader cannot take the ones that were down with it. Ids 1 to 8 are the engine's; 9 upward are ours |
 
 
 **The rest of the set, as the engine enforces it.** Each row is the rule's own
@@ -7401,6 +7401,43 @@ Build order: the registry format and `looper design init`; the walker and
 the generated per-screen check; the untagged-element and collision
 failures; state forcing; the provenance rule; the stall shape.
 
+## Names that pointed elsewhere, and a closing block that said less — 2026-09-04
+
+**The constitution's closing block became a rule about the whole reply.** It
+asked for three lines on every message — what changed, what it means, next
+steps — whether or not anything had changed. It now asks for as little text as
+the reader needs to decide, a yes or a no where that is the honest answer, and
+`Next steps:` alone when a job ends, standing on its own rather than pointing
+back into the text above. The wording came from outside looper, brought in by
+the owner; it is 905 characters against the 1,000 the constitution is allowed.
+
+**Four names in the branch index pointed at the wrong thing.** `law` is the
+TypeScript branch and already said so through `SAID_AS`. `sources` reads as
+source files and is about reading prior work; `structure` and `architecture`
+are one word apart with nothing to tell them apart; `discipline` reads as
+process and is about writing code; `evidence` reads as proof and is about
+documents. The index now says `sources (prior work)`, `structure (shape
+first)`, `discipline (writing code)` and `evidence (documents)`.
+
+**It cost 54 characters and 16 were spare, so something had to go.** Measured
+2026-09-04: the always-on tier stood at 2,584 against the 2,600 cap in
+`tests/budget.test.ts`. The cap was not raised. The index header was repeating
+the `doctrine` tool's own description almost word for word — "the sets tied to
+the files you are editing arrive on their own; before editing in another area,
+pull its set" sits in both and is paid twice on every turn — so the duplicate
+half went and the one sentence the tool description does not carry, "go to the
+running system first", stayed. The header also lost the words "with the
+doctrine tool": the tool's own entry carries them, and they mean nothing on an
+install where the tool is not wired. Always-on tier 2,594 after, index 700
+against its own ceiling of 900.
+
+**The cap is a ratchet on doctrine growth, not the machine limit, and that is
+the part worth writing down.** Measured the same day: the always-on tier plus
+the largest single branch — `law`, 2,603 characters — is 5,197 against a 9,800
+budget, so nothing was near being dropped. 2,600 exists to make adding a line
+cost a deletion. That is what it did, and the deletion was real rather than a
+shave: a paragraph that said nothing the model was not already told.
+
 ## A line that connects to nothing — 2026-09-10
 
 Asked for by the owner on 2026-09-10, from the Ghost CSS extension: switch it on
@@ -8982,3 +9019,48 @@ a pipe by design; looper's own canon and source files, which an install ships
 and a project does not replace; and a report's body, which `release` already
 refuses unless it is an ordinary file. The law's own reads — `law.toml`, the
 baseline and the files it judges — wait for the open change to the baseline.
+
+## What #189 undid by accident is back — 2026-10-05
+
+#189 (`03c4585`, 2026-09-08) said it had been written on 2026-09-04 and stranded
+uncommitted. It was committed from a tree older than #186 and #188, and it put
+that tree back. Measured with `git diff`: against the tree it should have been
+built on (#188, `9152957`) it changes exactly the 19 files #186 changed, each by
+the exact inverse of #186's change, and drops #188's entry in this document;
+against the tree from before #186 (#184, `c454c08`) it differs only in the four
+files #188 changed. It holds no change of its own. Its message describes the
+diff it was shown, so the two rules it says came out went the same way as
+everything else in it.
+
+#209 had already put back the Rust reader being handed the files it judges, and
+three tests. This puts back the rest, onto code that has moved since:
+
+- **Two kinds of file are read again**: a `.d.ts`, and JSX in a `.js` file.
+- **`vm.runInContext` and its family are code made from a string** again, under
+  `TS-SECURITY:1`.
+- **Four rules fire on the harm their ban text names and no wider**: `TS-LAYER:2`
+  leaves the top of a CommonJS file alone, `DATA:2` tells receiving a body from
+  sending one, `TS-ERROR:10` says which half of its reason survives a kept cause,
+  and `TS-DEAD:3`'s ban text says what its check already did.
+- **The report prints eight places for a rule** and then how many more, in how
+  many files.
+- **23 cases and 8 tests, failing first**: before the code came back, 7 of the
+  439 cases disagreed with their rule and the test file could not load.
+- **Findings 106 to 120 and the two pass write-ups** in `docs/FINDINGS.md`, and
+  #188's entry here, at its own place after the design registry.
+
+**Kept out on purpose: `TS-TYPE:7` (`==`) and `TS-SECURITY:2` (a value written
+into the page)**, with their canon lines, table rows, 16 cases and 4 tests.
+#189's message names their removal as its purpose, and a change about restoring
+what nobody meant to lose is the wrong place to overrule that. The tree says the
+removal was not decided either, so findings 108 and 110, which those two rules
+cleared, are marked open again. Whether they return is a person's decision.
+
+**One restored claim was wrong, and is not restored as it was.** #186 said a
+broken Rust file stopped taking its crate down once the reader was handed files.
+Measured on a three-file crate today: a broken file the reader is not handed can
+no longer take the others down, which is the commit gate's case, but the reader
+still stops at a broken file it *is* handed, and `looper law` names it and
+leaves every file read with it unjudged. `RUST-ERROR:9`'s reason, its row in the
+rule table and finding 120 now say both, and `tests/rust.test.ts` holds the
+second half.

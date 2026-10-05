@@ -46,6 +46,10 @@ const TSX_PLUGINS_LEGACY: readonly string[] = [
   "decoratorAutoAccessors",
 ];
 
+const DECLARATION_ONLY: readonly string[] = [".d.ts", ".d.mts", ".d.cts"];
+
+const MAY_HOLD_JSX_WITHOUT_SAYING_SO: readonly string[] = [".js", ".mjs", ".cjs"];
+
 export function pluginsFor(file: string): readonly string[] {
   if (file.endsWith(".tsx") || file.endsWith(".jsx")) return TSX_PLUGINS;
   return TS_PLUGINS;
@@ -54,6 +58,30 @@ export function pluginsFor(file: string): readonly string[] {
 export function legacyPluginsFor(file: string): readonly string[] {
   if (file.endsWith(".tsx") || file.endsWith(".jsx")) return TSX_PLUGINS_LEGACY;
   return TS_PLUGINS_LEGACY;
+}
+
+export function declaresOnly(file: string): boolean {
+  return DECLARATION_ONLY.some((suffix) => file.endsWith(suffix));
+}
+
+function asDeclarations(plugins: readonly string[]): readonly unknown[] {
+  return plugins.map((held) => (held === "typescript" ? ["typescript", { dts: true }] : held));
+}
+
+function withJsx(plugins: readonly string[]): readonly string[] {
+  return plugins.includes("jsx") ? plugins : [...plugins, "jsx"];
+}
+
+export function attemptsFor(file: string): readonly (readonly unknown[])[] {
+  const standing = pluginsFor(file);
+  const legacy = legacyPluginsFor(file);
+  if (declaresOnly(file)) {
+    return [asDeclarations(standing), asDeclarations(legacy)];
+  }
+  if (MAY_HOLD_JSX_WITHOUT_SAYING_SO.some((suffix) => file.endsWith(suffix))) {
+    return [standing, withJsx(standing), legacy, withJsx(legacy)];
+  }
+  return [standing, legacy];
 }
 
 type Remembered = {
@@ -81,14 +109,19 @@ export function parseSource(file: string, text: string): Parsed {
 }
 
 function parseFresh(file: string, text: string): Parsed {
-  const standing = parseWith(file, text, pluginsFor(file));
-  if (standing.kind === "parsed") return standing;
-  const legacy = parseWith(file, text, legacyPluginsFor(file));
-  if (legacy.kind === "parsed") return legacy;
-  return standing;
+  let refused: Parsed = { kind: "unreadable", line: 0, detail: "nothing tried to read it" };
+  let told = false;
+  for (const plugins of attemptsFor(file)) {
+    const held = parseWith(file, text, plugins);
+    if (held.kind === "parsed") return held;
+    if (told) continue;
+    refused = held;
+    told = true;
+  }
+  return refused;
 }
 
-function parseWith(file: string, text: string, plugins: readonly string[]): Parsed {
+function parseWith(file: string, text: string, plugins: readonly unknown[]): Parsed {
   try {
     const ast = parse(text, {
       sourceType: "module",
