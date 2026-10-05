@@ -403,6 +403,62 @@ test("a secret of one case is still a secret", () => {
   }
 });
 
+const PATHS_THROUGH_A_CREDENTIAL_WORD: readonly string[] = [
+  "Sessions are checked by `app::auth::SessionToken` before any handler runs.",
+  "Sessions are checked by app::auth::SessionToken before any handler runs.",
+  "See `crate::auth::SessionStore` for where they live.",
+  "The login form posts to `auth::login`.",
+  "Refresh goes through `self::token::KindOfRefresh` now.",
+  "- `crate::secret::SecretString`",
+  "    let user: auth::AuthenticatedUser = extract(&request)?;",
+  "use crate::auth::AuthenticatedUser",
+];
+
+test("a double colon joins two names in a path and is never the assignment", () => {
+  for (const line of PATHS_THROUGH_A_CREDENTIAL_WORD) {
+    assert.deepEqual(
+      [...kinds(line)],
+      [],
+      `${line} — the first colon of a path was read as the assignment, and the rest of the path as the value`,
+    );
+  }
+});
+
+const A_PATH_WRITTEN_AS_A_TYPE: readonly string[] = [
+  "    let token: auth::BearerToken = load_token();",
+  "    let password: secrecy::SecretString = read_password()?;",
+  "    pub api_key: secrecy::SecretString",
+];
+
+test("a path written as the type of a credential is not its value", () => {
+  for (const line of A_PATH_WRITTEN_AS_A_TYPE) {
+    assert.deepEqual(
+      [...kinds(line)],
+      [],
+      `${line} — the type was read as the credential's value`,
+    );
+  }
+});
+
+const A_REAL_LOOKING_VALUE = "Tr0ub4dor3xKQ99mZp";
+
+test("a credential beside a path, or after a type written as one, is still caught", () => {
+  for (const line of [
+    `auth: ${A_REAL_LOOKING_VALUE}`,
+    `auth = "${A_REAL_LOOKING_VALUE}"`,
+    `password: ${A_REAL_LOOKING_VALUE}`,
+    `AUTH_TOKEN=${A_REAL_LOOKING_VALUE}`,
+    `"auth": "${A_REAL_LOOKING_VALUE}"`,
+    "password: Tr0ub4dor::3xKQ99mZp",
+    `token = "auth::${A_REAL_LOOKING_VALUE}"`,
+    `    let token: auth::BearerToken = "${A_REAL_LOOKING_VALUE}";`,
+    `    let api_key: secrecy::SecretString = ${A_REAL_LOOKING_VALUE}`,
+    `See crate::auth::Session; the deploy secret: ${A_REAL_LOOKING_VALUE}`,
+  ]) {
+    assert.ok(kinds(line).length > 0, `${line} carries a credential and nothing was said`);
+  }
+});
+
 test("what one case must not swallow", () => {
   for (const value of [
     "thequickbrownfoxjumpedoverthelazydog2",

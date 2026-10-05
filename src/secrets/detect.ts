@@ -32,23 +32,45 @@ const NAMED_ON_ITS_OWN = "pass|auth";
 
 const MORE_NAME_AFTER_A_SEPARATOR = "(?:[_-][A-Za-z0-9_-]*)?";
 
+const A_COLON_THAT_IS_NOT_HALF_A_PATH = ":(?!:)";
+
+const A_VALUE = `(?:["']([^"'\\s]{12,})["']|([^\\s"';,()\\[\\]{}]{12,})(?=\\s|$))`;
+
 const ASSIGNED = new RegExp(
   `(?:[A-Za-z0-9_]*(?:${NAMED_ANYWHERE})${MORE_NAME_AFTER_A_SEPARATOR}|(?<![A-Za-z0-9])(?:${NAMED_ON_ITS_OWN}))` +
-    `\\b["']?\\s*[:=]\\s*` +
-    `(?:["']([^"'\\s]{12,})["']|([^\\s"';,()\\[\\]{}]{12,})(?=\\s|$))`,
+    `\\b["']?\\s*(?:${A_COLON_THAT_IS_NOT_HALF_A_PATH}|=)\\s*` +
+    A_VALUE,
   "i",
 );
 
+const ASSIGNED_AFTER_ITS_TYPE = new RegExp(`^\\s*=\\s*${A_VALUE}`);
+
 const BLOB = /[A-Za-z0-9+/_-]{24,}={0,2}/g;
 
-const A_DOTTED_PATH = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\??\.[A-Za-z_$][A-Za-z0-9_$]*)+$/;
+const A_PATH_OF_NAMES = /^[A-Za-z_$][A-Za-z0-9_$]*(?:(?:\??\.|::)[A-Za-z_$][A-Za-z0-9_$]*)+$/;
 
 const LONGEST_PATH = 40;
 
-function readsACredentialOutOfAnObject(hit: RegExpExecArray): boolean {
+function namesAPath(writtenWithoutQuotes: string): boolean {
+  return writtenWithoutQuotes.length < LONGEST_PATH && A_PATH_OF_NAMES.test(writtenWithoutQuotes);
+}
+
+function valueIn(hit: RegExpExecArray): string | undefined {
+  const quoted = hit[1];
+  if (quoted !== undefined) return quoted;
   const writtenWithoutQuotes = hit[2];
-  if (writtenWithoutQuotes === undefined) return false;
-  return writtenWithoutQuotes.length < LONGEST_PATH && A_DOTTED_PATH.test(writtenWithoutQuotes);
+  if (writtenWithoutQuotes === undefined || namesAPath(writtenWithoutQuotes)) return undefined;
+  return writtenWithoutQuotes;
+}
+
+function assignedIn(text: string): string | undefined {
+  const hit = ASSIGNED.exec(text);
+  if (hit === null) return undefined;
+  const value = valueIn(hit);
+  if (value !== undefined || hit[2] === undefined) return value;
+  const afterItsType = ASSIGNED_AFTER_ITS_TYPE.exec(text.slice(hit.index + hit[0].length));
+  if (afterItsType === null) return undefined;
+  return valueIn(afterItsType);
 }
 
 const GIT_SHA = /^(?:[0-9a-f]{7}|[0-9a-f]{8}|[0-9a-f]{40}|[0-9a-f]{64})$/;
@@ -119,12 +141,6 @@ function excerptOf(text: string): string {
   return `${trimmed.slice(0, 16)}…`;
 }
 
-function valueIn(hit: RegExpExecArray): string | undefined {
-  const quoted = hit[1];
-  if (quoted !== undefined) return quoted;
-  return hit[2];
-}
-
 export function findingsIn(text: string, allowed: ReadonlySet<string>): readonly Finding[] {
   const found: Finding[] = [];
 
@@ -143,19 +159,10 @@ export function findingsIn(text: string, allowed: ReadonlySet<string>): readonly
   }
   if (found.length > 0) return found;
 
-  const assigned = ASSIGNED.exec(text);
-  if (assigned !== null) {
-    const value = valueIn(assigned);
-    const real =
-      value !== undefined &&
-      !allowed.has(value) &&
-      !PLACEHOLDER.test(value) &&
-      !value.includes(A_URL) &&
-      !readsACredentialOutOfAnObject(assigned);
-    if (real && value !== undefined) {
-      found.push({ kind: "something named like a credential, with a value", excerpt: excerptOf(value) });
-      return found;
-    }
+  const value = assignedIn(text);
+  if (value !== undefined && !allowed.has(value) && !PLACEHOLDER.test(value) && !value.includes(A_URL)) {
+    found.push({ kind: "something named like a credential, with a value", excerpt: excerptOf(value) });
+    return found;
   }
 
   const blobs = text.match(BLOB);
