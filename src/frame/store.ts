@@ -1,9 +1,9 @@
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 import { FRAMES_DIR } from "../config.ts";
-import { reasonFrom } from "../fields.ts";
 import { trackedFiles } from "../git.ts";
+import { readOrdinary } from "../ordinary.ts";
 import { writeAtomically } from "../atomic.ts";
 import { readFrame, type Frame } from "./frame.ts";
 
@@ -54,14 +54,13 @@ export function heldIn(root: string): Held {
   for (const entry of readdirSync(dir).sort()) {
     if (!entry.endsWith(".json")) continue;
     const path = join(FRAMES_DIR, entry);
-    let text: string;
-    try {
-      text = readFileSync(join(dir, entry), "utf8");
-    } catch (cause) {
-      unreadable.push({ path, why: reasonFrom(cause) });
+    const read = readOrdinary(join(dir, entry));
+    if (read.kind === "absent") continue;
+    if (read.kind === "unreadable") {
+      unreadable.push({ path, why: read.why });
       continue;
     }
-    const held = readFrame(text);
+    const held = readFrame(read.text);
     if (held.kind === "unreadable") {
       unreadable.push({ path, why: held.why });
       continue;

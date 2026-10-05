@@ -8760,3 +8760,68 @@ what is ours in that copy.
   the key that was looked up (`None => Found::Missing(key)`), and so does a
   variant spelled through `Self` in one arm and through the type's name in
   another.
+
+## Two loopers could share one temporary file or one lock, a pipe could hang a read, and a dropped notice was named every turn — 2026-10-05
+
+Four faults. Three were written down on 2026-10-01 and left out of #200–#202;
+the fourth was seen live on 2026-10-05, while five sessions ran looper's hooks
+on one project at once.
+
+**Two writers of one file shared one temporary name.** `writeAtomically` wrote
+every file through `<path>.looper-tmp`, one name per target. Before every shell
+call the law marks `~/.looper/seen/<project>.bash`, so five sessions wrote it at
+once, and the hook said `law could not reach a verdict (could not write …bash
+(ENOENT: no such file or directory, rename '…bash.looper-tmp' -> '…bash'))`: one
+writer had renamed the other's half-written file away. Because the mark is
+written first, the check after it was skipped too, and on a commit that check is
+the law's gate. A second collision sat behind the first: every write copied the
+old file to `<path>.looper-backup` and deleted the copy again, so the slower
+writer's delete failed. Now each write goes through a name of its own,
+`<path>.<16 hex>.looper-tmp`, still matched by `*.looper-tmp` in `.gitignore`
+and removed on failure, and only `writeKeepingPrior`, which `init` uses to keep
+a person's previous settings, makes a backup. The case runs a whole second write
+between the first one's flush and its rename: before, it failed with that same
+message; now both finish and the last rename wins.
+
+**The lock could throw, and two loopers could hold it.** `withLockFor` asked
+`existsSync` and then `statSync` or `unlinkSync`, so a holder letting go between
+the two made the waiter throw. Worse, two waiters that both found a stale lock
+both deleted whatever stood at its name, so the second deleted the lock the
+first had just taken and both ran; and a holder whose lock had been broken under
+it deleted its successor's on the way out. Now a lock missing between two steps
+was let go; a stale lock is broken by renaming it aside and checking it is still
+the one judged stale, by device, inode and modification time, and put back if it
+is not; and a holder lets go only of its own. Each interleaving is forced in a
+test by wrapping one `node:fs` call. What remains: in the instant a lock that
+was moved by mistake is being put back, a third looper can take the free name,
+and then two hold it. Node has no advisory lock to close that.
+
+**A pipe where looper keeps a file hung whatever read it.** `readFileSync` on a
+named pipe waits for a writer that never comes, and on `/dev/zero` it reads for
+ever. Config and state files are now read through `readOrdinary`
+(`src/ordinary.ts`), which opens without waiting, asks the opened file what it
+is, and refuses a pipe, a directory, a socket or a device by name. Each reader
+turns that into the state it already had for a file it could not read, or throws
+`CouldNotRead`, which the hook announces: open, never silent. A test puts a pipe
+where each of twelve readers looks and runs it in a child process with five
+seconds to answer: all twelve hung before; each answers in about 0.3 s now. Not
+converted here, because changes in flight beside this one own those files:
+`law.toml` as the law reads it, `.looper/baseline.toml` and the files the law
+judges (`src/law`), the secrets allow-list (`src/secrets`), the stall stream
+(`src/stall`) and what `init` reads.
+
+**A notice dropped for room was named on every turn, and sent to a tool that
+could not serve it.** A notice that did not fit was not marked heard, so it came
+back on the next turn, was dropped and listed again, and the marker told the
+reader to "pull the one your work touches by name with the doctrine tool", which
+holds rule sets and no notice. Now every line says what it holds and how it
+arrives. A rule set names the doctrine tool and the name it knows it by, and is
+named on every turn it does not fit, as the 2026-08-21 decision requires. A
+notice says it is said on a later turn it fits, is named once per session for
+the same words, and from then on waits for room the way the report offer does
+("An offer waits for room", above). Anything else, like a broken loop, is named
+every turn, because a fault nobody mentions cannot be asked for.
+
+The cases came first and failed for the reasons above: 7 of 10 in
+`tests/atomic-races.test.ts`, 13 of 15 in `tests/not-a-file.test.ts` (every one
+by hanging until it was killed), and 4 of 6 in `tests/dropped-once.test.ts`.

@@ -116,3 +116,10 @@ export class HookGroupsNotAnArray extends NotOursToFix {
     this.event = event;
   }
 }
+
+export class CouldNotRead extends NotOursToFix {
+  constructor(why: string) {
+    super(why);
+    this.name = "CouldNotRead";
+  }
+}

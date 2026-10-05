@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 import {
@@ -17,7 +17,7 @@ import {
   whereRustupLives,
 } from "./config.ts";
 import { NotSomethingLooperStarts } from "./errors.ts";
-import { reasonFrom } from "./fields.ts";
+import { readOrdinary } from "./ordinary.ts";
 
 export type Answered = SpawnSyncReturns<string>;
 
@@ -91,13 +91,10 @@ function installedCompiler(): Compiler {
   const home = whereRustupLives();
   const settings = join(home, RUSTUP_SETTINGS);
   if (!isAbsolute(home)) return { kind: "not-known", why: `${home} is not a whole path, and rustup would read it from another folder` };
-  if (!existsSync(settings)) return { kind: "not-known", why: `there is no ${settings}` };
-  let written: string;
-  try {
-    written = readFileSync(settings, "utf8");
-  } catch (cause) {
-    return { kind: "not-known", why: reasonFrom(cause) };
-  }
+  const read = readOrdinary(settings);
+  if (read.kind === "absent") return { kind: "not-known", why: `there is no ${settings}` };
+  if (read.kind === "unreadable") return { kind: "not-known", why: read.why };
+  const written = read.text;
   const sections = WHERE_SECTIONS_BEGIN.exec(written);
   const named = NAMES_THE_COMPILER.exec(sections === null ? written : written.slice(0, sections.index))?.[1];
   if (named === undefined || !existsSync(join(home, "toolchains", named))) {

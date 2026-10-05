@@ -1,5 +1,4 @@
 import { ADOPTED_HEADER } from "../stubs.ts";
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeAtomically } from "../atomic.ts";
@@ -7,6 +6,7 @@ import {
   ADOPTED_PATH,
   ADOPTING_PATH,
 } from "../config.ts";
+import { readOrdinaryOrSay } from "../ordinary.ts";
 import { parseToml, stringsAt, tableIn } from "../toml.ts";
 import { isShape, type Adopted } from "./shapes.ts";
 
@@ -16,10 +16,10 @@ function firstOr(held: readonly string[], fallback: string): string {
 }
 
 export function readAdopted(root: string): readonly Adopted[] {
-  const path = join(root, ADOPTED_PATH);
-  if (!existsSync(path)) return [];
+  const read = readOrdinaryOrSay(join(root, ADOPTED_PATH));
+  if (read.kind === "absent") return [];
 
-  const document = parseToml(readFileSync(path, "utf8"), ADOPTED_PATH);
+  const document = parseToml(read.text, ADOPTED_PATH);
   const adopted: Adopted[] = [];
 
   for (const [section] of document) {
@@ -84,11 +84,11 @@ export function rememberProposal(
 }
 
 export function proposalFor(root: string, one: Adopted): Pending {
-  const path = join(root, ADOPTING_PATH);
-  if (!existsSync(path)) {
+  const read = readOrdinaryOrSay(join(root, ADOPTING_PATH));
+  if (read.kind === "absent") {
     return { kind: "none", why: "nothing was proposed, so there is no evidence to carry" };
   }
-  const document = parseToml(readFileSync(path, "utf8"), ADOPTING_PATH);
+  const document = parseToml(read.text, ADOPTING_PATH);
   const section = `${one.shape}.${one.what}`;
   if (!document.has(section)) {
     return { kind: "none", why: `the pending proposal is for something else` };

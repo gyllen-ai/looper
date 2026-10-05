@@ -2,10 +2,10 @@ import { relative } from "node:path";
 
 import { AGENT_DIR, MAP_PATH } from "./config.ts";
 import { canonBranch } from "./canon.ts";
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { listBranches, readProjectBranch } from "./doctrine.ts";
+import { readOrdinary } from "./ordinary.ts";
 import { lineFor, sizeOfTree } from "./size.ts";
 import { trackedFiles } from "./git.ts";
 import { branchLinesOutsideASection, matches, readMap, unheardIn } from "./map.ts";
@@ -161,9 +161,10 @@ export function costLines(root: string, weighed: readonly Weighed[]): readonly s
 
 
 function strayBranchLines(root: string): readonly string[] {
-  const path = join(root, MAP_PATH);
-  if (!existsSync(path)) return [];
-  const stray = branchLinesOutsideASection(readFileSync(path, "utf8"));
+  const read = readOrdinary(join(root, MAP_PATH));
+  if (read.kind === "absent") return [];
+  if (read.kind === "unreadable") return [`  ${read.why}`];
+  const stray = branchLinesOutsideASection(read.text);
   if (stray.length === 0) return [];
   return [
     `  ${MAP_PATH} has ${stray.length} branch line(s) above any section, so none of them is read:`,
