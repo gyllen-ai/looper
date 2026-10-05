@@ -132,6 +132,16 @@ test("the engine still carries the shape reader the report needs", () => {
   }
 });
 
+test("the engine still lets a None arm name its absence, as its own help asks", () => {
+  const held = readFileSync(join(ROOT, "vendor", "rust-law", "src", "absence.rs"), "utf8");
+  for (const named of ["pub fn names_the_absence", "pub fn hands_absence_on"]) {
+    assert.ok(
+      held.includes(named),
+      `vendor/rust-law/src/absence.rs no longer has ${named}, so RUST-TRUTH:1 fires on a match that names the absence while the same code written as a let else passes. A newer copy of lawkeeper does not have this file: it is ours, and PROVENANCE.md says to re-apply it.`,
+    );
+  }
+});
+
 test("the engine still carries what we added to it", () => {
   const patterns = readFileSync(join(ROOT, "vendor", "rust-law", "src", "patterns.rs"), "utf8");
   for (const named of OUR_ENGINE_CHANGES) {

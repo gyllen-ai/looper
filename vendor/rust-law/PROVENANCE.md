@@ -243,6 +243,42 @@ four kinds of file, and `tests/invariants.test.ts` fails if a newer copy of
 lawkeeper arrives without `scan_tokens_for_env_macros` or
 `tokens_name_a_cargo_key`.
 
+**A None arm may name its absence — changed here, 2026-10-05.** New file
+`src/absence.rs`, with `names_the_absence` and `hands_absence_on`; the
+`judge_none_arm` call in `src/visitor.rs`, which now takes the arms of its
+match; and the legal line of `SCATTERED_DEFAULT` in `src/helps.rs`.
+
+`TRUTH:1` read a `None` arm as lawful only when it propagated, crashed or ended
+in `return`, `break` or `continue`. So `None => Held::Absent` was a default while
+`None => return Held::Absent` and `let Some(n) = fast else { return
+Held::Absent; }` passed: the same code, three spellings, two verdicts, and the
+refused one was the spelling the rule's own help asks for. `None => None`, which
+hands the absence on unchanged, was refused too.
+
+Now a `None` arm is also lawful when it hands the absence on — `None`,
+`Option::None`, either inside `Ok` — or names it: it yields a unit variant
+`E::V`, directly or inside `Ok`, and every other arm of the same match visibly
+yields a different variant of the same `E`, diverges or propagates. A name in
+SCREAMING_CASE is read as a constant, not a variant. Everything a present value
+could also be still fires: the variant another arm yields, the present variant
+filled with a made-up value, a variant beside an arm whose value cannot be read,
+and an arm that answers absence and a present value at once (`Some(0) | None`).
+
+Measured on 1,221 crates from `~/.cargo/registry` that nobody here wrote (1,218
+judged; 3 do not parse under either engine), old engine against new: **760
+`TRUTH:1` hits removed, 0 added, no other rule moved**, 4,154 before and 3,394
+after. 645 of the 760 hand the absence on (`None => None`, `Ok(None)`). The other
+115 were all read by hand, and 25 of the 645: none is a made-up value standing in
+for one nobody gave. They are outcomes named in the function's own type —
+`Poll::Pending`, `Needed::Unknown`, `ArgumentSafety::Absent`, `Resettable::Reset`,
+`FoundCrate::Itself` — and a handful where a format or a protocol says what
+absence means, such as rustls setting the initial ClientHello's record version
+the way RFC 8446 §5.1 says to.
+
+`audit/rust-cases.ts` holds eighteen `TRUTH:1` cases, the rule's first, and
+`tests/invariants.test.ts` fails if a newer copy of lawkeeper arrives without
+`src/absence.rs`.
+
 **Updating it.** Nothing fetches this. If lawkeeper gains something worth having,
 someone copies the new source in by hand, deliberately, re-applies the changes
 listed above, and says so in the commit. That is the price of never downloading
