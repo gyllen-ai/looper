@@ -1,6 +1,7 @@
 import type { Out } from "../out.ts";
 import { readFileSync } from "node:fs";
 import { isHookEvent, type HookEvent, type Payload } from "../capability.ts";
+import { readOrdinary } from "../ordinary.ts";
 import { dispatchHook, registry, type Dispatch } from "../registry.ts";
 import { reasonFrom } from "../fields.ts";
 import { couldNotJudge } from "../report/say.ts";
@@ -78,11 +79,9 @@ function readMessage(path: string | undefined, out: Out): Payload {
     out.warn("looper: the commit-message check needs the message file; passing");
     return { kind: "none" };
   }
-  try {
-    return { kind: "text", text: readFileSync(path, "utf8") };
-  } catch (cause) {
-    const detail = reasonFrom(cause);
-    out.warn(`looper: could not read the commit message (${detail}); passing`);
-    return { kind: "none" };
-  }
+  const read = readOrdinary(path);
+  if (read.kind === "text") return { kind: "text", text: read.text };
+  const why = read.kind === "absent" ? `${path} is not there` : read.why;
+  out.warn(`looper: could not read the commit message (${why}); passing`);
+  return { kind: "none" };
 }

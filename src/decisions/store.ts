@@ -5,9 +5,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { withLock, writeAtomically } from "../atomic.ts";
+import { CouldNotRead } from "../errors.ts";
 import { reasonFrom } from "../fields.ts";
 import { required } from "../present.ts";
-import { readOrdinaryOrSay } from "../ordinary.ts";
+import { holdOrdinary, readOrdinaryOrSay } from "../ordinary.ts";
 
 export const HASH_LENGTH = 12;
 
@@ -103,7 +104,10 @@ export function readDecisions(root: string): readonly Decision[] {
 function hashInto(digest: Hash, root: string, rel: string): void {
   const full = join(root, rel);
   if (!statSync(full).isDirectory()) {
-    digest.update(readFileSync(full));
+    const held = holdOrdinary(full, (handle) => readFileSync(handle));
+    if (held.kind === "absent") throw new CouldNotRead(`${full} is not there`);
+    if (held.kind === "unreadable") throw new CouldNotRead(held.why);
+    digest.update(held.value);
     return;
   }
   for (const name of readdirSync(full).sort()) {

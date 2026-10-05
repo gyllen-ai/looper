@@ -8946,3 +8946,39 @@ command, nine times, forty minutes, no write between them"*. Any write now
 starts the count again, as a write to the file already did for reads (#211). A
 command polled with nothing changing between, such as a status asked four times
 while waiting, is still named.
+
+## Every read asks what it is reading — 2026-10-06
+
+#210 made looper refuse a named pipe, a device or a directory where it expects a
+file, in the readers no open change was rewriting at the time. Seven were left,
+and two of them run on every turn:
+
+- **the hook settings**, read on every prompt since #211 repairs looper's own
+  entries there, and by `looper init`;
+- **the stall stream**, read on every prompt and appended to on every tool call.
+  Opening a pipe to add to it waits for a reader exactly as a read waits for a
+  writer, so a pipe there would have stopped every edit, not only every prompt;
+- **the secrets allow-list**, read by the commit gate;
+- **the doctrine files** whose sizes are announced;
+- **the files a decision rests on**, hashed to tell whether its ground moved;
+- **the commit message**, handed to the commit-message check;
+- **what `looper init` and `looper adopt` look at**: the git hook already in
+  place, a candidate checkout's `package.json`, the files a proposed rule is
+  swept over.
+
+Each now opens without waiting and asks what it opened. A pipe, a device or a
+directory is named in the reader's own unreadable answer, and an append to one
+is refused before anything is written. Where the allow-list cannot be read the
+gate scans with nothing allowed, the stricter reading, and a refusal says that
+nothing in the allow-list was let through and why.
+
+The cases came first, each driven in its own process against a real named pipe
+with five seconds to answer. Putting the plain read back into the decision hash
+makes its case wait the whole five seconds and fail; leaving the reason out of a
+refusal fails the allow-list case. 910 tests pass and the loop is whole.
+
+Left as they are, on purpose: the hook's own payload on standard input, which is
+a pipe by design; looper's own canon and source files, which an install ships
+and a project does not replace; and a report's body, which `release` already
+refuses unless it is an ordinary file. The law's own reads — `law.toml`, the
+baseline and the files it judges — wait for the open change to the baseline.

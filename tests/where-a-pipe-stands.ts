@@ -1,6 +1,14 @@
 import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 
+import { SETTINGS_PATH } from "../src/config.ts";
+import { hashing } from "../src/decisions/store.ts";
 import { readProjectConstitution } from "../src/doctrine.ts";
+import { readExisting } from "../src/init.ts";
+import { allowedIn } from "../src/secrets/capability.ts";
+import { sizeOfTree } from "../src/size.ts";
+import { heardFrom } from "../src/stall/capability.ts";
+import { note, reachedFor } from "../src/stall/stream.ts";
 import { readAdopted } from "../src/adopt/store.ts";
 import { readDecisions } from "../src/decisions/store.ts";
 import { lastSeen } from "../src/loop/cache.ts";
@@ -12,6 +20,12 @@ import { heldIn } from "../src/report/store.ts";
 import { SaidInSession } from "../src/said.ts";
 import { lastRun } from "../src/seen.ts";
 import { languagesListedIn } from "../src/stack/read.ts";
+
+function aReachOf(): Parameters<typeof note>[2] {
+  const heard = heardFrom(JSON.stringify({ session_id: "a-session", tool_name: "Bash", tool_input: { command: "ls" } }), 1);
+  if (heard.kind !== "reached") throw new RangeError(`the stall hook did not count a plain command (${heard.kind})`);
+  return heard.reached;
+}
 
 function tried(asked: () => unknown): string {
   try {
@@ -34,6 +48,12 @@ const READERS: ReadonlyMap<string, (root: string, home: string) => string> = new
   ["decisions", (root: string) => tried(() => readDecisions(root))],
   ["adopted", (root: string) => tried(() => readAdopted(root))],
   ["stack", (root: string) => tried(() => languagesListedIn(root))],
+  ["settings", (root: string) => tried(() => readExisting(join(root, SETTINGS_PATH)))],
+  ["stall stream", (root: string, home: string) => tried(() => reachedFor(root, home, "a-session"))],
+  ["stall stream, written to", (root: string, home: string) => tried(() => note(root, home, aReachOf()))],
+  ["secrets allow-list", (root: string) => tried(() => allowedIn(root).trouble)],
+  ["doctrine sizes", (root: string) => tried(() => sizeOfTree(root))],
+  ["decision hashing", (root: string) => tried(() => hashing(root, ["pipe.txt"]))],
 ]);
 
 const [reader, root, home, answer] = process.argv.slice(2);

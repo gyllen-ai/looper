@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -10,6 +10,7 @@ import {
   DOCTRINE_README_PATH,
 } from "./config.ts";
 import { stagedFiles, stagedText } from "./git.ts";
+import { readOrdinaryOrSay } from "./ordinary.ts";
 
 export type Bullet = { readonly line: number; readonly chars: number };
 
@@ -113,7 +114,8 @@ export function doctrineFilesUnder(root: string): readonly string[] {
 export function sizeOfTree(root: string): readonly Oversized[] {
   const found: Oversized[] = [];
   for (const path of doctrineFilesUnder(root)) {
-    found.push(...oversizedIn(path, readFileSync(join(root, path), "utf8")));
+    const read = readOrdinaryOrSay(join(root, path));
+    if (read.kind === "text") found.push(...oversizedIn(path, read.text));
   }
   return found;
 }
