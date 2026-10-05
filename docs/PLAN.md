@@ -8936,3 +8936,13 @@ read as unplaced, so the metric starts clean once more.
 
 Not measured: whether three is the right number. It is the smallest that is not
 one fix.
+
+**The same question asked again now means asked again with nothing written in
+between.** A shell command run four times in forty minutes was one question
+asked four times even when an edit came between every run, so a test run after
+each change — the loop the notice itself recommends — was named as being stuck.
+That is the shape this document described from the start: *"one process-listing
+command, nine times, forty minutes, no write between them"*. Any write now
+starts the count again, as a write to the file already did for reads (#211). A
+command polled with nothing changing between, such as a status asked four times
+while waiting, is still named.

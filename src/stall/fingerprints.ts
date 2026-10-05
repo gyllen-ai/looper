@@ -41,25 +41,20 @@ function byPrint(held: readonly Reached[], counted: (one: Reached) => boolean): 
   return grouped;
 }
 
-function repeatedShapes(held: readonly Reached[], tool: string, means: string): readonly Fingerprint[] {
-  const found: Fingerprint[] = [];
-  for (const ones of byPrint(held, (one) => one.tool === tool).values()) {
-    const earliest = ones[0];
-    if (earliest === undefined || ones.length < REPEATED_ENOUGH) continue;
-    found.push({ shape: earliest.shape, times: ones.length, minutes: spanOf(ones), means });
-  }
-  return found;
-}
-
-function readAgainUnwritten(held: readonly Reached[]): readonly Fingerprint[] {
+function againWithoutAWrite(
+  held: readonly Reached[],
+  tool: string,
+  resets: (write: Reached, print: string) => boolean,
+  means: string,
+): readonly Fingerprint[] {
   const running = new Map<string, readonly Reached[]>();
   const longest = new Map<string, readonly Reached[]>();
   for (const one of held) {
     if (WRITING.includes(one.tool)) {
-      running.delete(one.print);
+      for (const print of [...running.keys()]) if (resets(one, print)) running.delete(print);
       continue;
     }
-    if (one.tool !== "Read") continue;
+    if (one.tool !== tool) continue;
     const before = running.get(one.print);
     const run = before === undefined ? [one] : [...before, one];
     running.set(one.print, run);
@@ -70,9 +65,17 @@ function readAgainUnwritten(held: readonly Reached[]): readonly Fingerprint[] {
   for (const run of longest.values()) {
     const earliest = run[0];
     if (earliest === undefined || run.length < REPEATED_ENOUGH) continue;
-    found.push({ shape: earliest.shape, times: run.length, minutes: spanOf(run), means: "a dump where a view was needed" });
+    found.push({ shape: earliest.shape, times: run.length, minutes: spanOf(run), means });
   }
   return found;
+}
+
+function anyWrite(): boolean {
+  return true;
+}
+
+function aWriteTo(write: Reached, print: string): boolean {
+  return write.print === print;
 }
 
 function longReadRun(held: readonly Reached[]): readonly Fingerprint[] {
@@ -222,8 +225,8 @@ function rewrittenSoon(held: readonly Reached[]): readonly Fingerprint[] {
 export function stallsIn(reached: readonly Reached[], now: number): readonly Fingerprint[] {
   const held = within(reached, now);
   return [
-    ...repeatedShapes(held, "Bash", "no single call answers the question"),
-    ...readAgainUnwritten(held),
+    ...againWithoutAWrite(held, "Bash", anyWrite, "no single call answers the question"),
+    ...againWithoutAWrite(held, "Read", aWriteTo, "a dump where a view was needed"),
     ...rewrittenSoon(held),
     ...longReadRun(held),
   ];

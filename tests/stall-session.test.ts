@@ -311,6 +311,20 @@ test("four commands that share their first lines but ask different things are fo
   assert.deepEqual([...named(reached, now, UNANSWERED)], []);
 });
 
+test("a check run again after each edit is the loop working, not one question asked again", () => {
+  const now = Date.now();
+  const reached: Reached[] = [];
+  let source = PARTS;
+  for (let at = 0; at < 4; at += 1) {
+    reached.push(reachedBy(ran("s", "npm test"), now - (20 - 4 * at) * MINUTE));
+    const gone = `part_${at}_value()`;
+    const put = `part_${at}_value() + 1`;
+    reached.push(reachedBy(edited(FILE, source, gone, put), now - (19 - 4 * at) * MINUTE));
+    source = source.replace(gone, () => put);
+  }
+  assert.deepEqual([...named(reached, now, UNANSWERED)], []);
+});
+
 test("the same long command four times is one question asked four times, and its shape says it was cut", () => {
   const now = Date.now();
   const command = `${PREAMBLE}\n${first(ASKS)}\nEOF`;
