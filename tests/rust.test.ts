@@ -363,6 +363,27 @@ test("one file that will not parse does not make its whole crate report clean", 
   }
 });
 
+test("what the Rust half reads with a file it cannot parse goes unjudged, and is said to", WITHOUT_THE_RUST_ENGINE, () => {
+  const root = rustCrate(GUILTY_ONE_LINER);
+  try {
+    writeFileSync(join(root, "src", "lib.rs"), "mod a;\nmod broken;\n");
+    writeFileSync(join(root, "src", "broken.rs"), "pub fn g( {\n");
+
+    const survey = surveyProject(root, "everything", EVERYTHING);
+    const said = survey.violations.map((held) => `${held.rule.id} ${held.file}`);
+    assert.ok(
+      !said.some((one) => one.includes("a.rs")),
+      `a file read with one the reader stopped at was reported as judged: ${said.join(", ")}`,
+    );
+    assert.ok(
+      survey.unreadable.some((one) => one.includes("stopped at src/broken.rs")),
+      `the files that went unjudged with it were not named: ${survey.unreadable.join(" | ")}`,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the one file in the vendored tree that is ours obeys our law", () => {
   const ours = join(import.meta.dirname, "..", "vendor", "rust-law", "src", "bin", "looper-rust.rs");
   const text = readFileSync(ours, "utf8");
