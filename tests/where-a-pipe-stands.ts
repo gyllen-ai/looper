@@ -5,6 +5,9 @@ import { SETTINGS_PATH } from "../src/config.ts";
 import { hashing } from "../src/decisions/store.ts";
 import { readProjectConstitution } from "../src/doctrine.ts";
 import { readExisting } from "../src/init.ts";
+import { readConcessions } from "../src/law/concessions.ts";
+import { surveyProject, walkProject } from "../src/law/project.ts";
+import { shapeOf } from "../src/law/shape.ts";
 import { allowedIn } from "../src/secrets/capability.ts";
 import { sizeOfTree } from "../src/size.ts";
 import { heardFrom } from "../src/stall/capability.ts";
@@ -54,6 +57,12 @@ const READERS: ReadonlyMap<string, (root: string, home: string) => string> = new
   ["secrets allow-list", (root: string) => tried(() => allowedIn(root).trouble)],
   ["doctrine sizes", (root: string) => tried(() => sizeOfTree(root))],
   ["decision hashing", (root: string) => tried(() => hashing(root, ["pipe.txt"]))],
+  ["law.toml, as the law reads it", (root: string) => tried(() => readConcessions(root))],
+  ["package.json, as the law reads it", (root: string) => tried(() => readConcessions(root))],
+  ["package.json, as the shape reads it", (root: string) => tried(() => shapeOf(root))],
+  ["decisions, as the law reads them", (root: string) => tried(() => readConcessions(root))],
+  [".gitmodules, as the walk reads it", (root: string) => tried(() => walkProject(root))],
+  ["a file the law judges", (root: string) => tried(() => surveyProject(root, "everything", []))],
 ]);
 
 const [reader, root, home, answer] = process.argv.slice(2);

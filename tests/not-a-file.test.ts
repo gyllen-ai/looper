@@ -50,6 +50,12 @@ const PLACES: readonly Place[] = [
   { reader: "secrets allow-list", at: (root) => join(root, SECRETS_ALLOW_PATH) },
   { reader: "doctrine sizes", at: (root) => join(root, DOCTRINE_DIR, "extra.md") },
   { reader: "decision hashing", at: (root) => join(root, "pipe.txt") },
+  { reader: "law.toml, as the law reads it", at: (root) => join(root, LAW_PATH) },
+  { reader: "package.json, as the law reads it", at: (root) => join(root, "package.json") },
+  { reader: "package.json, as the shape reads it", at: (root) => join(root, "package.json") },
+  { reader: "decisions, as the law reads them", at: (root) => join(root, DECISIONS_PATH) },
+  { reader: ".gitmodules, as the walk reads it", at: (root) => join(root, ".gitmodules") },
+  { reader: "a file the law judges", at: (root) => join(root, "src", "a.ts") },
 ];
 
 type Scene = { readonly scratch: string; readonly root: string; readonly home: string };

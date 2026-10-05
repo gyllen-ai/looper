@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
@@ -34,6 +34,7 @@ import {
   under,
   type RustSaid,
 } from "./readers.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 export type Survey = {
   readonly violations: readonly Violation[];
@@ -53,7 +54,7 @@ export function submodulesOf(root: string): readonly string[] {
   const path = join(root, SUBMODULES);
   if (!existsSync(path)) return [];
   const found: string[] = [];
-  for (const line of readFileSync(path, "utf8").split("\n")) {
+  for (const line of textOfOrdinary(path).split("\n")) {
     const held = SUBMODULE_PATH.exec(line);
     if (held === null) continue;
     found.push(required(held[1], "the path of a submodule"));
@@ -66,7 +67,7 @@ export type Governed =
   | { readonly kind: "yes"; readonly why: string };
 
 function saysSomething(path: string): boolean {
-  return readFileSync(path, "utf8")
+  return textOfOrdinary(path)
     .split("\n")
     .some((line) => line.trim().length > 0 && !line.trim().startsWith("#"));
 }
@@ -328,7 +329,7 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
     if (isStyling(named)) {
       let styling = "";
       try {
-        styling = readFileSync(path, "utf8");
+        styling = textOfOrdinary(path);
       } catch (cause) {
         unreadable.push(`${named} (${reasonFrom(cause)})`);
         continue;
@@ -340,7 +341,7 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
     }
     let text = "";
     try {
-      text = readFileSync(path, "utf8");
+      text = textOfOrdinary(path);
     } catch (cause) {
       const detail = reasonFrom(cause);
       unreadable.push(`${named} (${detail})`);

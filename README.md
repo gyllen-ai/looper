@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-90 rules · 5 languages · 619 cases · 826 tests
+96 rules · 5 languages · 753 cases
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -106,14 +106,14 @@ and every lookup written down: none.
 
 | language | rules | how |
 |---|---:|---|
-| **TypeScript & JavaScript** | 32 | Babel, including React, Next and JSX |
-| **Rust** | 30 | `syn`, built from vendored source with the `cargo` you have |
+| **TypeScript & JavaScript** | 37 | Babel, including React, Next and JSX |
+| **Rust** | 31 | `syn`, built from vendored source with the `cargo` you have |
 | **Python** | 14 | Python's own parser — `python3`, nothing to install |
 | **C# & Razor** | 8 | Roslyn, `@code` blocks judged; the markup goes to the CSS rules |
 | **CSS, Sass & HTML** | 5 | read as declarations; `<style>` blocks in a page or a Razor component judged on its own lines, and `style=` attributes refused |
 | **every language at once** | 1 | `COPY:1` reads the directory, not the file: a name that says it is a second go at the file beside it |
 
-**619 cases** hold those rules to their own ban text — what must fire, what must
+**753 cases** hold those rules to their own ban text — what must fire, what must
 stay silent — and every rule was run over code nobody here wrote before it
 shipped.
 
@@ -208,11 +208,11 @@ later.
 
 `docs/PLAN.md` is the design record: every rule argued before it was built, every
 decision that was reversed keeping both halves, and every number measured with
-the date beside it. Four tests read it and refuse the suite if it drifts from
-what the code does.
+the date beside it. The tests in `tests/plan-is-true.test.ts` read it and refuse
+the suite if it drifts from what the code does.
 
-`docs/FINDINGS.md` is the audit. **A hundred and five things that were wrong with
-this tool**, how each was found, and what closing it cost. All of them are
+`docs/FINDINGS.md` is the audit. **120 things that were wrong with this tool**,
+how each was found, and what closing it cost. All of them are
 closed, and the ones still open are named at the top of that file when there are
 any. A tool that publishes its own audit — including what it still gets wrong —
 is making a claim that is expensive to fake.

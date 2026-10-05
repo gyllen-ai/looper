@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
+import { existsSync, readdirSync, type Dirent } from "node:fs";
 import { join, relative } from "node:path";
 
 import { fieldAt, reasonFrom } from "../fields.ts";
+import { textOfOrdinary } from "../ordinary.ts";
 
 export type Role = "backend" | "interface";
 
@@ -72,14 +73,16 @@ const SERVER_FRAMEWORKS: readonly string[] = [
   "next",
 ];
 
-function declaredDependencies(root: string): readonly string[] {
+type Declared = { readonly kind: "read"; readonly names: readonly string[] } | { readonly kind: "unreadable"; readonly why: string };
+
+function declaredDependencies(root: string): Declared {
   const path = join(root, "package.json");
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) return { kind: "read", names: [] };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    parsed = JSON.parse(textOfOrdinary(path));
   } catch (cause) {
-    return [`unreadable: ${reasonFrom(cause)}`];
+    return { kind: "unreadable", why: reasonFrom(cause) };
   }
   const found: string[] = [];
   for (const field of ["dependencies", "devDependencies"]) {
@@ -87,7 +90,7 @@ function declaredDependencies(root: string): readonly string[] {
     if (held === null || typeof held !== "object") continue;
     found.push(...Object.keys(held));
   }
-  return found;
+  return { kind: "read", names: found };
 }
 
 export function shapeOf(root: string): Shape {
@@ -107,7 +110,12 @@ export function shapeOf(root: string): Shape {
     };
   }
 
-  const serves = declaredDependencies(root).some((name) => SERVER_FRAMEWORKS.includes(name));
+  const declared = declaredDependencies(root);
+  const serves = declared.kind === "read" && declared.names.some((name) => SERVER_FRAMEWORKS.includes(name));
+  const unread =
+    declared.kind === "unreadable"
+      ? `. Its package.json could not be read (${declared.why}), so it was taken to declare no server`
+      : "";
 
   if (hasCargo && hasPackage) {
     return {
@@ -115,7 +123,7 @@ export function shapeOf(root: string): Shape {
       rustUnder: ["."],
       said: serves
         ? "Rust and TypeScript, and the TypeScript declares a server framework, so both halves are backends"
-        : "Rust and TypeScript, and the TypeScript declares no server framework, so it is read as the interface",
+        : `Rust and TypeScript, and the TypeScript declares no server framework, so it is read as the interface${unread}`,
     };
   }
   if (hasCargo) return { kind: "rust", rustUnder: ["."], said: "a Rust project" };
@@ -123,7 +131,7 @@ export function shapeOf(root: string): Shape {
     return {
       kind: "typescript",
       rustUnder: [],
-      said: serves ? "a TypeScript project with a server in it" : "a TypeScript project",
+      said: serves ? "a TypeScript project with a server in it" : `a TypeScript project${unread}`,
     };
   }
   return { kind: "unknown", rustUnder: [], said: "no Cargo.toml and no package.json" };

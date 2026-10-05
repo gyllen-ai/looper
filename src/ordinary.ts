@@ -96,3 +96,9 @@ export function addToOrdinary(path: string, text: string): Added {
     closeSync(handle);
   }
 }
+
+export function textOfOrdinary(path: string): string {
+  const read = readOrdinary(path);
+  if (read.kind === "text") return read.text;
+  throw new CouldNotRead(read.kind === "absent" ? `${path} is not there` : read.why);
+}
