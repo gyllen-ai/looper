@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, renameSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readSync, renameSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 import { withLockFor, type Patience } from "../atomic.ts";
+import { CouldNotRead } from "../errors.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
+import { addToOrdinary, holdOrdinary } from "../ordinary.ts";
 import { readAs, writtenAs, type Placed } from "./placed.ts";
 
 const STREAM_DIR = join(".looper", "seen");
@@ -100,13 +102,14 @@ export function note(root: string, home: string, one: Reached): Noted {
   const path = streamPath(root, home);
   try {
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(
-      path,
-      `${one.at}\t${one.tool}\t${oneLine(one.shape)}\t${oneLine(one.session)}\t${one.print}\t${writtenAs(one.placed)}\n`,
-    );
   } catch (cause) {
     return { kind: "not-noted", why: reasonFrom(cause) };
   }
+  const added = addToOrdinary(
+    path,
+    `${one.at}\t${one.tool}\t${oneLine(one.shape)}\t${oneLine(one.session)}\t${one.print}\t${writtenAs(one.placed)}\n`,
+  );
+  if (added.kind === "not-added") return { kind: "not-noted", why: added.why };
   try {
     cutIfLong(path, olderStreamPath(root, home));
     return { kind: "noted" };
@@ -118,18 +121,15 @@ export function note(root: string, home: string, one: Reached): Noted {
 type Tail = { readonly text: string; readonly bytes: number; readonly whole: boolean };
 
 function tailOf(path: string, upTo: number): Tail {
-  const size = sizeOf(path);
-  if (size.kind === "gone") return { text: "", bytes: 0, whole: true };
-  const take = Math.min(size.bytes, upTo);
-  const into = new Uint8Array(take);
-  const handle = openSync(path, "r");
-  let got = 0;
-  try {
-    got = readSync(handle, into, 0, take, size.bytes - take);
-  } finally {
-    closeSync(handle);
-  }
-  return { text: new TextDecoder().decode(into.subarray(0, got)), bytes: got, whole: take === size.bytes };
+  const held = holdOrdinary(path, (handle, bytes) => {
+    const take = Math.min(bytes, upTo);
+    const into = new Uint8Array(take);
+    const got = readSync(handle, into, 0, take, bytes - take);
+    return { text: new TextDecoder().decode(into.subarray(0, got)), bytes: got, whole: take === bytes };
+  });
+  if (held.kind === "absent") return { text: "", bytes: 0, whole: true };
+  if (held.kind === "unreadable") throw new CouldNotRead(held.why);
+  return held.value;
 }
 
 function fromALineStart(tail: Tail): string {

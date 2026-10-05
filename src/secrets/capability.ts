@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -9,6 +8,7 @@ import {
   SKIP_SUFFIXES,
 } from "../config.ts";
 import { SILENT } from "../capability.ts";
+import { readOrdinary } from "../ordinary.ts";
 import type {
   Capability,
   HookContext,
@@ -44,16 +44,31 @@ export type Caught = {
   readonly excerpt: string;
 };
 
-export function allowedValues(root: string): ReadonlySet<string> {
-  const path = join(root, SECRETS_ALLOW_PATH);
-  if (!existsSync(path)) return new Set();
+export type Allowed = { readonly values: ReadonlySet<string>; readonly trouble: string };
+
+export function allowedIn(root: string): Allowed {
+  const read = readOrdinary(join(root, SECRETS_ALLOW_PATH));
+  if (read.kind === "absent") return { values: new Set(), trouble: "" };
+  if (read.kind === "unreadable") {
+    return { values: new Set(), trouble: `looper: nothing in the allow-list was let through, because ${read.why}.` };
+  }
   const allowed = new Set<string>();
-  for (const line of readFileSync(path, "utf8").split("\n")) {
+  for (const line of read.text.split("\n")) {
     const value = line.trim();
     if (value.length === 0 || value.startsWith("#")) continue;
     allowed.add(value);
   }
-  return allowed;
+  return { values: allowed, trouble: "" };
+}
+
+export function allowedValues(root: string): ReadonlySet<string> {
+  return allowedIn(root).values;
+}
+
+function refusing(root: string, caught: readonly Caught[]): Outcome {
+  const trouble = allowedIn(root).trouble;
+  const reason = reportOn(caught);
+  return { kind: "block", reason: trouble.length === 0 ? reason : `${reason}\n\n${trouble}` };
 }
 
 export function scanStaged(root: string): readonly Caught[] {
@@ -140,7 +155,7 @@ export class Secrets implements Capability {
       if (context.payload.kind === "none") return { kind: "pass" };
       const inMessage = scanMessage(context.root, context.payload.text);
       if (inMessage.length === 0) return { kind: "pass" };
-      return { kind: "block", reason: reportOn(inMessage) };
+      return refusing(context.root, inMessage);
     }
 
     const alsoTyped: Caught[] = [];
@@ -158,7 +173,7 @@ export class Secrets implements Capability {
     }
     const caught = [...alsoTyped, ...scanStaged(context.root)];
     if (caught.length === 0) return { kind: "pass" };
-    return { kind: "block", reason: reportOn(caught) };
+    return refusing(context.root, caught);
   }
 
   tools(): readonly ToolDef[] {

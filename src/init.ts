@@ -1,9 +1,10 @@
 import { CONSTITUTION_STUB, DOCTRINE_README_STUB, MAP_STUB, SECRETS_ALLOW_STUB,
   LAW_STUB } from "./stubs.ts";
-import { chmodSync, existsSync, readFileSync, readdirSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { writeAtomically, writeKeepingPrior, type Backup } from "./atomic.ts";
+import { readOrdinary, readOrdinaryOrSay } from "./ordinary.ts";
 import {
   AGENT_DIR,
   whereTheUserLives,
@@ -112,8 +113,9 @@ const STUBS: readonly Stub[] = [
 ];
 
 export function readExisting(path: string): Existing {
-  if (!existsSync(path)) return { kind: "absent" };
-  return { kind: "present", text: readFileSync(path, "utf8") };
+  const read = readOrdinaryOrSay(path);
+  if (read.kind === "absent") return { kind: "absent" };
+  return { kind: "present", text: read.text };
 }
 
 const VENDOR = "vendor";
@@ -132,9 +134,8 @@ type Checkout = { readonly kind: "none" } | { readonly kind: "found"; readonly a
 
 function isLooperCheckout(path: string): boolean {
   if (!existsSync(join(path, SHIM))) return false;
-  const manifest = join(path, MANIFEST);
-  if (!existsSync(manifest)) return false;
-  return readFileSync(manifest, "utf8").includes(NAMED_LOOPER);
+  const manifest = readOrdinary(join(path, MANIFEST));
+  return manifest.kind === "text" && manifest.text.includes(NAMED_LOOPER);
 }
 
 function directoriesIn(path: string): readonly string[] {
@@ -250,9 +251,10 @@ function gitHook(
   const path = join(root, dir.path, name);
   const line = `${gitHookEntryFor(invocation)} ${marker.slice("looper ".length)}`;
 
-  if (existsSync(path)) {
-    const held = readFileSync(path, "utf8");
-    if (held.includes(marker)) return { kind: "gate-already", hook: name, path };
+  const held = readOrdinary(path);
+  if (held.kind === "unreadable") return { kind: "gate-impossible", hook: name, why: held.why };
+  if (held.kind === "text") {
+    if (held.text.includes(marker)) return { kind: "gate-already", hook: name, path };
     return { kind: "gate-yours", hook: name, path, line };
   }
 

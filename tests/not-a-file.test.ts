@@ -1,17 +1,29 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { ADOPTED_PATH, CONSTITUTION_PATH, DECISIONS_PATH, LAW_PATH, MAP_PATH, RECALL_PATH, STACK_PATH } from "../src/config.ts";
+import {
+  ADOPTED_PATH,
+  CONSTITUTION_PATH,
+  DECISIONS_PATH,
+  DOCTRINE_DIR,
+  LAW_PATH,
+  MAP_PATH,
+  RECALL_PATH,
+  SECRETS_ALLOW_PATH,
+  SETTINGS_PATH,
+  STACK_PATH,
+} from "../src/config.ts";
 import { fieldAt, reasonFrom } from "../src/fields.ts";
 import { keptPath } from "../src/loop/cache.ts";
 import { LOOP_FILE } from "../src/loop/checks.ts";
 import { reportsIn } from "../src/report/store.ts";
 import { saidPath } from "../src/said.ts";
 import { seenPath } from "../src/seen.ts";
+import { streamPath } from "../src/stall/stream.ts";
 
 const DRIVER = join(import.meta.dirname, "where-a-pipe-stands.ts");
 
@@ -32,6 +44,12 @@ const PLACES: readonly Place[] = [
   { reader: "decisions", at: (root) => join(root, DECISIONS_PATH) },
   { reader: "adopted", at: (root) => join(root, ADOPTED_PATH) },
   { reader: "stack", at: (root) => join(root, STACK_PATH) },
+  { reader: "settings", at: (root) => join(root, SETTINGS_PATH) },
+  { reader: "stall stream", at: (root, home) => streamPath(root, home) },
+  { reader: "stall stream, written to", at: (root, home) => streamPath(root, home) },
+  { reader: "secrets allow-list", at: (root) => join(root, SECRETS_ALLOW_PATH) },
+  { reader: "doctrine sizes", at: (root) => join(root, DOCTRINE_DIR, "extra.md") },
+  { reader: "decision hashing", at: (root) => join(root, "pipe.txt") },
 ];
 
 type Scene = { readonly scratch: string; readonly root: string; readonly home: string };
@@ -73,6 +91,45 @@ for (const place of PLACES) {
     }
   });
 }
+
+test("a named pipe where the commit message should be is refused and named, never waited on", () => {
+  const held = scene();
+  try {
+    const path = join(held.scratch, "COMMIT_EDITMSG");
+    execFileSync("mkfifo", [path], { stdio: "ignore" });
+    const ran = spawnSync(process.execPath, [join(import.meta.dirname, "..", "bin", "looper.js"), "hook", "CommitMessage", path], {
+      cwd: held.root,
+      encoding: "utf8",
+      timeout: PATIENCE_MS,
+    });
+    assert.notEqual(fieldAt(ran.error, "code"), "ETIMEDOUT", "the commit-message check waited on the pipe");
+    assert.match(`${ran.stdout}${ran.stderr}`, /named pipe/);
+  } finally {
+    rmSync(held.scratch, { recursive: true, force: true });
+  }
+});
+
+test("a commit refused while the allow-list is a named pipe says that nothing in it was let through", () => {
+  const held = scene();
+  try {
+    const allow = join(held.root, SECRETS_ALLOW_PATH);
+    mkdirSync(dirname(allow), { recursive: true });
+    execFileSync("mkfifo", [allow], { stdio: "ignore" });
+    const message = join(held.scratch, "COMMIT_EDITMSG");
+    writeFileSync(message, "rotated ghp_zzzz1111zzzz1111zzzz1111zzzz1111zzzz\n");
+    const ran = spawnSync(process.execPath, [join(import.meta.dirname, "..", "bin", "looper.js"), "hook", "CommitMessage", message], {
+      cwd: held.root,
+      encoding: "utf8",
+      timeout: PATIENCE_MS,
+    });
+    assert.notEqual(fieldAt(ran.error, "code"), "ETIMEDOUT", "the commit gate waited on the allow-list");
+    const said = `${ran.stdout}${ran.stderr}`;
+    assert.match(said, /ghp_/, "the key in the message was not caught");
+    assert.match(said, /nothing in the allow-list was let through, because .* is a named pipe/);
+  } finally {
+    rmSync(held.scratch, { recursive: true, force: true });
+  }
+});
 
 test("a device where law.toml is read is refused, rather than read for ever", () => {
   const held = scene();

@@ -1,11 +1,10 @@
-import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import { CONCEDING_NOTHING, readConcessions } from "../law/concessions.ts";
 import { judge } from "../law/engine.ts";
 import { judgedFiles } from "../law/project.ts";
 import { checkFor, type Adopted } from "./shapes.ts";
-import { reasonFrom } from "../fields.ts";
+import { readOrdinary } from "../ordinary.ts";
 
 export type Where = { readonly file: string; readonly line: number };
 
@@ -22,14 +21,12 @@ export function sweepFor(root: string, adopted: Adopted): Sweep {
 
   for (const path of judgedFiles(root)) {
     const named = relative(root, path);
-    let text = "";
-    try {
-      text = readFileSync(path, "utf8");
-    } catch (cause) {
-      const detail = reasonFrom(cause);
-      unreadable.push(`${named} (${detail})`);
+    const read = readOrdinary(path);
+    if (read.kind !== "text") {
+      unreadable.push(`${named} (${read.kind === "absent" ? "it was not there" : read.why})`);
       continue;
     }
+    const text = read.text;
     for (const violation of judge([check], "fast", { file: named, text }, concessions)
       .violations) {
       found.push({ file: named, line: violation.line });
