@@ -8604,3 +8604,83 @@ raises none. 842 tests pass and the loop is whole.
 What it does not cover, each a different shape from this one: a type with no
 path in it at the end of a line (`pub token: SecretString`) is still read as
 the value, and `token := …` is not read as an assignment at all.
+
+## One Rust file asked about was answered with its whole crate, because a fix had been undone — 2026-10-05
+
+Issue #203, written by an adopting project's agent through the `report` tool:
+`looper law` on one Rust file reported problems from other files of the same
+crate, at paths missing a directory, and called them standing, while the
+whole-project run called the same problems older and blocking nothing. Rebuilt
+here at `0c4204b` with a crate of four source files whose baseline holds two
+problems in `src/parts/b.rs` and one in `src/main.rs`. Asked about the clean
+`src/a.rs`, it reported all three, at `parts/b.rs` and `main.rs`, said "3
+problems still standing", and exited 2. The whole-project run said all three
+were older and exited 0.
+
+**The cause was a fix that had been undone.** #186 (2026-09-04) found that
+`judgedCrate` handed the Rust reader an empty list, so the reader walked the
+crate's module tree instead of judging the files it was given, and measured the
+cost across ten crates: 67,722 findings at paths that did not exist, 63,324 of
+them duplicates, and `tests/`, `benches/`, `examples/` and build scripts never
+judged. It passed the files. #189 (2026-09-08) was work written on 2026-09-04 in
+a checkout that never received #186 and committed four days later. Every one of
+the nineteen files #186 changed is, after #189, byte for byte what it was before
+#186, its tests and cases with them, and `docs/PLAN.md` lost #188's entry the
+same way. The empty list came back, and with it everything #186 had measured.
+This issue is the first of those faults seen from an adopting project.
+
+#189's message says it meant to take out two of #186's rules. It does not say it
+meant to undo the rest — the reader that could not read `.d.ts` files or JSX in
+`.js`, the report that joined hundreds of places onto one line, four rules
+sharpened to their ban text — and nothing here decides that. Only the Rust
+reader's half is restored, because it is this issue.
+
+### What was built
+
+**The reader is handed the files again,** crate by crate, so asking about one
+file judges that file and nothing beside it.
+
+**Each finding is matched to its file by the name the reader gives it, exactly.**
+The reader names a file by what follows its last `src/`, or by the file's own
+name outside one, so `build.rs` and `src/build.rs`, or `src/x.rs` and
+`tests/x.rs`, read alike to it. Files are now handed over in batches in which no
+two share that name. The old way of placing a finding — `<crate>/<name>` if that
+existed, else any file asked about that ended in the name, else the guess
+itself — is gone: it is where a finding in `src/build.rs` became one in
+`build.rs`, and where `src/` dropped out of the path. A finding the reader names
+in a file it was not handed is said, never placed.
+
+**Every line about what could not be judged is one sentence**, naming what was
+not judged and then why: `looper: could not judge 4 Rust files in the crate at
+this project's root (looper's Rust half would not build: cargo could not be
+started (spawnSync cargo ENOENT)).` The reader's reason used to stand where a
+file name belongs — "could not read looper's Rust half would not build: …; it
+was not judged". The commit gate's line no longer calls every refusal the Rust
+half's, and the count beside the law's report counts files rather than lines: a
+refused crate of two files is two not judged, where it was one.
+
+Restored from #186: `tests/rust-workspace.test.ts`, and the two commit-gate
+cases in which a file nothing can parse decides only its own verdict.
+
+### Evidence
+
+- The cases came first: three in `tests/law-named-paths.test.ts`, plus #186's.
+  Putting #189's empty list back fails three of them.
+- On the rebuilt crate: `looper law src/a.rs` says `1 files, nothing to fix.`
+  and exits 0; `looper law src/parts/b.rs` names both of its problems at
+  `src/parts/b.rs:2`, older than looper, and exits 0.
+- The sentence above was produced, not composed: the reader's sources were made
+  newer than its build and `cargo` taken off the `PATH`.
+- 844 tests pass, `looper loop` is whole, and `looper law` finds nothing in the
+  changed files.
+
+### What it changes, and what it does not cover
+
+- **Rust files outside `src/` are judged again**, as they were between #186 and
+  #189. A project whose baseline was recorded while they went unjudged will see
+  their older problems as new, and `looper init` records a baseline only where
+  none exists. Nothing here records them for it.
+- One file the reader cannot parse still stops every file handed over with it,
+  which in a whole-project run is the rest of its crate. RUST-ERROR:9 says so.
+- The edit hook keeps only findings from the Rust half, so an edited Rust file
+  whose reader cannot start passes without a word. Read, not changed here.

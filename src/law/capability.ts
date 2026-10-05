@@ -176,11 +176,11 @@ function isUnreadableRust(violation: Violation): boolean {
   return known.kind === "known" && violation.rule.id === known.rule.id;
 }
 
-function wentUnjudged(blinding: readonly string[], staged: readonly string[]): string {
+function wentUnjudged(blinding: readonly string[]): string {
   return [
-    `looper: ${blinding.join("; ")}, so the Rust half could not read that crate.`,
-    `The ${staged.length} Rust file(s) staged here were not judged at all, which is not the same as being clean.`,
-    "Nothing is blocked. Fix what the reader names and they can be seen again.",
+    `looper: could not judge ${blinding.join("; ")}.`,
+    "What was staged there was not judged at all, which is not the same as being clean.",
+    "Nothing is blocked. Fix what is named and it can be judged again.",
   ].join(" ");
 }
 
@@ -248,7 +248,7 @@ export function judgeStaged(root: string): Outcome {
       continue;
     }
     if (isUnreadableRust(violation)) {
-      blinding.push(`${violation.file} cannot be read as Rust`);
+      blinding.push(`${violation.file} (it cannot be read as Rust)`);
     }
   }
 
@@ -274,7 +274,7 @@ export function judgeStaged(root: string): Outcome {
   }
 
   if (violations.length === 0) {
-    if (blinding.length > 0) return { kind: "mention", note: wentUnjudged(blinding, inRust) };
+    if (blinding.length > 0) return { kind: "mention", note: wentUnjudged(blinding) };
     return { kind: "pass" };
   }
   return {

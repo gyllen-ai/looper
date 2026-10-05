@@ -366,14 +366,15 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
   }
 
   const couldNotParse = violations.filter((held) => held.rule === UNREADABLE_FILE).length;
-  const openedButUnjudged = couldNotParse + pythonSaid.unjudged + csharpSaid.unjudged;
+  const openedButUnjudged = couldNotParse + rustSaid.unjudged + pythonSaid.unjudged + csharpSaid.unjudged;
+  const saidByAReader =
+    rustSaid.unreadable.length + pythonSaid.unreadable.length + csharpSaid.unreadable.length;
 
   return {
     violations,
     files: files.length,
     unreadable,
-    unjudged: unreadable.length - pythonSaid.unreadable.length + pythonSaid.unjudged
-      + couldNotParse,
+    unjudged: unreadable.length - saidByAReader + openedButUnjudged,
     judged: files.length - openedButUnjudged,
     selfGoverned: walked.selfGoverned,
     couldNotSkipIgnored: walked.couldNotSkipIgnored,

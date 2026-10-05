@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { PYTHON_EXTENSION, RUST_EXTENSION, CSHARP_EXTENSIONS } from "../config.ts";
 import { reasonFrom } from "../fields.ts";
@@ -17,6 +17,7 @@ import type { Violation } from "./rule.ts";
 export type RustSaid = {
   readonly violations: readonly Violation[];
   readonly unreadable: readonly string[];
+  readonly unjudged: number;
 };
 
 export function looperRoot(): string {
@@ -49,24 +50,45 @@ function byCrate(root: string, files: readonly string[]): ReadonlyMap<string, st
 }
 
 export function judgeRustIn(root: string, files: readonly string[]): RustSaid {
-  if (files.length === 0) return { violations: [], unreadable: [] };
+  if (files.length === 0) return { violations: [], unreadable: [], unjudged: 0 };
 
   const violations: Violation[] = [];
   const unreadable: string[] = [];
+  let unjudged = 0;
   for (const [crate, inCrate] of byCrate(root, files)) {
-    const said = judgedCrate(root, crate, inCrate);
-    violations.push(...said.violations);
-    unreadable.push(...said.unreadable);
+    for (const batch of namedApart(inCrate)) {
+      const said = judgedBatch(root, crate, batch);
+      violations.push(...said.violations);
+      unreadable.push(...said.unreadable);
+      unjudged += said.unjudged;
+    }
   }
-  return { violations, unreadable };
+  return { violations, unreadable, unjudged };
 }
 
-function namedAmong(said: string, crate: string, files: readonly string[]): string {
-  const guess = join(crate, said);
-  if (existsSync(guess)) return guess;
-  const ending = `/${said}`;
-  const held = files.find((path) => path.endsWith(ending));
-  return held === undefined ? guess : held;
+const THE_SOURCE_ROOT = "/src/";
+
+function nameTheReaderGives(path: string): string {
+  const at = path.lastIndexOf(THE_SOURCE_ROOT);
+  return at < 0 ? basename(path) : path.slice(at + THE_SOURCE_ROOT.length);
+}
+
+function namedApart(files: readonly string[]): readonly ReadonlyMap<string, string>[] {
+  const batches: Map<string, string>[] = [];
+  for (const file of files) {
+    const name = nameTheReaderGives(file);
+    const room = batches.find((batch) => !batch.has(name));
+    if (room === undefined) batches.push(new Map([[name, file]]));
+    else room.set(name, file);
+  }
+  return batches;
+}
+
+function filesNamed(root: string, crate: string, files: readonly string[], other: string): string {
+  const only = files[0];
+  if (files.length === 1 && only !== undefined) return relative(root, only);
+  const at = relative(root, crate);
+  return `${files.length} ${other}Rust files in the crate at ${at === "" ? "this project's root" : at}`;
 }
 
 const ALREADY_SAID = /^could not read /;
@@ -77,11 +99,15 @@ function withoutRepeatedOpening(detail: string): string {
 
 const COULD_NOT_PARSE = /could not read (\S+) as Rust: [^(]*\(line (\d+)\)/;
 
-function refusedCrate(root: string, detail: string, files: readonly string[]): RustSaid {
+function refusedCrate(root: string, crate: string, detail: string, files: readonly string[]): RustSaid {
   const held = COULD_NOT_PARSE.exec(detail);
   const known = rustRuleFor("ERROR:9");
   if (held === null || known.kind === "unknown") {
-    return { violations: [], unreadable: [withoutRepeatedOpening(detail)] };
+    return {
+      violations: [],
+      unreadable: [`${filesNamed(root, crate, files, "")} (${withoutRepeatedOpening(detail)})`],
+      unjudged: files.length,
+    };
   }
   const file = required(held[1], "the file the Rust reader named");
   const line = Number(required(held[2], "the line the Rust reader named"));
@@ -93,27 +119,35 @@ function refusedCrate(root: string, detail: string, files: readonly string[]): R
       rest.length === 0
         ? []
         : [
-            `${rest.length} other file(s) in the same crate (the Rust reader stops at the crate, so nothing else in it was judged)`,
+            `${filesNamed(root, crate, rest, "other ")} (the Rust half stopped at ${relative(root, file)}, which it cannot parse, so nothing read with it was judged)`,
           ],
+    unjudged: files.length,
   };
 }
 
-function judgedCrate(root: string, crate: string, files: readonly string[]): RustSaid {
-  const said = judgeRust(looperRoot(), crate, []);
-  if (said.kind !== "found") return refusedCrate(root, said.detail, files);
+function judgedBatch(root: string, crate: string, batch: ReadonlyMap<string, string>): RustSaid {
+  const files = [...batch.values()];
+  const said = judgeRust(looperRoot(), crate, files);
+  if (said.kind !== "found") return refusedCrate(root, crate, said.detail, files);
 
   const violations: Violation[] = [];
-  const unknown: string[] = [];
+  const unplaced: string[] = [];
   for (const hit of said.hits) {
-    const named = namedAmong(hit.file, crate, files);
-    const known = rustRuleFor(hit.rule);
-    if (known.kind === "unknown") {
-      unknown.push(`the Rust half reported ${hit.rule}, which looper has no words for`);
+    const file = batch.get(hit.file);
+    if (file === undefined) {
+      unplaced.push(
+        `${hit.file} (the Rust half named it in the crate at ${relative(root, crate)}, and looper had not handed it any file by that name, so the finding has nowhere to go)`,
+      );
       continue;
     }
-    violations.push({ rule: known.rule, file: relative(root, named), line: hit.line });
+    const known = rustRuleFor(hit.rule);
+    if (known.kind === "unknown") {
+      unplaced.push(`${relative(root, file)} (the Rust half reported ${hit.rule} there, which looper has no words for)`);
+      continue;
+    }
+    violations.push({ rule: known.rule, file: relative(root, file), line: hit.line });
   }
-  return { violations, unreadable: unknown };
+  return { violations, unreadable: unplaced, unjudged: 0 };
 }
 
 export function under(root: string, paths: readonly string[], file: string): boolean {
@@ -154,7 +188,7 @@ export function judgePythonIn(root: string, files: readonly string[]): PythonSai
   for (const hit of said.hits) {
     const known = PYTHON_RULES.find((rule) => rule.id === hit.rule);
     if (known === undefined) {
-      unreadable.push(`the Python half reported ${hit.rule}, which looper has no words for`);
+      unreadable.push(`${relative(root, hit.file)} (the Python half reported ${hit.rule} there, which looper has no words for)`);
       continue;
     }
     const named = relative(root, hit.file);
@@ -190,7 +224,7 @@ export function judgeCsharpIn(root: string, files: readonly string[]): PythonSai
   for (const hit of said.hits) {
     const known = csharpRuleFor(hit.rule);
     if (known.kind === "unknown") {
-      unreadable.push(`the C# half reported ${hit.rule}, which looper has no words for`);
+      unreadable.push(`${hit.file} (the C# half reported ${hit.rule} there, which looper has no words for)`);
       continue;
     }
     if (setAside(standingOf(concessions, hit.file, known.rule.id))) continue;
