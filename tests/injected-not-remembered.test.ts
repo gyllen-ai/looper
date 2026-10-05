@@ -12,6 +12,8 @@ import { keep, lastSeen } from "../src/loop/cache.ts";
 import { metricOf } from "../src/stall/fingerprints.ts";
 import { saidAbout as saidAboutLoop } from "../src/loop/capability.ts";
 import { saidAbout as saidAboutStall } from "../src/stall/capability.ts";
+import type { Reached } from "../src/stall/stream.ts";
+import { MINUTE, edited, opened, ran, reachedBy } from "./stall-scene.ts";
 
 const HOUR = 3600 * 1000;
 
@@ -57,8 +59,8 @@ test("an old answer still arrives, carrying its age", () => {
 
 test("one command shape repeated in a window is named as a stall, not as a scolding", () => {
   const now = Date.now();
-  const reached = [];
-  for (let i = 0; i < 6; i += 1) reached.push({ at: now - (20 - i) * 60000, tool: "Bash", shape: "ps aux" });
+  const reached: Reached[] = [];
+  for (let i = 0; i < 6; i += 1) reached.push(reachedBy(ran("s", "ps aux"), now - (20 - i) * MINUTE));
   const metric = metricOf(reached, now);
   assert.equal(metric.stalls.length, 1);
   const first = metric.stalls[0];
@@ -70,8 +72,8 @@ test("one command shape repeated in a window is named as a stall, not as a scold
 test("an edit rewritten within minutes is the guess-instead-of-looking shape", () => {
   const now = Date.now();
   const reached = [
-    { at: now - 300000, tool: "Edit", shape: "src/a.ts" },
-    { at: now - 240000, tool: "Edit", shape: "src/a.ts" },
+    reachedBy(edited("src/a.ts", "const limit = 1;\n", "1", "2"), now - 5 * MINUTE),
+    reachedBy(edited("src/a.ts", "const limit = 2;\n", "2", "3"), now - 4 * MINUTE),
   ];
   const stalls = metricOf(reached, now).stalls;
   assert.equal(stalls.length, 1);
@@ -82,18 +84,18 @@ test("an edit rewritten within minutes is the guess-instead-of-looking shape", (
 test("ordinary work is not a stall", () => {
   const now = Date.now();
   const reached = [
-    { at: now - 300000, tool: "Read", shape: "src/a.ts" },
-    { at: now - 240000, tool: "Edit", shape: "src/a.ts" },
-    { at: now - 180000, tool: "Read", shape: "src/b.ts" },
-    { at: now - 120000, tool: "Edit", shape: "src/b.ts" },
+    reachedBy(opened("s", "src/a.ts"), now - 5 * MINUTE),
+    reachedBy(edited("src/a.ts", "const limit = 1;\n", "1", "2"), now - 4 * MINUTE),
+    reachedBy(opened("s", "src/b.ts"), now - 3 * MINUTE),
+    reachedBy(edited("src/b.ts", "const limit = 1;\n", "1", "2"), now - 2 * MINUTE),
   ];
   assert.deepEqual([...metricOf(reached, now).stalls], []);
 });
 
 test("the stall metric says what to do with a shape, and it is never to guess", () => {
   const now = Date.now();
-  const reached = [];
-  for (let i = 0; i < 6; i += 1) reached.push({ at: now - (20 - i) * 60000, tool: "Bash", shape: "ps aux" });
+  const reached: Reached[] = [];
+  for (let i = 0; i < 6; i += 1) reached.push(reachedBy(ran("s", "ps aux"), now - (20 - i) * MINUTE));
 
   const said = saidAboutStall(metricOf(reached, now).stalls);
   assert.match(said, /least\s+input per unit of certainty/);

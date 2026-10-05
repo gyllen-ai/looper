@@ -1,3 +1,4 @@
+import { WRITING, type Change } from "./placed.ts";
 import type { Reached } from "./stream.ts";
 
 export type Fingerprint = {
@@ -17,8 +18,6 @@ const RE_READING_AT_MOST = 2;
 
 const MINUTE = 60 * 1000;
 
-const WRITING: readonly string[] = ["Edit", "MultiEdit", "Write", "NotebookEdit"];
-
 function within(reached: readonly Reached[], now: number): readonly Reached[] {
   return reached.filter((one) => now - one.at <= A_WINDOW_MINUTES * MINUTE);
 }
@@ -31,18 +30,23 @@ function spanOf(held: readonly Reached[]): number {
   return Math.max(1, Math.round((last.at - first.at) / MINUTE));
 }
 
-function repeatedShapes(held: readonly Reached[], tool: string, means: string): readonly Fingerprint[] {
+function byPrint(held: readonly Reached[], counted: (one: Reached) => boolean): ReadonlyMap<string, readonly Reached[]> {
   const grouped = new Map<string, Reached[]>();
   for (const one of held) {
-    if (one.tool !== tool) continue;
-    const kept = grouped.get(one.shape);
-    if (kept === undefined) grouped.set(one.shape, [one]);
+    if (!counted(one)) continue;
+    const kept = grouped.get(one.print);
+    if (kept === undefined) grouped.set(one.print, [one]);
     else kept.push(one);
   }
+  return grouped;
+}
+
+function repeatedShapes(held: readonly Reached[], tool: string, means: string): readonly Fingerprint[] {
   const found: Fingerprint[] = [];
-  for (const [shape, ones] of grouped) {
-    if (ones.length < REPEATED_ENOUGH) continue;
-    found.push({ shape, times: ones.length, minutes: spanOf(ones), means });
+  for (const ones of byPrint(held, (one) => one.tool === tool).values()) {
+    const earliest = ones[0];
+    if (earliest === undefined || ones.length < REPEATED_ENOUGH) continue;
+    found.push({ shape: earliest.shape, times: ones.length, minutes: spanOf(ones), means });
   }
   return found;
 }
@@ -60,7 +64,7 @@ function longReadRun(held: readonly Reached[]): readonly Fingerprint[] {
   }
   if (run.length > longest.length) longest = run;
   if (longest.length < A_LONG_READ_RUN) return [];
-  const targets = new Set(longest.map((one) => one.shape));
+  const targets = new Set(longest.map((one) => one.print));
   if (targets.size > RE_READING_AT_MOST) return [];
   return [
     {
@@ -74,22 +78,72 @@ function longReadRun(held: readonly Reached[]): readonly Fingerprint[] {
 
 const REWRITTEN_WITHIN_MINUTES = 5;
 
+type Written = { readonly from: number; readonly to: number; readonly by: Reached };
+
+type Chain = { readonly kind: "broken" } | { readonly kind: "at"; readonly after: string };
+
+function touches(span: Written, change: Change): boolean {
+  const end = change.at + change.removed;
+  if (span.from === span.to) {
+    if (change.removed === 0) return change.at === span.from;
+    return change.at < span.from && span.from < end;
+  }
+  if (change.removed === 0) return span.from < change.at && change.at < span.to;
+  return change.at < span.to && span.from < end;
+}
+
+function carried(span: Written, change: Change): readonly Written[] {
+  const end = change.at + change.removed;
+  const shift = change.added - change.removed;
+  if (!touches(span, change)) {
+    if (span.to <= change.at) return [span];
+    return [{ from: span.from + shift, to: span.to + shift, by: span.by }];
+  }
+  const kept: Written[] = [];
+  if (span.from < change.at) kept.push({ from: span.from, to: Math.min(span.to, change.at), by: span.by });
+  if (span.to > end) kept.push({ from: Math.max(span.from, end) + shift, to: span.to + shift, by: span.by });
+  return kept;
+}
+
+function rewritesIn(writes: readonly Reached[]): ReadonlySet<Reached> {
+  const involved = new Set<Reached>();
+  let chain: Chain = { kind: "broken" };
+  let written: readonly Written[] = [];
+  for (const write of writes) {
+    const placed = write.placed;
+    if (placed.kind !== "placed") {
+      chain = { kind: "broken" };
+      written = [];
+      continue;
+    }
+    if (chain.kind === "broken" || chain.after !== placed.before) written = [];
+    written = written.filter((span) => write.at - span.by.at <= REWRITTEN_WITHIN_MINUTES * MINUTE);
+    for (const change of placed.changes) {
+      for (const span of written) {
+        if (span.by === write || !touches(span, change)) continue;
+        involved.add(span.by);
+        involved.add(write);
+      }
+      written = [
+        ...written.flatMap((span) => carried(span, change)),
+        { from: change.at, to: change.at + change.added, by: write },
+      ];
+    }
+    chain = { kind: "at", after: placed.after };
+  }
+  return involved;
+}
+
 function rewrittenSoon(held: readonly Reached[]): readonly Fingerprint[] {
-  const written = held.filter((one) => WRITING.includes(one.tool));
   const found: Fingerprint[] = [];
-  const seen = new Set<string>();
-  for (let at = 0; at < written.length; at += 1) {
-    const one = written[at];
-    if (one === undefined || seen.has(one.shape)) continue;
-    const again = written.filter(
-      (other) => other.shape === one.shape && other.at - one.at <= REWRITTEN_WITHIN_MINUTES * MINUTE,
-    );
-    if (again.length < 2) continue;
-    seen.add(one.shape);
+  for (const writes of byPrint(held, (one) => WRITING.includes(one.tool)).values()) {
+    const involved = [...rewritesIn(writes)].sort((one, other) => one.at - other.at);
+    const earliest = involved[0];
+    if (earliest === undefined) continue;
     found.push({
-      shape: one.shape,
-      times: again.length,
-      minutes: spanOf(again),
+      shape: earliest.shape,
+      times: involved.length,
+      minutes: spanOf(involved),
       means: "acting on a guess, because looking was too expensive",
     });
   }

@@ -2,7 +2,8 @@ import { STALL_PRIORITY, whereTheUserLives } from "../config.ts";
 import type { Capability, HookContext, HookEvent, InjectContext, Injection, Outcome, ToolCall, ToolDef, ToolResult } from "../capability.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
 import { metricOf, type Fingerprint } from "./fingerprints.ts";
-import { note, reachedFor, shapeOf } from "./stream.ts";
+import { placedIn } from "./placed.ts";
+import { note, printOf, reachedFor, shapeOf, type Reached } from "./stream.ts";
 
 const SILENT: readonly Injection[] = [];
 
@@ -18,6 +19,45 @@ function detailIn(input: unknown): string {
     if (typeof held === "string") return held;
   }
   return "";
+}
+
+export type Heard =
+  | { readonly kind: "nothing" }
+  | { readonly kind: "not-counted"; readonly note: string }
+  | { readonly kind: "reached"; readonly reached: Reached };
+
+export function heardFrom(payload: string, at: number): Heard {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch (cause) {
+    return {
+      kind: "not-counted",
+      note: `looper: this tool call was not counted toward the stall metric (${reasonFrom(cause)}), so the metric is measuring less than happened.`,
+    };
+  }
+  const tool = fieldAt(parsed, "tool_name");
+  if (typeof tool !== "string") return { kind: "nothing" };
+  const who = fieldAt(parsed, "session_id");
+  if (typeof who !== "string" || who.length === 0) {
+    return {
+      kind: "not-counted",
+      note: "looper: this tool call carried no session id, so it was not counted toward the stall metric.",
+    };
+  }
+  const input = fieldAt(parsed, "tool_input");
+  const detail = detailIn(input);
+  return {
+    kind: "reached",
+    reached: {
+      at,
+      tool,
+      shape: shapeOf(tool, detail),
+      print: printOf(tool, detail),
+      placed: placedIn(tool, input, fieldAt(parsed, "tool_response")),
+      session: who,
+    },
+  };
 }
 
 export function saidAbout(stalls: readonly Fingerprint[]): string {
@@ -57,34 +97,21 @@ export class Stall implements Capability {
 
   onHook(context: HookContext): Outcome {
     if (context.payload.kind === "none") return { kind: "pass" };
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(context.payload.text);
-    } catch (cause) {
-      return {
-        kind: "mention",
-        note: `looper: this tool call was not counted toward the stall metric (${reasonFrom(cause)}), so the metric is measuring less than happened.`,
-      };
-    }
-    const tool = fieldAt(parsed, "tool_name");
-    if (typeof tool !== "string") return { kind: "pass" };
-    const who = fieldAt(parsed, "session_id");
-    if (typeof who !== "string" || who.length === 0) {
-      return {
-        kind: "mention",
-        note: "looper: this tool call carried no session id, so it was not counted toward the stall metric.",
-      };
-    }
-    const noted = note(context.root, whereTheUserLives(), {
-      at: Date.now(),
-      tool,
-      shape: shapeOf(tool, detailIn(fieldAt(parsed, "tool_input"))),
-      session: who,
-    });
+    const heard = heardFrom(context.payload.text, Date.now());
+    if (heard.kind === "nothing") return { kind: "pass" };
+    if (heard.kind === "not-counted") return { kind: "mention", note: heard.note };
+    const noted = note(context.root, whereTheUserLives(), heard.reached);
     if (noted.kind === "not-noted") {
       return {
         kind: "mention",
         note: `looper: what this session reached for was not written down (${noted.why}), so the stall metric is measuring less than happened.`,
+      };
+    }
+    const placed = heard.reached.placed;
+    if (placed.kind === "unplaced") {
+      return {
+        kind: "mention",
+        note: `looper: ${placed.why}, so the stall metric cannot tell whether it rewrote what was written just before it.`,
       };
     }
     return { kind: "pass" };
