@@ -8561,3 +8561,46 @@ Two things were found while reading this and are not changed here:
 - The stream is appended to and never trimmed, and every prompt reads all of it
   to use its last 400 lines. The largest on this machine is 8.4 MB, 44,549
   lines.
+
+## A double colon was read as a credential being assigned — 2026-10-05
+
+Issue #204, a report from an adopting project's agent: the secrets gate refused
+a commit over a sentence in a document that named a module path in backticks,
+a path through the word for sign-in. Rebuilt here from the shape at `0c4204b`,
+it fired: `` `app::auth::SessionToken` `` in a sentence came out as *something
+named like a credential, with a value*, and the value it quoted began with a
+colon. The pattern took the first colon of `::` as the assignment and the rest
+of the path as what was assigned. The same misreading had a second place: in
+`let token: auth::BearerToken = load_token();` the colon is real, but the value
+it took was the type.
+
+What changed, in `src/secrets/detect.ts`:
+
+- **A colon that is half of `::` is never the assignment.**
+- **An unquoted value that is a path of names is code, whether its names are
+  joined by `.` or by `::`.** The dotted half was already true
+  (`config.apiToken`). Where the path is a type and an `=` follows it, what
+  comes after the `=` is judged instead, so `let token: auth::BearerToken =
+  "<a real value>"` is still caught. Before, it was caught only because the
+  type was mistaken for the value.
+
+The cases came first: eight paths through a credential word, in prose and in
+code, that must stay silent; three credentials whose type is a path; and ten
+lines that must still be caught, among them a value with a double colon that is
+not a path of names, a quoted value shaped like a path, and a real value after
+a type written as a path. Each of the three parts was then broken on purpose,
+and a case stopped each one.
+
+**Measured on code nobody here wrote**, every Rust crate in this machine's
+cargo registry on 2026-10-05: 45,189 files, 21,272,177 lines. The change
+silences 1,177 lines and raises none: 797 where the value was a type or a trait
+bound written as a path, 378 where half of `::` was the assignment, and 2 where
+a macro quotes a path. 61 of them were read by hand, every twentieth of each
+kind and both of the last two, and none is a credential; one is a changelog line
+naming a type in backticks, the shape the report described. Over this
+repository, its packages and its vendored Rust, 388,049 lines, it silences 8 and
+raises none. 842 tests pass and the loop is whole.
+
+What it does not cover, each a different shape from this one: a type with no
+path in it at the end of a line (`pub token: SecretString`) is still read as
+the value, and `token := …` is not read as an assignment at all.
