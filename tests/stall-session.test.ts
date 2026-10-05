@@ -125,7 +125,7 @@ test("twelve edits inside a minute, each at a different place in one file, are o
   assert.deepEqual([...named(reached, now, GUESS)], []);
 });
 
-test("an edit that rewrites what an edit before it wrote, within minutes, is the guess shape", () => {
+test("one fix to what an edit just wrote is ordinary work, not a guess", () => {
   const now = Date.now();
   const reached = editedInTurn(
     FILE,
@@ -138,10 +138,27 @@ test("an edit that rewrites what an edit before it wrote, within minutes, is the
     now - 3 * MINUTE,
     MINUTE,
   );
+  assert.deepEqual([...named(reached, now, GUESS)], []);
+});
+
+test("the same place written three times within minutes is the guess shape", () => {
+  const now = Date.now();
+  const reached = editedInTurn(
+    FILE,
+    PARTS,
+    [
+      { gone: "part_3_value()", put: "part_3_value() + 1" },
+      { gone: "part_7_value()", put: "part_7_value() * 2" },
+      { gone: "part_3_value() + 1", put: "part_3_value() + 2" },
+      { gone: "part_3_value() + 2", put: "part_3_value() + 3" },
+    ],
+    now - 4 * MINUTE,
+    MINUTE,
+  );
   const said = named(reached, now, GUESS);
   assert.equal(said.length, 1);
   assert.equal(first(said).shape, FILE);
-  assert.equal(first(said).times, 2, "the edit at another place in the file is not part of it");
+  assert.equal(first(said).times, 3, "the edit at another place in the file is not part of it");
 });
 
 test("an edit undone by the next one is the guess shape", () => {
@@ -157,6 +174,48 @@ test("an edit undone by the next one is the guess shape", () => {
     MINUTE,
   );
   assert.equal(first(named(reached, now, GUESS)).times, 2);
+});
+
+test("an edit undone after other edits moved it is still the guess shape", () => {
+  const now = Date.now();
+  const reached = editedInTurn(
+    FILE,
+    PARTS,
+    [
+      { gone: "    part_5_value()\n", put: "    trace(5);\n    part_5_value()\n" },
+      { gone: "part_0_value()", put: "part_0_value() + 100" },
+      { gone: "    trace(5);\n    part_5_value()\n", put: "    part_5_value()\n" },
+    ],
+    now - 3 * MINUTE,
+    MINUTE,
+  );
+  const said = named(reached, now, GUESS);
+  assert.equal(said.length, 1);
+  assert.equal(first(said).times, 2, "the line put in and the edit that took it out; the edit above them is not part of it");
+});
+
+test("a new file fixed at two different places is not a guess", () => {
+  const now = Date.now();
+  const created = reachedBy(
+    {
+      session_id: "s",
+      tool_name: "Write",
+      tool_input: { file_path: FILE, content: PARTS },
+      tool_response: { type: "create", filePath: FILE, content: PARTS, structuredPatch: [], originalFile: null },
+    },
+    now - 3 * MINUTE,
+  );
+  const fixed = editedInTurn(
+    FILE,
+    PARTS,
+    [
+      { gone: "part_2_value()", put: "part_2_value()?" },
+      { gone: "part_9_value()", put: "part_9_value()?" },
+    ],
+    now - 2 * MINUTE,
+    MINUTE,
+  );
+  assert.deepEqual([...named([created, ...fixed], now, GUESS)], []);
 });
 
 test("an edit that only leans on an earlier edit's text to find its place did not rewrite it", () => {
@@ -230,7 +289,7 @@ test("Claude Code's own payloads: a whole-file rewrite is placed line by line, s
 });
 
 const CREATED: readonly { readonly name: string; readonly writes: number }[] = [
-  { name: "written-then-edited", writes: 5 },
+  { name: "written-then-edited", writes: 3 },
   { name: "no-newline-at-the-end", writes: 4 },
 ];
 
@@ -249,6 +308,20 @@ test("four commands that share their first lines but ask different things are fo
   const now = Date.now();
   const reached = ASKS.map((ask, at) => reachedBy(ran("s", `${PREAMBLE}\n${ask}\nEOF`), now - (10 - at) * MINUTE));
   assert.equal(new Set(reached.map((one) => one.shape)).size, 1, "they look the same once cut to a shape");
+  assert.deepEqual([...named(reached, now, UNANSWERED)], []);
+});
+
+test("a check run again after each edit is the loop working, not one question asked again", () => {
+  const now = Date.now();
+  const reached: Reached[] = [];
+  let source = PARTS;
+  for (let at = 0; at < 4; at += 1) {
+    reached.push(reachedBy(ran("s", "npm test"), now - (20 - 4 * at) * MINUTE));
+    const gone = `part_${at}_value()`;
+    const put = `part_${at}_value() + 1`;
+    reached.push(reachedBy(edited(FILE, source, gone, put), now - (19 - 4 * at) * MINUTE));
+    source = source.replace(gone, () => put);
+  }
   assert.deepEqual([...named(reached, now, UNANSWERED)], []);
 });
 

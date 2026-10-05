@@ -69,11 +69,11 @@ test("one command shape repeated in a window is named as a stall, not as a scold
   assert.match(first === undefined ? "" : first.means, /no single call answers/);
 });
 
-test("an edit rewritten within minutes is the guess-instead-of-looking shape", () => {
+test("an edit undone within minutes is the guess-instead-of-looking shape", () => {
   const now = Date.now();
   const reached = [
     reachedBy(edited("src/a.ts", "const limit = 1;\n", "1", "2"), now - 5 * MINUTE),
-    reachedBy(edited("src/a.ts", "const limit = 2;\n", "2", "3"), now - 4 * MINUTE),
+    reachedBy(edited("src/a.ts", "const limit = 2;\n", "2", "1"), now - 4 * MINUTE),
   ];
   const stalls = metricOf(reached, now).stalls;
   assert.equal(stalls.length, 1);

@@ -4,7 +4,13 @@ import { fieldAt } from "../fields.ts";
 
 export const WRITING: readonly string[] = ["Edit", "MultiEdit", "Write", "NotebookEdit"];
 
-export type Change = { readonly at: number; readonly removed: number; readonly added: number };
+export type Change = {
+  readonly at: number;
+  readonly removed: number;
+  readonly added: number;
+  readonly removedPrint: string;
+  readonly addedPrint: string;
+};
 
 export type Placed =
   | { readonly kind: "not-a-write" }
@@ -27,7 +33,15 @@ function narrowed(at: number, gone: string, put: string): Change {
   while (front < most && gone[front] === put[front]) front += 1;
   let back = 0;
   while (back < most - front && gone[gone.length - 1 - back] === put[put.length - 1 - back]) back += 1;
-  return { at: at + front, removed: gone.length - front - back, added: put.length - front - back };
+  const removed = gone.slice(front, gone.length - back);
+  const added = put.slice(front, put.length - back);
+  return {
+    at: at + front,
+    removed: removed.length,
+    added: added.length,
+    removedPrint: printOf(removed),
+    addedPrint: printOf(added),
+  };
 }
 
 function changes(change: Change): boolean {
@@ -226,14 +240,18 @@ const UNPLACED = "?";
 
 const A_PRINT = new RegExp(`^[0-9a-f]{${PRINT_LENGTH}}$`);
 
-const A_CHANGE = /^(\d+),(\d+),(\d+)$/;
+const A_CHANGE = new RegExp(`^(\\d+),(\\d+),(\\d+),([0-9a-f]{${PRINT_LENGTH}}),([0-9a-f]{${PRINT_LENGTH}})$`);
 
 const NOT_PLACED_THEN = "where it landed was not known when it was written down";
 
 export function writtenAs(where: Placed): string {
   if (where.kind === "not-a-write") return NOT_A_WRITE;
   if (where.kind === "unplaced") return UNPLACED;
-  return [where.before, where.after, ...where.changes.map((one) => `${one.at},${one.removed},${one.added}`)].join(" ");
+  return [
+    where.before,
+    where.after,
+    ...where.changes.map((one) => `${one.at},${one.removed},${one.added},${one.removedPrint},${one.addedPrint}`),
+  ].join(" ");
 }
 
 export function readAs(text: string): Placed {
@@ -247,7 +265,9 @@ export function readAs(text: string): Placed {
   for (const one of rest) {
     const held = A_CHANGE.exec(one);
     if (held === null) return { kind: "unplaced", why: NOT_PLACED_THEN };
-    made.push({ at: Number(held[1]), removed: Number(held[2]), added: Number(held[3]) });
+    const [, at, removed, added, removedPrint, addedPrint] = held;
+    if (removedPrint === undefined || addedPrint === undefined) return { kind: "unplaced", why: NOT_PLACED_THEN };
+    made.push({ at: Number(at), removed: Number(removed), added: Number(added), removedPrint, addedPrint });
   }
   return { kind: "placed", before, after, changes: made };
 }
