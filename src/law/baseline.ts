@@ -8,8 +8,9 @@ import {
   BASELINE_PATH,
   DOCTRINE_DIR,
 } from "../config.ts";
-import { changedLines, type Touched } from "../git.ts";
+import { changedLines, type Against, type Touched } from "../git.ts";
 import { parseToml, tableIn } from "../toml.ts";
+import type { AlreadyThere } from "./arrival.ts";
 import type { Violation } from "./rule.ts";
 
 export type Counts = ReadonlyMap<string, number>;
@@ -82,33 +83,36 @@ export function againstBaseline(
   baseline: Baseline,
   violations: readonly Violation[],
   touched: LinesYouTouched,
+  alreadyThere: AlreadyThere,
 ): Carried {
-  const yours: Violation[] = [];
-  const older: Violation[] = [];
-  for (const violation of violations) {
-    if (!isRecorded(baseline, violation.file, violation.rule.id)) {
-      yours.push(violation);
-      continue;
-    }
+  const untouched = violations.filter((violation) => {
     const changed = touched(violation.file);
-    if (changed.kind === "lines" && changed.lines.has(violation.line)) {
-      yours.push(violation);
-      continue;
-    }
-    older.push(violation);
-  }
-  return { yours, older };
+    return !(changed.kind === "lines" && changed.lines.has(violation.line));
+  });
+  const unrecorded = untouched.filter((violation) => !isRecorded(baseline, violation.file, violation.rule.id));
+  const older = new Set([
+    ...untouched.filter((violation) => isRecorded(baseline, violation.file, violation.rule.id)),
+    ...alreadyThere(unrecorded),
+  ]);
+  return {
+    yours: violations.filter((violation) => !older.has(violation)),
+    older: violations.filter((violation) => older.has(violation)),
+  };
 }
 
-export function linesChangedSinceHead(root: string): LinesYouTouched {
+export function linesChangedSince(root: string, against: Against): LinesYouTouched {
   const seen = new Map<string, Touched>();
   return (file: string): Touched => {
     const held = seen.get(file);
     if (held !== undefined) return held;
-    const asked = changedLines(root, file, "head");
+    const asked = changedLines(root, file, against);
     seen.set(file, asked);
     return asked;
   };
+}
+
+export function linesChangedSinceHead(root: string): LinesYouTouched {
+  return linesChangedSince(root, "head");
 }
 
 export function render(baseline: Baseline): string {

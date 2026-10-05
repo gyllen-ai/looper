@@ -8,8 +8,10 @@ import { variantsIn } from "./copy.ts";
 import { isStyling } from "./css/read.ts";
 import { rustRuleFor } from "./rust/rules.ts";
 import { roleOf, shapeOf } from "./shape.ts";
-import { existsSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { alreadyThereWhenLooperArrived, linesFrom, linesOnDisk } from "./arrival.ts";
+import { foundIn, inPlace, lawFor } from "./one-file.ts";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { JUDGED_EXTENSIONS, OUTSIDE_THE_LAW } from "../config.ts";
 import { SILENT } from "../capability.ts";
@@ -23,12 +25,12 @@ import type {
   ToolDef,
   ToolResult,
 } from "../capability.ts";
-import { changedLines, stagedFiles, stagedLines, stagedText } from "../git.ts";
+import { changedLines, stagedFiles, stagedText } from "../git.ts";
 import { withLock } from "../atomic.ts";
 import {
   againstBaseline,
   type Carried,
-  isRecorded,
+  linesChangedSince,
   readBaseline,
   countsOf,
   shrinkToward,
@@ -60,65 +62,30 @@ const LAW_EVENTS: readonly HookEvent[] = [
 
 const NO_TOOLS: readonly ToolDef[] = [];
 
-type Judging = { readonly path: string; readonly relative: string };
+type Judged = { readonly carried: Carried; readonly unjudged: readonly string[] };
 
-function judgedByTheRustLaw(root: string, target: Judging): readonly Violation[] {
-  const said = judgeRustIn(root, [target.path]);
-  return said.violations.filter((held) => held.file === target.relative);
+function judgeOneFile(root: string, relative: string): Judged {
+  const found = foundIn(inPlace(root), relative);
+  if (found.violations.length === 0) return { carried: { yours: [], older: [] }, unjudged: found.unjudged };
+  const touched = changedLines(root, relative, "commit");
+  return {
+    carried: againstBaseline(
+      readBaseline(root),
+      found.violations,
+      () => touched,
+      alreadyThereWhenLooperArrived(root, linesOnDisk(root)),
+    ),
+    unjudged: found.unjudged,
+  };
 }
 
-function judgedByThePythonLaw(root: string, target: Judging): readonly Violation[] {
-  const said = judgePythonIn(root, [target.path]);
-  return said.violations.filter((held) => held.file === target.relative);
+function notJudged(unjudged: readonly string[]): string {
+  if (unjudged.length === 0) return "";
+  return `looper: could not judge ${unjudged.join("; ")}, so what is there now was not judged, which is not the same as being clean.`;
 }
 
-function judgedByTheCsharpLaw(root: string, target: Judging): readonly Violation[] {
-  const said = judgeCsharpIn(root, [target.path]);
-  return said.violations.filter((held) => held.file === target.relative);
-}
-
-function lawFor(relative: string): "rust" | "python" | "csharp" | "css" | "typescript" {
-  if (relative.endsWith(RUST_EXTENSION)) return "rust";
-  if (relative.endsWith(PYTHON_EXTENSION)) return "python";
-  if (isCsharp(relative)) return "csharp";
-  if (isStyling(relative)) return "css";
-  return "typescript";
-}
-
-function judgeOneFile(root: string, target: Judging): Carried {
-  const law = lawFor(target.relative);
-  const copied = variantsIn(root, [target.relative], readConcessions(root));
-  const styled = isStyling(target.relative)
-    ? judge(
-        CSS_CHECKS,
-        "fast",
-        { file: target.relative, text: readFileSync(target.path, "utf8") },
-        readConcessions(root),
-      ).violations
-    : [];
-  const found = law === "rust"
-    ? judgedByTheRustLaw(root, target)
-    : law === "python"
-    ? judgedByThePythonLaw(root, target)
-    : law === "csharp"
-    ? judgedByTheCsharpLaw(root, target)
-    : law === "css"
-    ? []
-    : judge(
-        [...CHECKS, ...checksAdoptedIn(root)],
-        "fast",
-        {
-          file: target.relative,
-          text: readFileSync(target.path, "utf8"),
-          role: roleOf(shapeOf(root), target.relative),
-        },
-        readConcessions(root),
-      ).violations;
-  const all = [...copied, ...styled, ...found];
-  if (all.length === 0) return { yours: [], older: [] };
-
-  const touched = changedLines(root, target.relative, "commit");
-  return againstBaseline(readBaseline(root), all, () => touched);
+function andNotJudged(unjudged: readonly string[]): string {
+  return unjudged.length === 0 ? "" : `\n\n${notJudged(unjudged)}`;
 }
 
 function judgeWhatTheCommandWrote(root: string): Outcome {
@@ -141,33 +108,36 @@ function judgeWhatTheCommandWrote(root: string): Outcome {
 
   const yours: Violation[] = [];
   const older: Violation[] = [];
+  const unjudged: string[] = [];
   for (const path of written.paths) {
-    const full = resolve(root, path);
-    if (!existsSync(full)) continue;
+    if (!existsSync(resolve(root, path))) continue;
     if (underAnotherLaw(root, path)) continue;
-    const split = judgeOneFile(root, { path: full, relative: path });
-    yours.push(...split.yours);
-    older.push(...split.older);
+    const split = judgeOneFile(root, path);
+    yours.push(...split.carried.yours);
+    older.push(...split.carried.older);
+    unjudged.push(...split.unjudged);
   }
 
   const couldNotStat =
     written.vanished.length === 0
       ? ""
       : `\n\nlooper could not read ${written.vanished.join(", ")}, so those were not judged.`;
+  const unread = `${couldNotStat}${andNotJudged(unjudged)}`;
 
   if (yours.length > 0) {
     return {
       kind: "block",
-      reason: `${formatReport(yours, "some-new")}${alsoHere(older)}${couldNotStat}\n\n${IF_THE_RULE_IS_WRONG}`,
+      reason: `${formatReport(yours, "some-new")}${alsoHere(older)}${unread}\n\n${IF_THE_RULE_IS_WRONG}`,
     };
   }
-  if (older.length > 0 || couldNotStat.length > 0) {
+  if (older.length > 0) {
     const named = [...new Set(older.map((one) => one.file))].join(", ");
     return {
       kind: "mention",
-      note: `looper: this command changed ${named.length === 0 ? "files" : named}, which still ${older.length === 1 ? "has" : "have"} ${older.length} thing(s) from before looper arrived. Nothing is blocked.${couldNotStat}`,
+      note: `looper: this command changed ${named}, which still ${older.length === 1 ? "has" : "have"} ${older.length} thing(s) from before looper arrived. Nothing is blocked.${unread}`,
     };
   }
+  if (unread.length > 0) return { kind: "mention", note: unread.trim() };
   return { kind: "pass" };
 }
 
@@ -199,8 +169,7 @@ export function judgeStaged(root: string): Outcome {
   if (staged.kind === "unavailable") return { kind: "pass" };
 
   const concessions = readConcessions(root);
-  const baseline = readBaseline(root);
-  const violations = [];
+  const found: Violation[] = [];
 
   const judged = staged.paths.filter(
     (path) =>
@@ -209,34 +178,17 @@ export function judgeStaged(root: string): Outcome {
       !underAnotherLaw(root, path),
   );
 
-  const keep = (violation: Violation, path: string): void => {
-    if (!isRecorded(baseline, path, violation.rule.id)) {
-      violations.push(violation);
-      return;
-    }
-    const touched = stagedLines(root, path);
-    if (touched.kind === "lines" && touched.lines.has(violation.line)) {
-      violations.push(violation);
-    }
-  };
-
   const inPython = judged.filter((path) => path.endsWith(PYTHON_EXTENSION));
   const stagedPython = new Set(inPython);
   const pythonSaid = judgePythonIn(root, inPython.map((path) => resolve(root, path)));
-  for (const violation of pythonSaid.violations) {
-    if (stagedPython.has(violation.file)) keep(violation, violation.file);
-  }
+  found.push(...pythonSaid.violations.filter((violation) => stagedPython.has(violation.file)));
 
   const inCsharp = judged.filter(isCsharp);
   const stagedCsharp = new Set(inCsharp);
   const csharpSaid = judgeCsharpIn(root, inCsharp.map((path) => resolve(root, path)));
-  for (const violation of csharpSaid.violations) {
-    if (stagedCsharp.has(violation.file)) keep(violation, violation.file);
-  }
+  found.push(...csharpSaid.violations.filter((violation) => stagedCsharp.has(violation.file)));
 
-  for (const violation of variantsIn(root, judged, concessions)) {
-    keep(violation, violation.file);
-  }
+  found.push(...variantsIn(root, judged, concessions));
 
   const inRust = judged.filter((path) => path.endsWith(RUST_EXTENSION));
   const stagedRust = new Set(inRust);
@@ -244,7 +196,7 @@ export function judgeStaged(root: string): Outcome {
   const blinding: string[] = [...rustSaid.unreadable, ...pythonSaid.unreadable, ...csharpSaid.unreadable];
   for (const violation of rustSaid.violations) {
     if (stagedRust.has(violation.file)) {
-      keep(violation, violation.file);
+      found.push(violation);
       continue;
     }
     if (isUnreadableRust(violation)) {
@@ -253,6 +205,7 @@ export function judgeStaged(root: string): Outcome {
   }
 
   const shape = shapeOf(root);
+  const stagedTexts = new Map<string, string>();
 
   for (const path of judged) {
     const law = lawFor(path);
@@ -260,8 +213,9 @@ export function judgeStaged(root: string): Outcome {
     if (law !== "typescript" && !styling) continue;
     const held = stagedText(root, path);
     if (held.kind === "unreadable") continue;
+    stagedTexts.set(path, held.text);
 
-    const found = styling
+    const said = styling
       ? judge(CSS_CHECKS, "fast", { file: path, text: held.text }, concessions).violations
       : judge(
           [...CHECKS, ...checksAdoptedIn(root)],
@@ -269,17 +223,22 @@ export function judgeStaged(root: string): Outcome {
           { file: path, text: held.text, role: roleOf(shape, path) },
           concessions,
         ).violations;
-
-    for (const violation of found) keep(violation, path);
+    found.push(...said);
   }
 
-  if (violations.length === 0) {
+  const split = againstBaseline(
+    readBaseline(root),
+    found,
+    linesChangedSince(root, "index"),
+    alreadyThereWhenLooperArrived(root, linesFrom(stagedTexts, root)),
+  );
+  if (split.yours.length === 0) {
     if (blinding.length > 0) return { kind: "mention", note: wentUnjudged(blinding) };
     return { kind: "pass" };
   }
   return {
     kind: "block",
-    reason: `${formatReport(violations, "some-new")}\nNothing was committed.\n\n${NOT_A_WAY_THROUGH}`,
+    reason: `${formatReport(split.yours, "some-new")}${andNotJudged(blinding)}\nNothing was committed.\n\n${NOT_A_WAY_THROUGH}`,
   };
 }
 
@@ -386,15 +345,19 @@ export class Law implements Capability {
     if (target.kind !== "judge") return { kind: "pass" };
     if (!existsSync(target.path)) return { kind: "pass" };
 
-    const split = judgeOneFile(context.root, target);
-    if (split.yours.length === 0 && split.older.length === 0) return { kind: "pass" };
+    const judged = judgeOneFile(context.root, target.relative);
+    const split = judged.carried;
     if (split.yours.length > 0) {
       return {
         kind: "block",
-        reason: `${formatReport(split.yours, "some-new")}${alsoHere(split.older)}\n\n${IF_THE_RULE_IS_WRONG}`,
+        reason: `${formatReport(split.yours, "some-new")}${alsoHere(split.older)}${andNotJudged(judged.unjudged)}\n\n${IF_THE_RULE_IS_WRONG}`,
       };
     }
-    return { kind: "mention", note: invitation(target.relative, split.older) };
+    if (split.older.length > 0) {
+      return { kind: "mention", note: `${invitation(target.relative, split.older)}${andNotJudged(judged.unjudged)}` };
+    }
+    if (judged.unjudged.length > 0) return { kind: "mention", note: notJudged(judged.unjudged) };
+    return { kind: "pass" };
   }
 
   tools(): readonly ToolDef[] {

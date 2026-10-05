@@ -21,9 +21,10 @@ function walked(dir: string): Age {
       files += below.files;
       continue;
     }
+    const held = statSync(path, { throwIfNoEntry: false });
+    if (held === undefined) continue;
     files += 1;
-    const when = statSync(path).mtimeMs;
-    if (when > newest) newest = when;
+    if (held.mtimeMs > newest) newest = held.mtimeMs;
   }
   return { newest, files };
 }

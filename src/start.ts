@@ -39,6 +39,8 @@ const GIT_ONLY_READS: readonly (readonly string[])[] = [
   ["diff"],
   ["diff-tree"],
   ["show"],
+  ["log", "-n", "1", "--diff-filter=A", "--format=%H", "--"],
+  ["ls-tree", "--name-only"],
   ["rev-parse"],
   ["grep"],
   ["merge-base", "--is-ancestor"],

@@ -2,10 +2,11 @@ import type { Out } from "../out.ts";
 import {
   adoptedButUnrecorded,
   againstBaseline,
+  isRecorded,
   linesChangedSinceHead,
   readBaseline,
-  totalIn,
 } from "../law/baseline.ts";
+import { alreadyThereWhenLooperArrived, linesOnDisk } from "../law/arrival.ts";
 import { formatReport } from "../law/report.ts";
 import { surveyProject } from "../law/project.ts";
 import { misspelledIn } from "../law/misspelled.ts";
@@ -64,16 +65,19 @@ export function law(asked: readonly string[], out: Out): number {
     out.say(`looper: ${survey.files} files, nothing to fix.`);
     return 0;
   }
+  const baseline = readBaseline(here());
   const carried = againstBaseline(
-    readBaseline(here()),
+    baseline,
     survey.violations,
     linesChangedSinceHead(here()),
+    alreadyThereWhenLooperArrived(here(), linesOnDisk(here())),
   );
   const older = carried.older.length;
   const yours = carried.yours.length;
+  const recorded = carried.older.filter((one) => isRecorded(baseline, one.file, one.rule.id)).length;
   out.say(formatReport(survey.violations, yours === 0 ? "all-older" : "some-new"));
   if (older > 0) {
-    out.say(alreadyHere(older, yours));
+    out.say(alreadyHere(older, recorded, yours));
   }
   if (survey.unjudged > 0) {
     out.say(couldNotBeRead(survey.unjudged, survey.judged));
@@ -91,11 +95,17 @@ function couldNotBeRead(unjudged: number, judged: number): string {
   ].join(" ");
 }
 
-function alreadyHere(older: number, yours: number): string {
+function whereItIsKnown(older: number, recorded: number): string {
+  if (recorded === older) return `, and ${older === 1 ? "is" : "are"} recorded in .looper/baseline.toml.`;
+  const found = older - recorded;
+  return `: ${recorded} recorded in .looper/baseline.toml, and ${found} it does not list that ${found === 1 ? "was" : "were"} already in the code when looper arrived.`;
+}
+
+function alreadyHere(older: number, recorded: number, yours: number): string {
   const was = older === 1 ? "was" : "were";
   const all = yours === 0 ? "All " : "";
   return [
-    `${all}${older} of these ${was} already here before looper arrived, and ${older === 1 ? "is" : "are"} recorded in .looper/baseline.toml.`,
+    `${all}${older} of these ${was} already here before looper arrived${whereItIsKnown(older, recorded)}`,
     `${older === 1 ? "It does" : "They do"} not block a commit until you touch the line ${older === 1 ? "it is" : "they are"} on.`,
     yours === 0
       ? "Fix them when you are next in that file."

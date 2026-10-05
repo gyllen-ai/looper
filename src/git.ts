@@ -247,6 +247,62 @@ export function changedLines(root: string, path: string, against: Against): Touc
   }
 }
 
+export type Landed =
+  | { readonly kind: "unknown"; readonly why: string }
+  | { readonly kind: "never-committed" }
+  | { readonly kind: "at"; readonly commit: string };
+
+export function lastAdded(root: string, path: string): Landed {
+  try {
+    const commit = ask(root, ["log", "-n", "1", "--diff-filter=A", "--format=%H", "--", path])[0];
+    if (commit === undefined) return { kind: "never-committed" };
+    return { kind: "at", commit };
+  } catch (cause) {
+    return { kind: "unknown", why: reasonFrom(cause) };
+  }
+}
+
+export function headCommit(root: string): Landed {
+  try {
+    const commit = ask(root, ["rev-parse", "--verify", "HEAD"])[0];
+    if (commit === undefined) return { kind: "unknown", why: "git named no commit" };
+    return { kind: "at", commit };
+  } catch (cause) {
+    return { kind: "unknown", why: reasonFrom(cause) };
+  }
+}
+
+export type AsItWas =
+  | { readonly kind: "unknown"; readonly why: string }
+  | { readonly kind: "absent" }
+  | { readonly kind: "text"; readonly text: string };
+
+export function asItWasAt(root: string, commit: string, path: string): AsItWas {
+  const why = whyNotARevision(commit);
+  if (why.length > 0) return { kind: "unknown", why };
+  try {
+    if (ask(root, ["ls-tree", "--name-only", commit, "--", path]).length === 0) return { kind: "absent" };
+    return { kind: "text", text: askWhole(root, ["show", `${commit}:./${path}`]) };
+  } catch (cause) {
+    return { kind: "unknown", why: reasonFrom(cause) };
+  }
+}
+
+export type Listed =
+  | { readonly kind: "unknown"; readonly why: string }
+  | { readonly kind: "names"; readonly names: readonly string[] };
+
+export function namesAt(root: string, commit: string, directory: string): Listed {
+  const why = whyNotARevision(commit);
+  if (why.length > 0) return { kind: "unknown", why };
+  const where = directory === "." || directory === "" ? [] : ["--", `${directory}/`];
+  try {
+    return { kind: "names", names: ask(root, ["ls-tree", "--name-only", commit, ...where]) };
+  } catch (cause) {
+    return { kind: "unknown", why: reasonFrom(cause) };
+  }
+}
+
 export type Ahead =
   | { readonly kind: "cannot-tell"; readonly why: string }
   | { readonly kind: "against"; readonly revision: string };

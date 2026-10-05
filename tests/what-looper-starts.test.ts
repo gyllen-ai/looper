@@ -167,6 +167,8 @@ test("git is asked only to read, whatever words it is handed", () => {
     ["-c", "protocol.allow=always", "fetch", "origin"],
     ["config", "protocol.allow", "always"],
     ["tag", "v9"],
+    ["log", "--output=written-by-git.txt"],
+    ["ls-tree", "-r", "HEAD"],
     [],
   ];
 
@@ -193,12 +195,14 @@ test("git is asked only to read, whatever words it is handed", () => {
       ["diff", "--cached", "--name-only"],
       ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
       ["show", ":a.txt"],
+      ["log", "-n", "1", "--diff-filter=A", "--format=%H", "--", "a.txt"],
+      ["ls-tree", "--name-only", "HEAD", "--", "a.txt"],
       ["grep", "-h", "-o", "-E", "[a-z]+", "HEAD", "--"],
       ["merge-base", "--is-ancestor", "HEAD", "HEAD"],
       ["tag", "--points-at", "HEAD"],
     ];
     for (const args of openings) {
-      assert.equal(askGit(root, args).status, 0, `git ${args.join(" ")} is one of the ten ways looper asks, and it was refused or failed`);
+      assert.equal(askGit(root, args).status, 0, `git ${args.join(" ")} is one of the twelve ways looper asks, and it was refused or failed`);
     }
     assert.equal(askGit(root, ["config", "--get", "user.name"]).stdout.trim(), "t");
   } finally {
