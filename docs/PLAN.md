@@ -1980,7 +1980,7 @@ Every rule the engine loads appears exactly once below, and
 | a failure vanishes, and nobody hears it | `TS-ERROR:1` `TS-ERROR:4` `TS-ERROR:6` `TS-ERROR:7` `TS-ERROR:8` `TS-ERROR:10` | `RUST-ERROR:1` `RUST-ERROR:2` `RUST-ERROR:4` `RUST-ERROR:6` `RUST-ERROR:8` `RUST-ERROR:9` | `PY-ERROR:1` `PY-TRUTH:2` | `CS-ERROR:1` `CS-ERROR:4` | a stylesheet cannot fail |
 | a failure is answered with a made-up value | `TS-ERROR:3` `TS-TYPE:5` | `RUST-ERROR:3` `RUST-TYPE:5` | `PY-ERROR:2` | `CS-ERROR:3` | a stylesheet cannot fail |
 | the failure survives but names nothing | `TS-TYPE:2` | `RUST-TYPE:1` `RUST-TYPE:2` `RUST-TYPE:3` | `PY-ERROR:3` | `CS-ERROR:2` | a stylesheet cannot fail |
-| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
+| the checker is told to trust you | `TS-TYPE:3` `TS-TYPE:4` `TS-DEAD:1` `TS-TYPE:6` `TS-TYPE:7` | `RUST-TYPE:4` `RUST-DEAD:1` | `PY-TYPE:1` | **refused on measurement**, below | CSS has no checker to tell |
 | "what happens when nobody said" is answered in more than one place | `TS-TRUTH:1` `TS-TRUTH:2` `TS-TRUTH:3` | `RUST-TRUTH:1` `RUST-TRUTH:2` | `PY-TRUTH:1` `PY-TRUTH:3` | none built | `CSS-TRUTH:1` `CSS-TRUTH:3` |
 | a failure quietly takes a second route | `TS-TRUTH:4` | `RUST-TRUTH:3` | **left out on purpose**, 2026-09-08, measured below | none built | a stylesheet takes no route |
 | output is taken from whoever ran the program | `TS-LOG:1` | `RUST-LOG:1` `RUST-LOG:2` | `PY-LOG:1` | `CS-LOG:1` | a stylesheet has no output |
@@ -1990,7 +1990,7 @@ Every rule the engine loads appears exactly once below, and
 | the language's own guarantees are stepped around | none built | `RUST-ERROR:5` `RUST-ERROR:7` `RUST-TESTS:1` | none built | none built | `CSS-TYPE:1` |
 | a number is guessed where a fact was available | `TS-ERROR:9` | none built | `PY-ERROR:4` | none built | — |
 | the same file exists twice under two names | `COPY:1`, which reads the directory rather than a file, so it answers for all five | | | | |
-| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` `TS-SECURITY:1` | none built | `PY-SECURITY:1` `PY-SECURITY:2` `PY-SECURITY:3` | `CS-SECURITY:1` | open |
+| something from outside is used as an instruction | `DATA:1` `DATA:2` `NODE:1` `NEXT:1` `TS-SECURITY:1` `TS-SECURITY:2` | none built | `PY-SECURITY:1` `PY-SECURITY:2` `PY-SECURITY:3` | `CS-SECURITY:1` | open |
 | a framework's own contract is broken in silence | `REACT:1` `REACT:2` `TAURI:1` | — | — | — | — |
 | the project gains a language nobody chose | `STACK:1`, which reads the project rather than a file, so it answers for all four | | | | |
 
@@ -9030,11 +9030,15 @@ the exact inverse of #186's change, and drops #188's entry in this document;
 against the tree from before #186 (#184, `c454c08`) it differs only in the four
 files #188 changed. It holds no change of its own. Its message describes the
 diff it was shown, so the two rules it says came out went the same way as
-everything else in it.
+everything else in it: by accident, not by decision.
 
 #209 had already put back the Rust reader being handed the files it judges, and
 three tests. This puts back the rest, onto code that has moved since:
 
+- **Two rules**: `TS-TYPE:7` refuses `==` and `!=` except against `null` and
+  `undefined`, and `TS-SECURITY:2` refuses a value handed to the page as markup.
+  The law's canon names `==`, `innerHTML` and `textContent` again, beside the
+  `style=` it gained since.
 - **Two kinds of file are read again**: a `.d.ts`, and JSX in a `.js` file.
 - **`vm.runInContext` and its family are code made from a string** again, under
   `TS-SECURITY:1`.
@@ -9044,17 +9048,45 @@ three tests. This puts back the rest, onto code that has moved since:
   and `TS-DEAD:3`'s ban text says what its check already did.
 - **The report prints eight places for a rule** and then how many more, in how
   many files.
-- **23 cases and 8 tests, failing first**: before the code came back, 7 of the
+- **39 cases and 12 tests, failing first**: before the code came back, 7 of the
   439 cases disagreed with their rule and the test file could not load.
 - **Findings 106 to 120 and the two pass write-ups** in `docs/FINDINGS.md`, and
   #188's entry here, at its own place after the design registry.
 
-**Kept out on purpose: `TS-TYPE:7` (`==`) and `TS-SECURITY:2` (a value written
-into the page)**, with their canon lines, table rows, 16 cases and 4 tests.
-#189's message names their removal as its purpose, and a change about restoring
-what nobody meant to lose is the wrong place to overrule that. The tree says the
-removal was not decided either, so findings 108 and 110, which those two rules
-cleared, are marked open again. Whether they return is a person's decision.
+**The law's canon had to pay for its three words.** It has a ceiling of 1,300
+characters, and the restored words took it to 1,353. The clause saying the
+`report` tool writes the shape and nothing else of yours went: the tool's own
+description says it, and so does the line every session hears once, so it was
+paid for twice. 1,290 after.
+
+**`TS-SECURITY:2` was sharpened when it came back.** Measured on the night of
+2026-10-05 to 06 over the twelve projects #186 judged, downloaded at the commits
+it recorded, with
+only these two rules: markup written out in full was silent for `innerHTML`,
+`insertAdjacentHTML` and `document.write`, but not for React's door, Angular's,
+or written-out pieces joined with `+`. That let 17 hits through on markup that
+came from nowhere but the line itself. They are silent now, eight new cases hold
+it, and no other hit moved.
+
+**What both rules say about code nobody here wrote,** on the basis that gives
+back #186's counts (tests, examples, benchmarks, the docs site and vendored
+copies left out): `TS-TYPE:7` 22 hits in the ten good projects and 6 in Juice
+Shop, `TS-SECURITY:2` 6 and 10 — #186's numbers exactly. Everything outside the
+one vendored file was read by hand: 123 hits, the 17 the sharpening removed
+among them. Every `==` it names converts between values that are neither `null`
+nor `undefined`; 7 do it on purpose, the 6 Juice Shop plants and one vitest
+matcher, each carrying an ESLint pardon where it stands. Every
+page hit hands a value to a markup door: a framework building the DOM on purpose,
+Juice Shop's planted cross-site scripting, or a test writing generated markup
+into a container. Not read: 69 hits in the copy of three.js Juice Shop carries.
+This repository: 0 hits in 294 files.
+
+**Upgrading will show these rules' hits on old code as new.** A project's
+baseline records the problems looper could see when it arrived, and these two
+rules were not there to see them. Another open change makes the baseline treat a
+problem that predates looper's ability to see it — a new file kind, language or
+rule — as older; until that lands, an adopter upgrading past this sees them as
+fresh.
 
 **One restored claim was wrong, and is not restored as it was.** #186 said a
 broken Rust file stopped taking its crate down once the reader was handed files.

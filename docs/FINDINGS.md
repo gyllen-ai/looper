@@ -107,10 +107,8 @@ Longest line in the hono report fell from several thousand characters to 708.
 
 ---
 
-**106 through 120. Two are open again.** Eleven were cleared. 120 is from pass
-9, the rest from pass 8. 108 and 110 were cleared by two rules that came out
-with #189 on 2026-09-08, so each stands open until its rule returns or a
-decision says it should not; both entries say so. Four were
+**106 through 120. Nothing open.** Eleven cleared. 120 is from pass 9, the rest
+from pass 8. Four were
 re-examined by hand against every finding they produced and **closed as not
 defects — they were overstated when first written**, and the correction is in
 each entry.
@@ -353,7 +351,7 @@ where its own advice was a syntax error. That one had no path. This one has six.
 A rule is judged on precision and on whether it leaves somewhere to stand, never
 on how much of the world it disagrees with.
 
-### 110 · `missing` — `==` was refused nowhere — cleared, then open again
+### 110 · `missing` — `==` was refused nowhere — cleared
 
 2026-09-01. Nothing in the TypeScript law, or in the Rust, Python, C# or CSS
 sets, mentioned `==`. It is the one comparison TypeScript cannot save you from:
@@ -375,10 +373,9 @@ comment as well.
 uses of that idiom in the corpus, and it is the one place the conversion is the
 question being asked.
 
-**Open again since 2026-09-08.** `TS-TYPE:7` came out with #189, so `==` is
-refused nowhere once more. That commit's tree matches the one from before #186
-in every file but #188's four, so whether this rule was meant to go is not
-settled by it; `docs/PLAN.md`, 2026-10-05, has the evidence.
+**Out from 2026-09-08 to 2026-10-05, by accident.** #189 removed `TS-TYPE:7`
+along with the rest of #186; `docs/PLAN.md`, 2026-10-05, has how that was found
+and the measurement taken when it came back.
 
 ### 109 · `missing` — the sandbox ran a string past the rule that bans running strings — cleared
 
@@ -395,7 +392,7 @@ juice-shop/routes/b2bOrder.ts:23
 `compileFunction` on `vm` now fire. Three more findings in juice-shop, five in
 vitest's module runner and none anywhere else in the corpus.
 
-### 108 · `missing` — a third of the input rule had nothing behind it — cleared, then open again
+### 108 · `missing` — a third of the input rule had nothing behind it — cleared
 
 2026-09-01. `secure/input` and `law` both say "Nothing from outside is pasted
 into a query, a shell command, **or a page**". `DATA:1` held the query and
@@ -419,11 +416,18 @@ Vue's entity decoder, Vue's `unsafeToTrustedHTML`, hono's JSX renderer honouring
 `__html`, vitest's `toContainHTML` matcher, TanStack's hydration stream. Those are
 the six lines a reviewer of those projects should read.
 
-**Open again since 2026-09-08.** `TS-SECURITY:2` came out with #189, so nothing
-holds the page once more, while `secure/input` still promises it. That commit's
-tree matches the one from before #186 in every file but #188's four, so whether
-this rule was meant to go is not settled by it; `docs/PLAN.md`, 2026-10-05, has
-the evidence.
+**Out from 2026-09-08 to 2026-10-05, by accident.** #189 removed `TS-SECURITY:2`
+along with the rest of #186, while `secure/input` went on promising the page;
+`docs/PLAN.md`, 2026-10-05, has how that was found and the measurement taken
+when it came back.
+
+**Sharpened when it came back.** Markup written out in full was already silent
+for `innerHTML`, `insertAdjacentHTML` and `document.write`, and not for React's
+door, Angular's or a string joined from written-out pieces with `+`. Measured
+over the same twelve projects at the same commits, that let 17 hits through on
+markup that came from nowhere but the line itself — hono's benchmarks and tests,
+two stylesheets in tRPC, six joined strings in Vue's tests. All 17 are gone and
+nothing else moved, so the 6 and 10 above are unchanged.
 
 ### 107 · `wrong` — JSX in a `.js` file was unreadable to the law — cleared
 
