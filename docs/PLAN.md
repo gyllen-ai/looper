@@ -8684,3 +8684,79 @@ cases in which a file nothing can parse decides only its own verdict.
   which in a whole-project run is the rest of its crate. RUST-ERROR:9 says so.
 - The edit hook keeps only findings from the Rust half, so an edited Rust file
   whose reader cannot start passes without a word. Read, not changed here.
+
+## A None arm that names its absence was read as a default, while the same let else passed — 2026-10-05
+
+A report written on 2026-10-04 by an adopting project's agent, never sent, said
+`RUST-TRUTH:1` fired on a `match` over an optional row whose `None` arm returned
+a variant of the function's own enum naming the absence — what the rule's help
+asks for — while the same code as a `let … else` returning that variant passed.
+Rebuilt here from the shape at `0c4204b`, with names of its own:
+
+```rust
+match fast { Some(n) => Held::At(n), None => Held::Absent }        // fired
+let Some(n) = fast else { return Held::Absent; }; Held::At(n)      // passed
+match fast { Some(n) => Held::At(n), None => return Held::Absent } // passed
+```
+
+The engine read a `None` arm as lawful only when it propagated, crashed or
+ended in `return`, `break` or `continue`. A value in the arm's tail was a
+default whatever it said, so of three spellings of one thing, the one refused
+was the one the help recommends. `None => None`, which hands the absence on
+unchanged, was refused as well. `RUST-TRUTH:1` had no cases in
+`audit/rust-cases.ts` at all.
+
+### What was built
+
+**A `None` arm that hands the absence on is lawful** — `None`, `Option::None`,
+either inside `Ok`.
+
+**So is one that names it:** it yields a unit variant `E::V`, directly or inside
+`Ok`, and every other arm of the same match visibly yields a different variant of
+the same `E`, diverges or propagates. Then the absence keeps its own name and
+cannot be mistaken for anything a present value produces. A name in
+SCREAMING_CASE is a constant, not a variant.
+
+**Everything a present value could also be still fires:** a literal, an empty
+string or collection, `Default::default()`, a constant, the variant another arm
+also yields, the present variant filled with a made-up value, a variant beside
+an arm whose value cannot be read (`Some(n) => decode(n)`), and an arm that
+answers absence and a present value at once (`Some(0) | None`).
+
+The help's legal line now lists both new spellings. The change lives in
+`vendor/rust-law/src/absence.rs`, and `PROVENANCE.md` records it with the rest of
+what is ours in that copy.
+
+### Evidence
+
+- 18 cases, the rule's first: 10 that must fire and 8 that must stay silent.
+  Before the engine changed, the 10 fired and 7 of the 8 silent ones fired too;
+  the eighth, the `let … else`, already passed.
+- 1,221 crates from `~/.cargo/registry`, old engine against new: 1,218 judged
+  (3 do not parse under either), **760 `RUST-TRUTH:1` hits removed, 0 added, no
+  other rule moved**, 4,154 before and 3,394 after.
+- 645 of the 760 hand the absence on. The other 115 were all read by hand, and
+  25 of the 645. None is a made-up value standing in for one nobody gave: 79 are
+  outcomes named in the function's own type (`Poll::Pending`, `Needed::Unknown`,
+  `ArgumentSafety::Absent`, `Resettable::Reset`, `FoundCrate::Itself`), a few of
+  them a format or protocol's own rule for absence — rustls sets an initial
+  ClientHello's record version the way RFC 8446 §5.1 says; 27 are blocks that do
+  some work and then hand the absence on or answer `Poll::Pending`; 9 are
+  `None if … => None`.
+- This repository holds no Rust outside `vendor/`, which is outside the law.
+
+### What it does not cover
+
+- **A variant that only absence produces is accepted, whatever its word.**
+  `None => Pace::Steady` passes beside `Some(true) => Pace::Fast` and
+  `Some(false) => Pace::Slow`. Syntax cannot tell a name for absence from a
+  policy chosen at that site; what it can tell is that the absence stays
+  visible as its own variant.
+- **`return 30` still passes.** `None => return 30` and `let … else { return 30; }`
+  are read as diverging, which the rule's text counts as lawful, while
+  `None => 30` fires. Whether a value handed back with `return` is a default is
+  not decided here.
+- **A variant with a payload on the `None` arm still fires**, even one carrying
+  the key that was looked up (`None => Found::Missing(key)`), and so does a
+  variant spelled through `Self` in one arm and through the type's name in
+  another.

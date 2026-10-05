@@ -1,6 +1,7 @@
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
+use crate::absence::{hands_absence_on, names_the_absence};
 use crate::bodies::{arm_facts, drop_body_lines, expr_mentions, ArmFacts};
 use crate::config::{file_matches, LawConfig};
 use crate::shapes::{
@@ -409,7 +410,7 @@ impl<'c> Judge<'c> {
             return;
         }
         for arm in &node.arms {
-            self.judge_arm(arm);
+            self.judge_arm(arm, &node.arms);
         }
     }
 
@@ -441,7 +442,7 @@ impl<'c> Judge<'c> {
         }
     }
 
-    fn judge_arm(&mut self, arm: &syn::Arm) {
+    fn judge_arm(&mut self, arm: &syn::Arm, arms: &[syn::Arm]) {
         let line = arm.pat.span().start().line;
         let cases = or_cases(&arm.pat);
 
@@ -465,7 +466,7 @@ impl<'c> Judge<'c> {
         }
 
         if is_none_arm {
-            self.judge_none_arm(arm, line);
+            self.judge_none_arm(arm, line, arms);
         }
     }
 
@@ -488,9 +489,13 @@ impl<'c> Judge<'c> {
         }
     }
 
-    fn judge_none_arm(&mut self, arm: &syn::Arm, line: usize) {
+    fn judge_none_arm(&mut self, arm: &syn::Arm, line: usize, arms: &[syn::Arm]) {
         let facts = self.arm_facts(arm, &[]);
-        let lawful = facts.propagates || facts.has_crash || tail_diverges(&arm.body);
+        let lawful = facts.propagates
+            || facts.has_crash
+            || tail_diverges(&arm.body)
+            || hands_absence_on(&arm.body)
+            || names_the_absence(arm, arms);
         if !lawful && !self.is_sanctum {
             self.hit(Rule::ScatteredDefault, line);
         }

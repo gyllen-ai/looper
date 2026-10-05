@@ -4,6 +4,7 @@
 #![deny(unused_variables)]
 #![deny(unused_assignments)]
 
+pub mod absence;
 pub mod bodies;
 pub mod config;
 pub mod helps;
