@@ -35,7 +35,7 @@ export function law(asked: readonly string[], out: Out): number {
     );
   }
   for (const named of survey.unreadable) {
-    out.warn(`looper: could not read ${named}; it was not judged`);
+    out.warn(`looper: could not judge ${named}.`);
   }
   for (const held of survey.selfGoverned) {
     out.warn(
