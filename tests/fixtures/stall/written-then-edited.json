@@ -1,0 +1,209 @@
+{
+  "measured": "PostToolUse payloads Claude Code 2.1.289 wrote on 2026-10-05 for one file: created, rewritten whole at two lines, edited between them, the first rewrite undone, then one word replaced everywhere. Ids, the session and the path are replaced; nothing else is changed.",
+  "payloads": [
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/project/parts.txt",
+        "content": "row 1\nrow 2\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow 29\nrow 30\n"
+      },
+      "tool_response": {
+        "type": "create",
+        "filePath": "/project/parts.txt",
+        "content": "row 1\nrow 2\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow 29\nrow 30\n",
+        "structuredPatch": [],
+        "originalFile": null,
+        "userModified": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/project/parts.txt",
+        "content": "row 1\nrow two\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow twenty-nine\nrow 30\n"
+      },
+      "tool_response": {
+        "type": "update",
+        "filePath": "/project/parts.txt",
+        "content": "row 1\nrow two\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow twenty-nine\nrow 30\n",
+        "structuredPatch": [
+          {
+            "oldStart": 1,
+            "oldLines": 5,
+            "newStart": 1,
+            "newLines": 5,
+            "lines": [
+              " row 1",
+              "-row 2",
+              "+row two",
+              " row 3",
+              " row 4",
+              " row 5 TODO"
+            ]
+          },
+          {
+            "oldStart": 26,
+            "oldLines": 5,
+            "newStart": 26,
+            "newLines": 5,
+            "lines": [
+              " row 26",
+              " row 27",
+              " row 28",
+              "-row 29",
+              "+row twenty-nine",
+              " row 30"
+            ]
+          }
+        ],
+        "originalFile": "row 1\nrow 2\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow 29\nrow 30\n",
+        "userModified": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/project/parts.txt",
+        "old_string": "row 15 TODO",
+        "new_string": "row fifteen TODO",
+        "replace_all": false
+      },
+      "tool_response": {
+        "filePath": "/project/parts.txt",
+        "oldString": "row 15 TODO",
+        "newString": "row fifteen TODO",
+        "originalFile": "row 1\nrow two\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow 15 TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow twenty-nine\nrow 30\n",
+        "structuredPatch": [
+          {
+            "oldStart": 12,
+            "oldLines": 7,
+            "newStart": 12,
+            "newLines": 7,
+            "lines": [
+              " row 12",
+              " row 13",
+              " row 14",
+              "-row 15 TODO",
+              "+row fifteen TODO",
+              " row 16",
+              " row 17",
+              " row 18"
+            ]
+          }
+        ],
+        "userModified": false,
+        "replaceAll": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/project/parts.txt",
+        "old_string": "row two",
+        "new_string": "row 2",
+        "replace_all": false
+      },
+      "tool_response": {
+        "filePath": "/project/parts.txt",
+        "oldString": "row two",
+        "newString": "row 2",
+        "originalFile": "row 1\nrow two\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow fifteen TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow twenty-nine\nrow 30\n",
+        "structuredPatch": [
+          {
+            "oldStart": 1,
+            "oldLines": 5,
+            "newStart": 1,
+            "newLines": 5,
+            "lines": [
+              " row 1",
+              "-row two",
+              "+row 2",
+              " row 3",
+              " row 4",
+              " row 5 TODO"
+            ]
+          }
+        ],
+        "userModified": false,
+        "replaceAll": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/project/parts.txt",
+        "old_string": "TODO",
+        "new_string": "DONE",
+        "replace_all": true
+      },
+      "tool_response": {
+        "filePath": "/project/parts.txt",
+        "oldString": "TODO",
+        "newString": "DONE",
+        "originalFile": "row 1\nrow 2\nrow 3\nrow 4\nrow 5 TODO\nrow 6\nrow 7\nrow 8\nrow 9\nrow 10\nrow 11\nrow 12\nrow 13\nrow 14\nrow fifteen TODO\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25 TODO\nrow 26\nrow 27\nrow 28\nrow twenty-nine\nrow 30\n",
+        "structuredPatch": [
+          {
+            "oldStart": 2,
+            "oldLines": 7,
+            "newStart": 2,
+            "newLines": 7,
+            "lines": [
+              " row 2",
+              " row 3",
+              " row 4",
+              "-row 5 TODO",
+              "+row 5 DONE",
+              " row 6",
+              " row 7",
+              " row 8"
+            ]
+          },
+          {
+            "oldStart": 12,
+            "oldLines": 7,
+            "newStart": 12,
+            "newLines": 7,
+            "lines": [
+              " row 12",
+              " row 13",
+              " row 14",
+              "-row fifteen TODO",
+              "+row fifteen DONE",
+              " row 16",
+              " row 17",
+              " row 18"
+            ]
+          },
+          {
+            "oldStart": 22,
+            "oldLines": 7,
+            "newStart": 22,
+            "newLines": 7,
+            "lines": [
+              " row 22",
+              " row 23",
+              " row 24",
+              "-row 25 TODO",
+              "+row 25 DONE",
+              " row 26",
+              " row 27",
+              " row 28"
+            ]
+          }
+        ],
+        "userModified": false,
+        "replaceAll": true
+      }
+    }
+  ]
+}

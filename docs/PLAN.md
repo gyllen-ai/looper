@@ -8479,3 +8479,85 @@ Adding one to the list is one line, argued for like a dependency.
 - **That no packet leaves.** The promise is about looper and the programs it
   starts, held by tests that can be read in ten minutes and by measurements
   anybody with the same two tools can repeat.
+
+## Edits at different places in one file were counted as one edit guessed again — 2026-10-05
+
+A report written on 2026-10-05 by an adopting project's agent, through the
+`report` tool, said the stall metric had read working as being stuck, twice in
+one session. It was taken as a claim about looper and rebuilt here from its
+shape, against `src/stall` as it stood at `02d226f`, which nothing had touched
+since #169. Both halves fired.
+
+- **Twelve edits to one file inside a minute, each at a different place,** came
+  out as `… — 12 times over 1 minute(s): acting on a guess, because looking was
+  too expensive`. The fingerprint is "an edit reverted or rewritten within
+  minutes", but the stream kept only the path a write went to, so what was built
+  is "one file written twice within five minutes". Every change of more than one
+  hunk was a guess.
+- **Four shell commands that began with the same 160 characters** came out as
+  one command `4 times … no single call answers the question`. The 2026-08-21
+  entry says a shape is the whole command. It was the whole command cut at 160
+  characters, and a command sent to another machine spends its first lines on
+  the connection and the setup before it asks anything.
+
+Both were then run through `looper hook PostToolUse` and `looper inject` with a
+scratch home directory: on `main` the prompt carried both lines, and with this
+change it carries neither.
+
+### What was built
+
+**A call is the same call only when all of it is the same.** The shape stays
+what the notice shows, cut at 160 characters and now ending in `…` when it is
+cut. Whether two calls are one is decided by a print of the whole command, path
+or pattern.
+
+**Every write records where it landed.** Measured 2026-10-05 against Claude Code
+2.1.289, by running a throwaway session with a hook that kept what it was
+handed: an `Edit` arrives with the file as it was before it
+(`tool_response.originalFile`) beside its old and new text, and a `Write`
+arrives with `originalFile` (null for a new file), what it wrote, and
+`structuredPatch`, line hunks with three lines of context. Two of those
+sessions, with their ids and paths taken out, are the fixtures in
+`tests/fixtures/stall`. `src/stall/placed.ts` works out from them which
+characters each write changed, narrowed to what actually differs, so text an
+edit only used to find its place is not counted as written. A whole-file write
+is placed hunk by hunk and checked: its hunks have to rebuild exactly what it
+wrote, or it is not placed at all.
+
+**Rewritten now means rewritten:** a write that changes characters another write
+put there within the last five minutes. It is compared only with writes that
+left the file exactly as it found it — the print of the file before it must
+equal the print after the write before. A formatter, a `sed`, a person or
+another session that changed the file in between breaks that chain, because
+where the earlier text went is no longer known, and nothing is compared across
+it.
+
+**A write that cannot be placed says so** in the hook's answer — no copy of the
+file before it, text that is not in that copy, hunks that do not add up — and is
+never compared. Stream lines written before this change are not read, as on
+2026-08-21, so the metric starts clean.
+
+The cases came first, from the report's two shapes and from the captured
+payloads. Each half was then broken on purpose to see the cases stop it:
+comparing calls by their cut shape fails one case, and letting any write to the
+file count fails four.
+
+### What it still counts, and what it cannot see
+
+- **A file written and then changed where it was just written, inside five
+  minutes, is still the guess shape.** That includes a first draft the compiler
+  or the law sent back. The fingerprint names a guess that was cheaper than
+  looking, and a draft corrected minutes later is one, whether or not a check
+  ran between. How often a single rewrite is a stall rather than a correction
+  has not been measured.
+- **An edit made through the shell** is not placed, and it breaks the chain for
+  the writes on either side of it.
+
+Two things were found while reading this and are not changed here:
+
+- The hook is installed for `Edit|MultiEdit|Write|Bash`, so a `Read` never
+  reaches it. The fingerprint "one file read repeatedly" cannot fire in a real
+  session, and "a long run of reads" sees only shell calls.
+- The stream is appended to and never trimmed, and every prompt reads all of it
+  to use its last 400 lines. The largest on this machine is 8.4 MB, 44,549
+  lines.

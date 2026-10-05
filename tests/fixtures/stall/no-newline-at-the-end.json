@@ -1,0 +1,127 @@
+{
+  "measured": "PostToolUse payloads Claude Code 2.1.289 wrote on 2026-10-05 for one file with no newline at its end: created, edited twice, then rewritten whole. Ids, the session and the path are replaced; nothing else is changed.",
+  "payloads": [
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/project/a.txt",
+        "content": "alpha\nbeta\ngamma\ndelta"
+      },
+      "tool_response": {
+        "type": "create",
+        "filePath": "/project/a.txt",
+        "content": "alpha\nbeta\ngamma\ndelta",
+        "structuredPatch": [],
+        "originalFile": null,
+        "userModified": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/project/a.txt",
+        "old_string": "beta",
+        "new_string": "BETA",
+        "replace_all": false
+      },
+      "tool_response": {
+        "filePath": "/project/a.txt",
+        "oldString": "beta",
+        "newString": "BETA",
+        "originalFile": "alpha\nbeta\ngamma\ndelta",
+        "structuredPatch": [
+          {
+            "oldStart": 1,
+            "oldLines": 4,
+            "newStart": 1,
+            "newLines": 4,
+            "lines": [
+              " alpha",
+              "-beta",
+              "+BETA",
+              " gamma",
+              " delta",
+              "\\ No newline at end of file"
+            ]
+          }
+        ],
+        "userModified": false,
+        "replaceAll": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "/project/a.txt",
+        "old_string": "delta",
+        "new_string": "DELTA",
+        "replace_all": false
+      },
+      "tool_response": {
+        "filePath": "/project/a.txt",
+        "oldString": "delta",
+        "newString": "DELTA",
+        "originalFile": "alpha\nBETA\ngamma\ndelta",
+        "structuredPatch": [
+          {
+            "oldStart": 1,
+            "oldLines": 4,
+            "newStart": 1,
+            "newLines": 4,
+            "lines": [
+              " alpha",
+              " BETA",
+              " gamma",
+              "-delta",
+              "\\ No newline at end of file",
+              "+DELTA",
+              "\\ No newline at end of file"
+            ]
+          }
+        ],
+        "userModified": false,
+        "replaceAll": false
+      }
+    },
+    {
+      "session_id": "s",
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/project/a.txt",
+        "content": "one\ntwo"
+      },
+      "tool_response": {
+        "type": "update",
+        "filePath": "/project/a.txt",
+        "content": "one\ntwo",
+        "structuredPatch": [
+          {
+            "oldStart": 1,
+            "oldLines": 4,
+            "newStart": 1,
+            "newLines": 2,
+            "lines": [
+              "-alpha",
+              "-BETA",
+              "-gamma",
+              "-DELTA",
+              "\\ No newline at end of file",
+              "+one",
+              "+two",
+              "\\ No newline at end of file"
+            ]
+          }
+        ],
+        "originalFile": "alpha\nBETA\ngamma\nDELTA",
+        "userModified": false
+      }
+    }
+  ]
+}
