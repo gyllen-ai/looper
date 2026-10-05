@@ -14,13 +14,24 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write",
+        "matcher": "Edit|MultiEdit|Write|Bash",
         "hooks": [
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/bin/looper.js\" hook PostToolUse",
             "timeout": 30,
             "statusMessage": "looper: checking that edit"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/bin/looper.js\" reached",
+            "timeout": 30,
+            "statusMessage": "looper: noting what was read"
           }
         ]
       }

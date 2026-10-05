@@ -24,9 +24,9 @@ import {
   SECRETS_ALLOW_PATH,
   mcpStub,
   SETTINGS_PATH,
-  looperHooks,
   type Invocation,
 } from "./config.ts";
+import { looperHooks } from "./wiring/hooks.ts";
 import { hooksDirectory } from "./git.ts";
 import {
   COMMIT_MSG,
@@ -48,7 +48,7 @@ import { stackOf } from "./stack/read.ts";
 import { stackDocument } from "./stack/write.ts";
 import { mergeMcp, mergeSettings } from "./settings.ts";
 import type { WrittenLaunch } from "./settings.ts";
-import type { Existing } from "./types.ts";
+import type { Existing, Moved } from "./types.ts";
 
 const EVERYTHING: readonly string[] = [];
 
@@ -63,6 +63,7 @@ export type Step =
       readonly path: string;
       readonly wired: readonly string[];
       readonly rewired: readonly string[];
+      readonly moved: readonly Moved[];
       readonly backup: Backup;
     }
   | { readonly kind: "already-wired"; readonly path: string }
@@ -110,7 +111,7 @@ const STUBS: readonly Stub[] = [
   { path: LAW_PATH, body: LAW_STUB },
 ];
 
-function readExisting(path: string): Existing {
+export function readExisting(path: string): Existing {
   if (!existsSync(path)) return { kind: "absent" };
   return { kind: "present", text: readFileSync(path, "utf8") };
 }
@@ -205,6 +206,7 @@ function wireSettings(root: string, invocation: Invocation): Step {
     path,
     wired: outcome.wired,
     rewired: outcome.rewired,
+    moved: outcome.moved,
     backup: written.backup,
   };
 }

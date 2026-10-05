@@ -13,6 +13,7 @@ import { Loop } from "./loop/capability.ts";
 import { Pins } from "./pins/capability.ts";
 import { Report } from "./report/capability.ts";
 import { Stall } from "./stall/capability.ts";
+import { Wiring } from "./wiring/capability.ts";
 
 export type Refusal = {
   readonly capability: string;
@@ -39,6 +40,7 @@ export type Dispatch = {
 export function registry(): readonly Capability[] {
   return [
     new Router(),
+    new Wiring(),
     new Law(),
     new Secrets(),
     new Recall(),

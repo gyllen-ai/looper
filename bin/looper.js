@@ -56,13 +56,16 @@ function saidWhenLooperCannotLoad(detail) {
   ].join(" ");
 }
 
+const ONLY_WHAT_A_READ_NEEDS = "reached";
+
 try {
-  await import("../src/main.ts");
+  if (process.argv[2] === ONLY_WHAT_A_READ_NEEDS) await import("../src/reached.ts");
+  else await import("../src/main.ts");
 } catch (cause) {
   const detail = cause instanceof Error ? cause.message : String(cause);
   const asked = process.argv[2];
   const named = process.argv[3];
-  const event = asked === "hook" ? HOOKS_THAT_SPEAK.get(named) : undefined;
+  const event = asked === "hook" ? HOOKS_THAT_SPEAK.get(named) : asked === ONLY_WHAT_A_READ_NEEDS ? "PostToolUse" : undefined;
   if (asked === "inject") {
     console.log(
       JSON.stringify({

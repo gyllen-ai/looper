@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
-import type { HookSpec } from "./types.ts";
 
 import { homedir } from "node:os";
 
@@ -46,6 +45,8 @@ export function isABranchName(name: string): boolean {
 export const CANON_DIR = "canon";
 
 export const ROUTER_PRIORITY = 0;
+
+export const WIRING_PRIORITY = 1;
 
 export const LOOP_PRIORITY = 5;
 
@@ -360,8 +361,6 @@ export const TEMP_SUFFIX = ".looper-tmp";
 
 export const BACKUP_SUFFIX = ".looper-backup";
 
-export const EDIT_TOOLS = "Edit|MultiEdit|Write|Bash";
-
 export type Invocation =
   | { readonly kind: "installed" }
   | { readonly kind: "local" }
@@ -464,35 +463,4 @@ export function entryFor(invocation: Invocation): string {
     return `node "$CLAUDE_PROJECT_DIR/${scriptUnder(invocation.at)}"`;
   }
   return INSTALLED_ENTRY;
-}
-
-export function looperHooks(invocation: Invocation): readonly HookSpec[] {
-  const entry = entryFor(invocation);
-  return [
-    {
-      event: "UserPromptSubmit",
-      matcher: { kind: "all" },
-      command: `${entry} inject`,
-      statusMessage: "looper: reading this project's rules",
-    },
-    {
-      event: "PostToolUse",
-      matcher: { kind: "match", pattern: EDIT_TOOLS },
-      command: `${entry} hook PostToolUse`,
-      statusMessage: "looper: checking that edit",
-    },
-    {
-      event: "PreToolUse",
-      matcher: { kind: "match", pattern: "Bash" },
-      command: `${entry} hook PreToolUse`,
-      statusMessage: "looper: checking what is about to be committed",
-      timeoutSeconds: COMMIT_GATE_TIMEOUT_SECONDS,
-    },
-    {
-      event: "Stop",
-      matcher: { kind: "all" },
-      command: `${entry} hook Stop`,
-      statusMessage: "looper: updating what is left to fix",
-    },
-  ];
 }

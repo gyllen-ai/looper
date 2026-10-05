@@ -51,6 +51,30 @@ function repeatedShapes(held: readonly Reached[], tool: string, means: string): 
   return found;
 }
 
+function readAgainUnwritten(held: readonly Reached[]): readonly Fingerprint[] {
+  const running = new Map<string, readonly Reached[]>();
+  const longest = new Map<string, readonly Reached[]>();
+  for (const one of held) {
+    if (WRITING.includes(one.tool)) {
+      running.delete(one.print);
+      continue;
+    }
+    if (one.tool !== "Read") continue;
+    const before = running.get(one.print);
+    const run = before === undefined ? [one] : [...before, one];
+    running.set(one.print, run);
+    const best = longest.get(one.print);
+    if (best === undefined || run.length > best.length) longest.set(one.print, run);
+  }
+  const found: Fingerprint[] = [];
+  for (const run of longest.values()) {
+    const earliest = run[0];
+    if (earliest === undefined || run.length < REPEATED_ENOUGH) continue;
+    found.push({ shape: earliest.shape, times: run.length, minutes: spanOf(run), means: "a dump where a view was needed" });
+  }
+  return found;
+}
+
 function longReadRun(held: readonly Reached[]): readonly Fingerprint[] {
   let run: Reached[] = [];
   let longest: Reached[] = [];
@@ -154,7 +178,7 @@ export function stallsIn(reached: readonly Reached[], now: number): readonly Fin
   const held = within(reached, now);
   return [
     ...repeatedShapes(held, "Bash", "no single call answers the question"),
-    ...repeatedShapes(held, "Read", "a dump where a view was needed"),
+    ...readAgainUnwritten(held),
     ...rewrittenSoon(held),
     ...longReadRun(held),
   ];

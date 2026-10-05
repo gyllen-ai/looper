@@ -22,6 +22,7 @@ import type {
   JsonValue,
   Matcher,
   Merge,
+  Moved,
 } from "./types.ts";
 
 const NO_GROUPS: readonly JsonValue[] = [];
@@ -293,6 +294,25 @@ export function mergeMcp(existing: Existing, launch: Launch): McpMerge {
   };
 }
 
+const EVERY_TOOL = "every tool";
+
+export function matcherText(matcher: Matcher): string {
+  return matcher.kind === "all" ? EVERY_TOOL : matcher.pattern;
+}
+
+function matchersCarrying(groups: readonly JsonValue[], command: string): readonly Matcher[] {
+  const found: Matcher[] = [];
+  for (const group of groups) {
+    if (!isJsonObject(group)) continue;
+    const entries = group[HOOKS_KEY];
+    if (!isJsonArray(entries)) continue;
+    for (const entry of entries) {
+      if (isJsonObject(entry) && entry[COMMAND_KEY] === command) found.push(matcherOf(group));
+    }
+  }
+  return found;
+}
+
 export function mergeSettings(
   existing: Existing,
   wanted: readonly HookSpec[],
@@ -302,16 +322,56 @@ export function mergeSettings(
 
   const wired: string[] = [];
   const rewired: string[] = [];
+  const moved: Moved[] = [];
+  const added: string[] = [];
+  const folded: string[] = [];
   for (const spec of wanted) {
-    if (carriesCommand(eventGroups(root, spec.event), spec.command)) continue;
-    for (const older of ourOlderHooksIn(eventGroups(root, spec.event), spec.command)) {
-      rewired.push(older);
+    const groups = eventGroups(root, spec.event);
+    const carrying = matchersCarrying(groups, spec.command);
+    const older = ourOlderHooksIn(groups, spec.command);
+    const inPlace = carrying.length === 1 && carrying.every((one) => sameMatcher(one, spec.matcher));
+    if (inPlace && older.length === 0) continue;
+    rewired.push(...older);
+    for (const was of carrying) {
+      if (sameMatcher(was, spec.matcher)) continue;
+      moved.push({ event: spec.event, command: spec.command, was: matcherText(was), now: matcherText(spec.matcher) });
     }
+    if (carrying.length === 0 && older.length === 0) added.push(spec.command);
+    if (carrying.length > 1) folded.push(spec.command);
     root = withHookWired(root, spec);
     wired.push(spec.command);
   }
 
   if (wired.length === 0) return { kind: "unchanged" };
-  if (startedEmpty) return { kind: "created", text: serialise(root), wired, rewired };
-  return { kind: "merged", text: serialise(root), wired, rewired };
+  const changes = { text: serialise(root), wired, rewired, moved, added, folded };
+  if (startedEmpty) return { kind: "created", ...changes };
+  return { kind: "merged", ...changes };
+}
+
+export type Started =
+  | { readonly kind: "not-here" }
+  | { readonly kind: "started-by"; readonly entry: string };
+
+function entryOf(command: string): string {
+  return command.slice(0, command.length - tailOf(command).length).trimEnd();
+}
+
+export function startedIn(existing: Existing, wanted: readonly HookSpec[]): Started {
+  if (existing.kind === "absent") return { kind: "not-here" };
+  const root = parseSettings(existing.text);
+  for (const spec of wanted) {
+    for (const group of eventGroups(root, spec.event)) {
+      if (!isJsonObject(group)) continue;
+      const entries = group[HOOKS_KEY];
+      if (!isJsonArray(entries)) continue;
+      for (const entry of entries) {
+        if (!isJsonObject(entry)) continue;
+        const command = entry[COMMAND_KEY];
+        if (typeof command === "string" && isOneWeWrote(command, spec.command)) {
+          return { kind: "started-by", entry: entryOf(command) };
+        }
+      }
+    }
+  }
+  return { kind: "not-here" };
 }

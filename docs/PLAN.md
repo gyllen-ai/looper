@@ -8825,3 +8825,77 @@ every turn, because a fault nobody mentions cannot be asked for.
 The cases came first and failed for the reasons above: 7 of 10 in
 `tests/atomic-races.test.ts`, 13 of 15 in `tests/not-a-file.test.ts` (every one
 by hanging until it was killed), and 4 of 6 in `tests/dropped-once.test.ts`.
+
+## A read is counted, an old install catches up on its own, and the stream stays short — 2026-10-05
+
+The two things the entry above found and left, and a third from 2026-10-01: this
+repository's own `.claude/settings.json` still ran the edit hook for
+`Edit|MultiEdit|Write`. #95 widened that matcher for installs made after it,
+and `looper init` skipped any entry whose command was already there, whatever
+its matcher. So every project that installed looper before #95 was still not
+judging what it changed through the shell, and nothing would ever tell it.
+
+### What was measured
+
+On the machine this was written on (Linux 6.18 under WSL2, Node 24.20.0),
+2026-10-05, each figure a median of fifteen runs:
+
+- `node -e 0` takes 26 ms. The loader looper starts through, with one tiny file
+  to strip, takes 75 ms. That is the floor for anything looper runs.
+- `looper hook PostToolUse` takes 268 ms on a Read payload and 270 ms on an
+  edit: it loads 160 files, 750 KB, whatever the call was.
+- Handed a Read of a file with a `console.log` in it, that hook judged the file
+  and refused, exit 2. **The law judges whatever file a payload names**, so a
+  read cannot simply join the edit hook's matcher: it would refuse reads.
+- Reading a stream of 8.47 MB, 44,703 lines, took 12.6 ms and gave back 399
+  records, not 400: the empty piece after the last newline took a place.
+
+### What was built
+
+**A read has an entry of its own.** `looper reached`, wired for `Read` alone,
+loads the stall code and nothing else — 11 files, 51 KB, measured at 100 ms,
+which is 25 ms above the floor. `bin/looper.js` chooses it by name before
+anything else loads, and `src/main.ts` does not know the word, so if that
+choice is ever lost the read entry stops working and a test says so. It counts
+reads only: handed anything else it says it did not count it, because the edit
+hook already does and the same call counted twice would break the chain #205
+compares writes along. The law never sees a read.
+
+**One file read again is a dump only when nothing was written to it between.**
+Wired in, the old count — four reads of a file in forty minutes — would have
+called read, edit, read, edit the dump shape, and that is checking the edit.
+
+**looper keeps its own hook entries current, on an ordinary turn.** A new
+capability, `wiring`, runs on every prompt that carries a session. When
+`.claude/settings.json` holds any of looper's entries, it brings them to what
+this looper wires: an entry under a matcher looper no longer asks for is
+moved, an entry it now wires and the file lacks is added, an older form is
+replaced, and one written twice is written once. The way the project starts
+looper is read from the entries already there and kept, so a project started
+through `node_modules` stays that way. Nothing that is not looper's is touched,
+the file as it was is kept beside it, and the turn is told what changed and
+that a running session keeps the hooks it started with until it is restarted.
+`looper init` now moves a stale matcher too; it used to leave it. The list of
+entries moved out of `src/config.ts`, which had crossed its 500-line cap, into
+`src/wiring/hooks.ts`.
+
+**The stream is cut at 256 KB.** Past that size the file is renamed to
+`.older`, under a lock taken by one process and never waited for; appending
+takes no lock at all. A hook that had the file open when it was renamed still
+writes into it, and that file is still read. Reading takes the last 256 KB
+across the two files, so the 8.47 MB stream now reads back in 0.8 ms, and gives
+400 records. A stream an older looper left long is read from its end and is
+cut by the next line written.
+
+### What it costs, and what it does not cover
+
+- **Every read now starts a process: 100 ms here.** A session of a hundred
+  reads pays about ten seconds for the metric to see them.
+- `Grep` and `Glob` are reads too, and are not counted: deciding when two of
+  them are the same question needs their whole input, and that was not built.
+- A looper entry somebody removed by hand comes back on the next turn, and the
+  turn says so. Turning looper off means removing all of its entries.
+- Entries kept anywhere but `.claude/settings.json` — `settings.local.json`,
+  the user's own settings — are not kept current.
+- Noticed and not changed: "one command repeated" still counts a test run
+  after each edit as a stall.

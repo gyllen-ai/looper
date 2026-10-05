@@ -19,6 +19,7 @@ export const USAGE: readonly string[] = [
   "  looper init [--dev]     wire looper into this project",
   "  looper inject           the per-prompt injection hook",
   "  looper hook <event>     dispatch an agent hook",
+  "  looper reached          the hook after a read: note it for the stall metric",
   "  looper status           what looper injects, and what it costs per turn",
   "  looper serve            the MCP server, on stdin and stdout",
   "  looper law [path...]    judge every file, or only what is under these paths",
@@ -56,14 +57,18 @@ export function describeStep(step: Step): readonly string[] {
     const replaced = step.rewired.map(
       (command) => `             replaced an older looper hook: ${command}`,
     );
+    const moved = step.moved.map(
+      (one) => `             now runs for ${one.now}, where it ran for ${one.was}: ${one.command}`,
+    );
     const said =
-      step.rewired.length === 0
+      step.rewired.length === 0 && step.moved.length === 0
         ? `  merged   ${step.path} (everything already in it was left alone)`
         : `  merged   ${step.path} (looper's own hooks were rewired; everything else was left alone)`;
     return [
       said,
       ...step.wired.map((command) => `             wired  ${command}`),
       ...replaced,
+      ...moved,
       ...backup,
     ];
   }

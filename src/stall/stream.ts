@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, renameSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-import { reasonFrom } from "../fields.ts";
+import { withLockFor, type Patience } from "../atomic.ts";
+import { fieldAt, reasonFrom } from "../fields.ts";
 import { readAs, writtenAs, type Placed } from "./placed.ts";
 
 const STREAM_DIR = join(".looper", "seen");
@@ -55,7 +56,41 @@ export function printOf(tool: string, detail: string): string {
 
 export type Noted =
   | { readonly kind: "noted" }
-  | { readonly kind: "not-noted"; readonly why: string };
+  | { readonly kind: "not-noted"; readonly why: string }
+  | { readonly kind: "kept-long"; readonly why: string };
+
+export const A_STREAM_IS_CUT_AT_BYTES = 256 * 1024;
+
+const OLDER = ".older";
+
+export function olderStreamPath(root: string, home: string): string {
+  return `${streamPath(root, home)}${OLDER}`;
+}
+
+const ONE_CUT_AT_A_TIME: Patience = { waitMs: 0, giveUpMs: 0, staleMs: 5000 };
+
+type Size = { readonly kind: "gone" } | { readonly kind: "sized"; readonly bytes: number };
+
+function sizeOf(path: string): Size {
+  try {
+    return { kind: "sized", bytes: statSync(path).size };
+  } catch (cause) {
+    if (fieldAt(cause, "code") === "ENOENT") return { kind: "gone" };
+    throw cause;
+  }
+}
+
+function longerThanACut(path: string): boolean {
+  const size = sizeOf(path);
+  return size.kind === "sized" && size.bytes > A_STREAM_IS_CUT_AT_BYTES;
+}
+
+function cutIfLong(path: string, older: string): void {
+  if (!longerThanACut(path)) return;
+  withLockFor(path, ONE_CUT_AT_A_TIME, () => {
+    if (longerThanACut(path)) renameSync(path, older);
+  });
+}
 
 function oneLine(text: string): string {
   return text.replace(/[\t\n]/g, " ");
@@ -69,25 +104,59 @@ export function note(root: string, home: string, one: Reached): Noted {
       path,
       `${one.at}\t${one.tool}\t${oneLine(one.shape)}\t${oneLine(one.session)}\t${one.print}\t${writtenAs(one.placed)}\n`,
     );
-    return { kind: "noted" };
   } catch (cause) {
     return { kind: "not-noted", why: reasonFrom(cause) };
   }
+  try {
+    cutIfLong(path, olderStreamPath(root, home));
+    return { kind: "noted" };
+  } catch (cause) {
+    return { kind: "kept-long", why: reasonFrom(cause) };
+  }
+}
+
+type Tail = { readonly text: string; readonly bytes: number; readonly whole: boolean };
+
+function tailOf(path: string, upTo: number): Tail {
+  const size = sizeOf(path);
+  if (size.kind === "gone") return { text: "", bytes: 0, whole: true };
+  const take = Math.min(size.bytes, upTo);
+  const into = new Uint8Array(take);
+  const handle = openSync(path, "r");
+  let got = 0;
+  try {
+    got = readSync(handle, into, 0, take, size.bytes - take);
+  } finally {
+    closeSync(handle);
+  }
+  return { text: new TextDecoder().decode(into.subarray(0, got)), bytes: got, whole: take === size.bytes };
+}
+
+function fromALineStart(tail: Tail): string {
+  return tail.whole ? tail.text : tail.text.slice(tail.text.indexOf("\n") + 1);
+}
+
+function windowOf(path: string, older: string): string {
+  const recent = tailOf(path, A_STREAM_IS_CUT_AT_BYTES);
+  const room = A_STREAM_IS_CUT_AT_BYTES - recent.bytes;
+  if (!recent.whole || room <= 0) return fromALineStart(recent);
+  return `${fromALineStart(tailOf(older, room))}${recent.text}`;
 }
 
 const FIELDS = 6;
 
 export function reachedFor(root: string, home: string, session: string): Stream {
   const path = streamPath(root, home);
-  if (!existsSync(path)) return { kind: "none" };
+  const older = olderStreamPath(root, home);
+  if (!existsSync(path) && !existsSync(older)) return { kind: "none" };
   let held = "";
   try {
-    held = readFileSync(path, "utf8");
+    held = windowOf(path, older);
   } catch (cause) {
     return { kind: "unreadable", why: reasonFrom(cause) };
   }
   const reached: Reached[] = [];
-  for (const line of held.split("\n").slice(-A_STREAM_HOLDS)) {
+  for (const line of held.split("\n").filter((one) => one.length > 0).slice(-A_STREAM_HOLDS)) {
     const parts = line.split("\t");
     if (parts.length !== FIELDS) continue;
     const at = Number(parts[0]);

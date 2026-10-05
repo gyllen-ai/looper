@@ -1,5 +1,5 @@
 [entry]
-files = ["src/main.ts", "bin/looper.js", "audit/evasion.ts", "audit/dup-scan.ts", "audit/rust-evasion.ts", "audit/probe.ts", "audit/secrets-probe.ts"]
+files = ["src/main.ts", "src/reached.ts", "bin/looper.js","audit/evasion.ts", "audit/dup-scan.ts", "audit/rust-evasion.ts", "audit/probe.ts", "audit/secrets-probe.ts"]
 
 [exempt]
 # One line builds a rule whose pass is a word no rule declares, to prove the
