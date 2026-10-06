@@ -28,20 +28,24 @@ function fileFor(at: number): string {
   return `case_${at}.rs`;
 }
 
+const FOLDERS: readonly string[] = ["src", "tests", "examples"];
+
+function folderOf(held: RustCase): string {
+  return held.place === undefined ? "src" : held.place;
+}
+
 export function judgeCases(cases: readonly RustCase[]): Judged {
   const crate = mkdtempSync(join(tmpdir(), "looper-rust-cases-"));
   try {
-    mkdirSync(join(crate, "src"), { recursive: true });
+    for (const folder of FOLDERS) mkdirSync(join(crate, folder), { recursive: true });
     writeFileSync(join(crate, "Cargo.toml"), MANIFEST);
-    writeFileSync(
-      join(crate, "src", "lib.rs"),
-      cases.map((_, at) => `pub mod case_${at};`).join("\n") + "\n",
-    );
+    const modules = [...cases.entries()].filter(([, held]) => held.place === undefined);
+    writeFileSync(join(crate, "src", "lib.rs"), modules.map(([at]) => `pub mod case_${at};`).join("\n") + "\n");
     for (const [at, held] of cases.entries()) {
-      writeFileSync(join(crate, "src", fileFor(at)), `${held.code}\n`);
+      writeFileSync(join(crate, folderOf(held), fileFor(at)), `${held.code}\n`);
     }
 
-    const said = judgeRustIn(crate, cases.map((_, at) => join(crate, "src", fileFor(at))));
+    const said = judgeRustIn(crate, cases.map((held, at) => join(crate, folderOf(held), fileFor(at))));
     const mismatches: Mismatch[] = [];
     const notFixedYet: Mismatch[] = [];
 

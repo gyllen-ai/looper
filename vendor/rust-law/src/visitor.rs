@@ -2,7 +2,7 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use crate::absence::{hands_absence_on, names_the_absence};
-use crate::bodies::{arm_facts, drop_body_lines, expr_mentions, ArmFacts};
+use crate::bodies::{arm_facts, drop_body_lines, expr_mentions, takes_the_lock_back, ArmFacts};
 use crate::config::{file_matches, LawConfig};
 use crate::shapes::{
     collect_results, erased_error_carrier, shape_of_type, sig_option_lines, type_holds_callable,
@@ -51,6 +51,10 @@ pub const BANNED_METHODS: &[&str] = &[
     "is_none_or",
 ];
 
+const PANICKING_METHODS: &[&str] = &["unwrap", "expect", "unwrap_err", "expect_err"];
+
+const LOCK_METHODS: &[&str] = &["lock", "read", "write"];
+
 const ENV_FNS: &[&str] = &[
     "var", "vars", "var_os", "vars_os", "args", "args_os", "set_var", "remove_var",
 ];
@@ -76,6 +80,7 @@ pub struct FileRole {
     pub judges_tests: bool,
     pub build_script: bool,
     pub cargo_test: bool,
+    pub example: bool,
 }
 
 pub struct Judge<'c> {
@@ -86,7 +91,8 @@ pub struct Judge<'c> {
     is_sanctum: bool,
     env_allowed: bool,
     judges_tests: bool,
-    cargo_keys_allowed: bool,
+    in_tests_target: bool,
+    silent_family: Vec<&'static str>,
     generics: Vec<String>,
     in_foreign_contract: bool,
     pub_trait: bool,
@@ -94,11 +100,21 @@ pub struct Judge<'c> {
     pub hits: Vec<Violation>,
 }
 
+fn silent_family_for(role: &FileRole) -> Vec<&'static str> {
+    BANNED_METHODS
+        .iter()
+        .copied()
+        .filter(|name| !(role.cargo_test && PANICKING_METHODS.contains(name)))
+        .collect()
+}
+
 impl<'c> Judge<'c> {
     pub fn new(cfg: &'c LawConfig, rel: &str, prov: Provenance<'c>, role: FileRole) -> Judge<'c> {
-        let is_bin = role.build_script || rel == "main.rs" || rel.starts_with("bin/");
+        let is_bin =
+            role.build_script || role.example || rel == "main.rs" || rel.starts_with("bin/");
         let is_sanctum = file_matches(rel, &cfg.truth.sanctum);
         let env_allowed = cfg.truth.env_files.iter().any(|f| file_matches(rel, f));
+        let silent_family = silent_family_for(&role);
         Judge {
             cfg,
             prov,
@@ -107,7 +123,8 @@ impl<'c> Judge<'c> {
             is_sanctum,
             env_allowed,
             judges_tests: role.judges_tests,
-            cargo_keys_allowed: role.cargo_test,
+            in_tests_target: role.cargo_test,
+            silent_family,
             generics: Vec::new(),
             in_foreign_contract: false,
             pub_trait: false,
@@ -278,7 +295,7 @@ impl<'c> Judge<'c> {
 
     fn scan_macro_tokens(&mut self, node: &syn::Macro) {
         let mut silent = Vec::new();
-        scan_tokens_for_banned(node.tokens.clone(), BANNED_METHODS, &mut silent);
+        scan_tokens_for_banned(node.tokens.clone(), &self.silent_family, &mut silent);
         for line in silent {
             self.hit(Rule::SilentOp, line);
         }
@@ -364,7 +381,7 @@ impl<'c> Judge<'c> {
     }
 
     fn names_a_cargo_key(&self, node: &syn::Macro) -> bool {
-        self.cargo_keys_allowed && tokens_name_a_cargo_key(node.tokens.clone())
+        self.in_tests_target && tokens_name_a_cargo_key(node.tokens.clone())
     }
 
     fn scan_macro_environ(&mut self, node: &syn::Macro) {
@@ -373,7 +390,7 @@ impl<'c> Judge<'c> {
         }
         let mut envs = Vec::new();
         scan_tokens_for_environ(node.tokens.clone(), &mut envs);
-        if self.cargo_keys_allowed {
+        if self.in_tests_target {
             scan_tokens_for_env_macros(node.tokens.clone(), ENV_MACROS, &mut envs);
         } else {
             scan_tokens_for_macros(node.tokens.clone(), ENV_MACROS, &mut envs);
@@ -409,8 +426,9 @@ impl<'c> Judge<'c> {
         if !fallible {
             return;
         }
+        let over_a_test_lock = self.in_tests_target && is_lock_call(&node.expr);
         for arm in &node.arms {
-            self.judge_arm(arm, &node.arms);
+            self.judge_arm(arm, &node.arms, over_a_test_lock);
         }
     }
 
@@ -442,7 +460,7 @@ impl<'c> Judge<'c> {
         }
     }
 
-    fn judge_arm(&mut self, arm: &syn::Arm, arms: &[syn::Arm]) {
+    fn judge_arm(&mut self, arm: &syn::Arm, arms: &[syn::Arm], over_a_test_lock: bool) {
         let line = arm.pat.span().start().line;
         let cases = or_cases(&arm.pat);
 
@@ -462,7 +480,7 @@ impl<'c> Judge<'c> {
         let is_none_arm = cases.iter().any(|c| pat_is_none(c));
 
         if is_err_arm {
-            self.judge_err_arm(arm, line);
+            self.judge_err_arm(arm, line, over_a_test_lock);
         }
 
         if is_none_arm {
@@ -470,7 +488,7 @@ impl<'c> Judge<'c> {
         }
     }
 
-    fn judge_err_arm(&mut self, arm: &syn::Arm, line: usize) {
+    fn judge_err_arm(&mut self, arm: &syn::Arm, line: usize, over_a_test_lock: bool) {
         let bindings = err_bindings(&arm.pat);
         let facts = self.arm_facts(arm, &bindings);
         let bound = !bindings.is_empty();
@@ -480,8 +498,10 @@ impl<'c> Judge<'c> {
         if tail_is_stub(&arm.body) {
             self.hit(Rule::StubValue, line);
         }
-        let observed = facts.has_trace && (!bound || facts.binding_used);
-        if !facts.propagates && !facts.has_crash && !observed {
+        let written = facts.has_trace || (self.is_bin && facts.prints_the_failure);
+        let observed = written && (!bound || facts.binding_used);
+        let lock_taken_back = over_a_test_lock && takes_the_lock_back(arm, &bindings);
+        if !facts.propagates && !facts.has_crash && !observed && !lock_taken_back {
             self.hit(Rule::VanishedError, line);
         }
         if takes_another_route(&arm.body, &bindings) {
@@ -587,7 +607,7 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
         let name = node.method.to_string();
         let line = node.method.span().start().line;
-        if BANNED_METHODS.iter().any(|m| *m == name) {
+        if self.silent_family.iter().any(|m| *m == name) {
             self.hit(Rule::SilentOp, line);
         }
         if ident_is_mangle(&name) {
@@ -598,7 +618,7 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
     }
 
     fn visit_expr_path(&mut self, node: &'ast syn::ExprPath) {
-        if path_is_fallible_family(&node.path, BANNED_METHODS) {
+        if path_is_fallible_family(&node.path, &self.silent_family) {
             self.hit(Rule::SilentOp, callee_line(&node.path));
         }
         syn::visit::visit_expr_path(self, node);
@@ -611,7 +631,7 @@ impl<'ast, 'c> Visit<'ast> for Judge<'c> {
             let segs = path_segs(&ep.path);
             let last = path_last(&ep.path);
             let qualified_fallible = segs.iter().any(|s| s == "Option" || s == "Result");
-            if segs.len() >= 2 && qualified_fallible && last_banned(&segs) {
+            if segs.len() >= 2 && qualified_fallible && last_banned(&segs, &self.silent_family) {
                 self.hit(Rule::SilentOp, line);
             }
             if last_is(&ep.path, "drop") && node.args.len() == 1 {
@@ -777,11 +797,18 @@ fn callee_line(path: &syn::Path) -> usize {
     seg.ident.span().start().line
 }
 
-fn last_banned(segs: &[String]) -> bool {
+fn is_lock_call(expr: &syn::Expr) -> bool {
+    let syn::Expr::MethodCall(call) = expr else {
+        return false;
+    };
+    call.args.is_empty() && LOCK_METHODS.contains(&call.method.to_string().as_str())
+}
+
+fn last_banned(segs: &[String], family: &[&str]) -> bool {
     let Some(last) = segs.last() else {
         return false;
     };
-    BANNED_METHODS.iter().any(|m| m == last)
+    family.iter().any(|m| m == last)
 }
 
 

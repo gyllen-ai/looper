@@ -85,7 +85,7 @@ export const RUST_RULES: readonly Rule[] = [
     category: "ERROR",
     pass: "fast",
     bans:
-      "reading a fallible value without handling it. The whole family: `unwrap`, `expect`, `unwrap_err`, `expect_err`, `unwrap_or`, `unwrap_or_else`, `unwrap_or_default`, `ok()`, `err()`, `or()`, `or_else()`, `map_or()`, `map_or_else()`, every `is_ok` / `is_some` / `is_none_or` predicate, `matches!` on one, `if let` and `while let` on `Some`/`Ok`/`Err`/`None`, `let _ =`, an untyped `let _name =`, `==` or `!=` against `None` or `Some(..)`, `drop(call())`, and `let … else` on `Ok`/`Err`",
+      "reading a fallible value without handling it. The whole family: `unwrap`, `expect`, `unwrap_err`, `expect_err`, `unwrap_or`, `unwrap_or_else`, `unwrap_or_default`, `ok()`, `err()`, `or()`, `or_else()`, `map_or()`, `map_or_else()`, every `is_ok` / `is_some` / `is_none_or` predicate, `matches!` on one, `if let` and `while let` on `Some`/`Ok`/`Err`/`None`, `let _ =`, an untyped `let _name =`, `==` or `!=` against `None` or `Some(..)`, `drop(call())`, and `let … else` on `Ok`/`Err`. In a crate's `tests/` target, `unwrap`, `expect`, `unwrap_err` and `expect_err` pass: a test that crashes is a test failing out loud, reported with its message. The quiet members still fire there, because a test that turns a failure into a value passes when it should not",
     why:
       "each one answers a failure without saying so. `unwrap` turns it into a crash in front of whoever is using the thing; `unwrap_or` turns it into a value that looks exactly like a real one, one line later. The person who sees the result has no way to know anything went wrong",
     instead: [
@@ -130,13 +130,15 @@ export const RUST_RULES: readonly Rule[] = [
     id: "RUST-ERROR:4",
     category: "ERROR",
     pass: "fast",
-    bans: "an `Err` arm that does none of the three things an `Err` arm may do",
+    bans:
+      "an `Err` arm that does none of the three things an `Err` arm may do. In the file that starts a program, `eprintln!` or `eprint!` naming the bound failure writes it down for whoever ran it. In a crate's `tests/` target, `Err(poisoned) => poisoned.into_inner()` on a `.lock()`, `.read()` or `.write()` takes the lock back after another test panicked, and that test's own failure already said so",
     why:
       "a failure nobody hears about is a bug reported months later as something else entirely. There are three doors out and no fourth: pass it on, stop the program, or read the error and write it down before recovering. An arm that does none of those has decided the failure did not happen",
     instead: [
       "pass it on: `?`, or `return Err(CouldNotRead { path, cause })`",
       "stop: `panic!` or `process::exit` — loud, immediate, and honest about being a dead end",
       "observe it, then answer with a named absence: `Err(cause) => { tracing::warn!(?cause, \"cache unreadable\"); Held::Absent }`. Answering by calling a second route is a fallback, which RUST-TRUTH:3 refuses",
+      "in the file that starts the program: `Err(failure) => { eprintln!(\"run: {failure}\"); ExitCode::FAILURE }`",
     ],
     valve: NO_VALVE,
   },
@@ -144,7 +146,8 @@ export const RUST_RULES: readonly Rule[] = [
     id: "RUST-ERROR:5",
     category: "ERROR",
     pass: "fast",
-    bans: "a crate root that does not appoint its deputies",
+    bans:
+      "a crate root that does not appoint its deputies. `lib.rs`, `main.rs`, each file in `bin/`, `build.rs` and each example program — a file directly in `examples/`, or `examples/<name>/main.rs` — is one",
     why:
       "the compiler will catch most of this law for you, for free, on every build — but only for the lints the crate actually turns on. A crate that appoints none is one where every rule below has to be caught by looper instead, on a machine that may not be running it. This is the cheapest strong rule there is: a few lines of configuration buy a second reader who never gets tired",
     instead: [
@@ -359,7 +362,7 @@ export const RUST_RULES: readonly Rule[] = [
     category: "LOG",
     pass: "fast",
     bans:
-      "`println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere. A crate's `build.rs` is such a file: cargo compiles and runs it as its own program, and what it writes to stdout is cargo's protocol",
+      "`println!`, `print!`, `eprintln!` and `eprint!` outside the file that starts the program, and `dbg!` anywhere. A crate's `build.rs` is such a file: cargo compiles and runs it as its own program, and what it writes to stdout is cargo's protocol. So is each example program, a file directly in `examples/` or `examples/<name>/main.rs`, which cargo builds as a program of its own",
     why:
       "what a program prints is its output, and it belongs to whoever ran it. A library that prints has decided for every future caller, including the one piping the output into something else. `dbg!` is the one that reaches production, because it is written to be removed and removing it is a step nobody schedules",
     instead: [

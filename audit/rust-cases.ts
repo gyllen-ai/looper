@@ -1,9 +1,12 @@
+export type Place = "tests" | "examples";
+
 export type RustCase = {
   readonly rule: string;
   readonly name: string;
   readonly code: string;
   readonly expect: "fires" | "silent";
   readonly notFixedYet?: string;
+  readonly place?: Place;
 };
 
 export const RUST_CASES: readonly RustCase[] = [
@@ -183,4 +186,47 @@ export const RUST_CASES: readonly RustCase[] = [
     code: `pub fn next(at: Option<u64>) -> Option<u64> { match at { Some(n) => n.checked_add(1), None => None } }` },
   { rule: "RUST-TRUTH:1", name: "a None arm that hands the absence on inside Ok", expect: "silent",
     code: `pub struct Unread;\npub fn next(at: Result<Option<u64>, Unread>) -> Result<Option<u64>, Unread> { match at? { Some(n) => Ok(n.checked_add(1)), None => Ok(None) } }` },
+
+  { rule: "RUST-ERROR:1", name: "expect under src is still refused", expect: "fires",
+    code: `pub fn f(v: Result<u8, u8>) -> u8 { v.expect("a value") }` },
+  { rule: "RUST-ERROR:1", name: "a fixture helper in a test file may expect: a failure there fails the test out loud", expect: "silent", place: "tests",
+    code: `fn seven() -> u8 { "7".parse().expect("the fixture parses") }\n#[test]\nfn reads() { assert_eq!(seven(), 7); }` },
+  { rule: "RUST-ERROR:1", name: "unwrap in a test helper is the same loud failure", expect: "silent", place: "tests",
+    code: `pub fn seven() -> u8 { "7".parse().unwrap() }` },
+  { rule: "RUST-ERROR:1", name: "unwrap_err in a test helper asserts the failure it expects", expect: "silent", place: "tests",
+    code: `pub fn refusal() -> std::num::ParseIntError { "x".parse::<u8>().unwrap_err() }` },
+  { rule: "RUST-ERROR:1", name: "expect inside an assertion in a test helper", expect: "silent", place: "tests",
+    code: `pub fn check() { assert_eq!("7".parse::<u8>().expect("parses"), 7); }` },
+  { rule: "RUST-ERROR:1", name: "unwrap_or in a test helper still answers a failure with a value", expect: "fires", place: "tests",
+    code: `pub fn seven() -> u8 { "x".parse().unwrap_or(7) }` },
+  { rule: "RUST-ERROR:1", name: "ok() in a test helper still throws the failure away", expect: "fires", place: "tests",
+    code: `pub fn seven() -> Option<u8> { "7".parse().ok() }` },
+  { rule: "RUST-ERROR:1", name: "is_ok in a test helper still reads the answer and drops the evidence", expect: "fires", place: "tests",
+    code: `pub fn parses() -> bool { "7".parse::<u8>().is_ok() }` },
+  { rule: "RUST-ERROR:1", name: "an example program is not a test, so its unwrap is still refused", expect: "fires", place: "examples",
+    code: `fn main() -> std::process::ExitCode { let n: u8 = "7".parse().unwrap(); std::process::ExitCode::from(n) }` },
+
+  { rule: "RUST-LOG:1", name: "an example program prints its own output", expect: "silent", place: "examples",
+    code: `fn main() { println!("the example shows this"); }` },
+  { rule: "RUST-LOG:1", name: "a test file is not a program start, so its helpers do not print", expect: "fires", place: "tests",
+    code: `pub fn noise() { println!("noise"); }` },
+  { rule: "RUST-ERROR:5", name: "an example program is a crate root and appoints its deputies", expect: "fires", place: "examples",
+    code: `fn main() {}` },
+  { rule: "RUST-ERROR:5", name: "an example that appoints them", expect: "silent", place: "examples",
+    code: `#![deny(unused_must_use)]\n#![deny(for_loops_over_fallibles)]\n#![deny(dead_code)]\n#![deny(unused_variables)]\n#![deny(unused_assignments)]\nfn main() {}` },
+
+  { rule: "RUST-ERROR:4", name: "a program start writes its failure to stderr and exits with failure", expect: "silent", place: "examples",
+    code: `#[derive(Debug)]\npub struct Failed;\nfn run() -> Result<(), Failed> { Ok(()) }\nfn main() -> std::process::ExitCode { match run() { Ok(()) => std::process::ExitCode::SUCCESS, Err(failure) => { eprintln!("run: {failure:?}"); std::process::ExitCode::FAILURE } } }` },
+  { rule: "RUST-ERROR:4", name: "the same arm in a library has written nothing down", expect: "fires",
+    code: `#[derive(Debug)]\npub struct Failed;\nfn run() -> Result<(), Failed> { Ok(()) }\npub fn go() -> u8 { match run() { Ok(()) => 0, Err(failure) => { eprintln!("run: {failure:?}"); 1 } } }` },
+  { rule: "RUST-ERROR:4", name: "a program start that prints something other than the failure has not written it down", expect: "fires", place: "examples",
+    code: `#[derive(Debug)]\npub struct Failed;\nfn run() -> Result<(), Failed> { Ok(()) }\nfn main() -> std::process::ExitCode { match run() { Ok(()) => std::process::ExitCode::SUCCESS, Err(failure) => { eprintln!("it failed"); std::process::ExitCode::FAILURE } } }` },
+  { rule: "RUST-ERROR:4", name: "a test lock taken back after another test panicked", expect: "silent", place: "tests",
+    code: `use std::sync::{Mutex, MutexGuard};\nstatic IN_TURN: Mutex<()> = Mutex::new(());\npub fn turn() -> MutexGuard<'static, ()> { match IN_TURN.lock() { Ok(held) => held, Err(poisoned) => poisoned.into_inner() } }` },
+  { rule: "RUST-ERROR:4", name: "a read lock taken back in a test", expect: "silent", place: "tests",
+    code: `use std::sync::{RwLock, RwLockReadGuard};\nstatic SHARED: RwLock<u8> = RwLock::new(0);\npub fn look() -> RwLockReadGuard<'static, u8> { match SHARED.read() { Ok(seen) => seen, Err(poisoned) => poisoned.into_inner() } }` },
+  { rule: "RUST-ERROR:4", name: "the same recovery in a library is still a judgment the arm must show", expect: "fires",
+    code: `use std::sync::{Mutex, MutexGuard};\nstatic IN_TURN: Mutex<()> = Mutex::new(());\npub fn turn() -> MutexGuard<'static, ()> { match IN_TURN.lock() { Ok(held) => held, Err(poisoned) => poisoned.into_inner() } }` },
+  { rule: "RUST-ERROR:4", name: "into_inner on something that is not a lock is not a lock taken back", expect: "fires", place: "tests",
+    code: `pub struct Wrapped(pub u8);\nimpl Wrapped { pub fn into_inner(self) -> u8 { self.0 } }\npub fn read(v: Result<u8, Wrapped>) -> u8 { match v { Ok(n) => n, Err(w) => w.into_inner() } }` },
 ];
