@@ -115,7 +115,10 @@ const SILENT_OP: &str = concat!(
     "    acquire();`. `let _: T = ..` is never a guard: it drops on the spot.\n",
     "    valve: law.toml [error] guard_types — the declared list of types allowed as `let _name: T`.\n",
     "    a real guard is worth one visible line in the diff, which is why the list is declared and\n",
-    "    not guessed.",
+    "    not guessed.\n",
+    "    in a crate's tests/ target, unwrap / expect / unwrap_err / expect_err pass: a test that\n",
+    "    crashes is a test failing out loud, with its message. the quiet members still fire there,\n",
+    "    because a test that turns a failure into a value passes when it should not.",
 );
 
 const DISCARDED_PAYLOAD: &str = concat!(
@@ -153,6 +156,10 @@ const VANISHED_ERROR: &str = concat!(
     "    Cargo.toml (checked for files under src/), and only if no local `mod` / `use` / `macro_rules!`\n",
     "    of that name shadows it. a hand-rolled `fn warn()` in your own src/ emits nothing and buys\n",
     "    nothing. a single-segment symbol is honoured only as a macro.\n",
+    "    in the file that starts a program, `eprintln!` or `eprint!` naming the bound failure writes it\n",
+    "    down for whoever ran it: `Err(failure) => { eprintln!(\"run: {failure}\"); ExitCode::FAILURE }`.\n",
+    "    in a crate's tests/ target, `Err(poisoned) => poisoned.into_inner()` on a .lock() / .read() /\n",
+    "    .write() takes the lock back after another test panicked, which that test already reported.\n",
     "    valve: law.toml [truth] trace_symbols — your logger's symbols go here. deny the sin, not the lib.",
 );
 
@@ -160,7 +167,7 @@ const MISSING_DEPUTY: &str = concat!(
     "crate root is missing a deputy attribute.\n",
     "    why: this law is syntax-only — it cannot see a type. the deputies are rustc lints that can,\n",
     "    uplifted from warning to error so they cannot be scrolled past.\n",
-    "    legal: put them at the top of lib.rs / main.rs / bin/*.rs —\n",
+    "    legal: put them at the top of lib.rs / main.rs / bin/*.rs / build.rs / each example program —\n",
     "      #![deny(unused_must_use)]           a fallible dropped in statement position\n",
     "      #![deny(for_loops_over_fallibles)]  a for-loop laundering an if-let\n",
     "      #![deny(dead_code)]                 DEAD:1 is decor without it: the compiler names the corpse\n",
@@ -380,7 +387,8 @@ const VALUE_IN_MESSAGE: &str = concat!(
 const STRAY_PRINT: &str = concat!(
     "println! / print! / eprintln! / eprint! outside a bin root, or dbg! anywhere. a crate's\n",
     "    build.rs IS a bin root: cargo compiles and runs it as its own program, and what it writes\n",
-    "    to stdout is cargo's protocol rather than output.\n",
+    "    to stdout is cargo's protocol rather than output. so is each example program, a file\n",
+    "    directly in examples/ or examples/<name>/main.rs, which cargo builds as its own binary.\n",
     "    why: stdout is the program's OUTPUT and it belongs to whoever owns the process. a library\n",
     "    that prints has decided for every future caller, including the one piping your output into\n",
     "    another program. dbg! is a debugging artifact that shipped.\n",

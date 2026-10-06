@@ -9220,3 +9220,63 @@ names the file whose tests read it instead of how many there are.
 **Three lines of merge debris** (`||||||| …`) that earlier conflict resolutions
 left in this document are gone. Nothing beside them was duplicated: measured
 2026-10-06, no line longer than sixty characters appears twice in the file.
+
+## Tests and example programs are what cargo says they are — 2026-10-06
+
+#209 hands the Rust reader every file it is asked about again, so an adopting
+project's crate `tests/`, `examples/` and `build.rs` files were read for the
+first time. Their 49 hits were read one by one: 26 in `tests/`, 21 in example
+programs, 2 in build scripts. Most were the code's to fix. Four groups were the
+rule's, because the rule's own *why* does not hold there:
+
+- **20 `expect` calls in test helpers**, building fixtures from literals: a URL,
+  a JSON body, a typed id. A test that crashes fails out loud, with its message,
+  in front of whoever runs it, which is the opposite of answering a failure
+  without saying so. In a crate's `tests/` target `unwrap`, `expect`,
+  `unwrap_err` and `expect_err` now pass, as clippy's `allow-unwrap-in-tests` and
+  `allow-expect-in-tests` let them. The quiet members still fire there: a helper
+  that turns a failure into a value makes a test pass that should not.
+- **4 `eprintln!` in example programs.** cargo builds each file directly in
+  `examples/`, and each `examples/<name>/main.rs`, as a program of its own,
+  exactly as it builds `build.rs`, which RUST-LOG:1 already treated as a program
+  start. An example now is one too: it may print and take the output handles,
+  and it is a crate root that appoints its deputies like any other.
+- **4 `Err` arms in example `main`s** that print the failure to stderr and exit
+  with `ExitCode::FAILURE`. In a program start that is writing it down for
+  whoever ran it, so an `eprintln!` or `eprint!` naming the bound failure counts
+  there, and only there; everywhere else RUST-LOG:1 still refuses it.
+- **1 poisoned test lock** taken back with `into_inner()`, in a lock that keeps
+  tests from running at once. Another test's panic poisoned it and was already
+  reported; crashing here would turn one failure into every later one. In a
+  crate's `tests/` target that arm, on a `.lock()`, `.read()` or `.write()`, is
+  lawful. Outside tests, recovering data a panic may have left half-written stays
+  a judgment the arm has to show.
+
+The other 20 stay the project's: a payload bound and dropped, an expected
+`NotFound` swallowed by an empty arm, an `unwrap_or_else` that panics, a
+comparison against `Some(..)`, a temporary directory read from the environment,
+two build scripts without deputies, and twelve lines of example programs reading
+their arguments, which `law.toml [truth] env_files` exists to say out loud.
+
+The cases came first: 20 new Rust cases, 9 of which failed before the change,
+each in the direction the change fixes; the others are controls that must still
+fire. The harness can now place a case in a crate's `tests/` or `examples/`.
+
+Measured on the 1,221 crates in `~/.cargo/registry` (1,206 judged by both
+readers), old against new, handing each crate's `src/`, `tests/`, `examples/`,
+`benches/` and `build.rs` as looper does since #209: RUST-ERROR:1 201,108 →
+197,437, RUST-LOG:1 3,023 → 811, RUST-LOG:2 376 → 276, RUST-ERROR:4 55,058 →
+55,048, RUST-ERROR:7 398 → 393 (catching a panic is a program start's to do, and
+examples now are), and RUST-ERROR:5 1,557 → 2,327. Every removed RUST-ERROR:1 hit
+sits under `tests/` on a line holding one of the four (3,253 `unwrap`, 314
+`expect`, 80 `unwrap_err`, 24 `expect_err`). 70 removals were read by hand: all
+10 RUST-ERROR:4 (9 example programs and one binary's own `main.rs`, each printing
+the failure it bound), all 5 RUST-ERROR:7, and spread samples of 25 RUST-ERROR:1,
+20 RUST-LOG:1 and 10 RUST-LOG:2. None was a failure going quiet. The 770 added
+are example programs without deputies. This repository holds no Rust the law
+reads: `vendor/` is outside it.
+
+Not covered: an item a test marker covers is still skipped whole, so a quiet
+member inside a `#[test]` body is never read. Files in `benches/` are judged as
+before. The modules of a multi-file example, other than its `main.rs`, are not
+program starts.

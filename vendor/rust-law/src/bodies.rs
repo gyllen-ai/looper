@@ -2,7 +2,7 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use crate::patterns::{
-    ident_is_drop_producer, last_is, path_last, path_segs, pat_mentions_fallible,
+    ident_is_drop_producer, last_is, path_last, path_segs, pat_mentions_fallible, tail_of,
     tokens_contain_idents, DROP_TYPES,
 };
 use crate::provenance::Provenance;
@@ -12,7 +12,10 @@ pub struct ArmFacts {
     pub propagates: bool,
     pub has_crash: bool,
     pub has_trace: bool,
+    pub prints_the_failure: bool,
 }
+
+const STDERR_MACROS: &[&str] = &["eprintln", "eprint"];
 
 pub fn arm_facts(prov: &Provenance<'_>, arm: &syn::Arm, bindings: &[String]) -> ArmFacts {
     let mut scan = BodyScan::new(prov, bindings);
@@ -23,7 +26,21 @@ pub fn arm_facts(prov: &Provenance<'_>, arm: &syn::Arm, bindings: &[String]) -> 
         propagates: scan.has_try || scan.has_err_ctor,
         has_crash: scan.has_crash,
         has_trace: scan.has_trace,
+        prints_the_failure: scan.prints_the_failure,
     }
+}
+
+pub fn takes_the_lock_back(arm: &syn::Arm, bindings: &[String]) -> bool {
+    let syn::Expr::MethodCall(call) = tail_of(&arm.body) else {
+        return false;
+    };
+    if call.method != "into_inner" || !call.args.is_empty() {
+        return false;
+    }
+    let syn::Expr::Path(receiver) = &*call.receiver else {
+        return false;
+    };
+    receiver.path.segments.len() == 1 && bindings.contains(&path_last(&receiver.path))
 }
 
 pub fn drop_body_lines(block: &syn::Block) -> Vec<usize> {
@@ -48,6 +65,7 @@ struct BodyScan<'c> {
     has_crash: bool,
     has_trace: bool,
     binding_used: bool,
+    prints_the_failure: bool,
 }
 
 impl<'c> BodyScan<'c> {
@@ -60,6 +78,7 @@ impl<'c> BodyScan<'c> {
             has_crash: false,
             has_trace: false,
             binding_used: false,
+            prints_the_failure: false,
         }
     }
 }
@@ -98,6 +117,9 @@ impl<'ast, 'c> Visit<'ast> for BodyScan<'c> {
         }
         if tokens_contain_idents(node.tokens.clone(), self.bindings) {
             self.binding_used = true;
+            if STDERR_MACROS.contains(&path_last(&node.path).as_str()) {
+                self.prints_the_failure = true;
+            }
         }
         syn::visit::visit_macro(self, node);
     }

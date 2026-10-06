@@ -279,6 +279,34 @@ the way RFC 8446 §5.1 says to.
 `tests/invariants.test.ts` fails if a newer copy of lawkeeper arrives without
 `src/absence.rs`.
 
+**Tests and example programs are what cargo says they are (2026-10-06).** Four
+changes, each from a hit read by hand in an adopting project's crate `tests/`,
+`examples/` and `build.rs` files that the reader had not been handed before #209.
+`src/scan.rs` gives a file a fourth role, `example`: a file directly in a crate's
+`examples/` directory, or `examples/<name>/main.rs`, which cargo builds as its own
+program. Such a file is a program start (`is_bin`), so it may print and take the
+output handles, and it is a crate root that must appoint its deputies. In a
+crate's `tests/` target `src/visitor.rs` drops `unwrap`, `expect`, `unwrap_err`
+and `expect_err` from the silent family: a test that crashes fails out loud with
+its message. The quiet members stay. An `Err` arm in a program start that prints
+the bound failure with `eprintln!` or `eprint!` has written it down
+(`src/bodies.rs`, `prints_the_failure`), and in a crate's `tests/` target an
+`Err(poisoned) => poisoned.into_inner()` arm on a `.lock()`, `.read()` or
+`.write()` takes a lock back after another test panicked
+(`takes_the_lock_back`). The flag that already meant "a crate's `tests/` target"
+is renamed from `cargo_keys_allowed` to `in_tests_target`, since it now governs
+three things.
+
+Measured on the 1,221 crates in `~/.cargo/registry`, handing the reader each
+crate's `src/`, `tests/`, `examples/`, `benches/` and `build.rs` as looper does
+since #209 (1,206 judged by both; 5 refused by both): `ERROR:1` 201,108 → 197,437,
+`LOG:1` 3,023 → 811, `LOG:2` 376 → 276, `ERROR:4` 55,058 → 55,048, `ERROR:7`
+398 → 393, and `ERROR:5` 1,557 → 2,327. Every removed `ERROR:1` hit is under
+`tests/` on a line holding one of the four (3,253 `unwrap`, 314 `expect`, 80
+`unwrap_err`, 24 `expect_err`); every other removal is in an example's start
+file, and one `ERROR:4` in a binary's own `src/main.rs`; all 770 additions are
+example programs asked for their deputies.
+
 **Updating it.** Nothing fetches this. If lawkeeper gains something worth having,
 someone copies the new source in by hand, deliberately, re-applies the changes
 listed above, and says so in the commit. That is the price of never downloading

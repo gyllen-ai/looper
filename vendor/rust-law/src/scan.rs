@@ -180,7 +180,11 @@ fn judge_one(
     if file_name == "lib.rs" || file_name == "mod.rs" {
         check_switchboard(&rel, &ast, &mut hits);
     }
-    if file_name == "lib.rs" || file_name == "main.rs" || rel.starts_with("bin/") || role.build_script
+    if file_name == "lib.rs"
+        || file_name == "main.rs"
+        || rel.starts_with("bin/")
+        || role.build_script
+        || role.example
     {
         check_deputies(cfg, &rel, &ast, &mut hits);
     }
@@ -220,7 +224,34 @@ fn role_of(path: &Path, full: &str) -> FileRole {
         judges_tests: judges_tests(full),
         build_script: is_build_script(path, full),
         cargo_test: under_crate_tests(path),
+        example: is_example(path, full),
     }
+}
+
+fn is_crate_examples(dir: &Path) -> bool {
+    if dir.file_name().and_then(|name| name.to_str()) != Some("examples") {
+        return false;
+    }
+    let Some(up) = dir.parent() else {
+        return false;
+    };
+    holds_a_manifest(up)
+}
+
+fn is_example(path: &Path, full: &str) -> bool {
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    if is_crate_examples(dir) {
+        return true;
+    }
+    if file_name_of(full) != "main.rs" {
+        return false;
+    }
+    let Some(up) = dir.parent() else {
+        return false;
+    };
+    is_crate_examples(up)
 }
 
 fn holds_a_manifest(dir: &Path) -> bool {

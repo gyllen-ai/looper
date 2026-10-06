@@ -11,7 +11,7 @@
 ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
 
 rules before the work · gates after it · no socket, ever
-96 rules · 5 languages · 753 cases
+96 rules · 5 languages · 773 cases
 ```
 
 An agent writing code for you is fast, agreeable, and unsupervised. looper is
@@ -113,7 +113,7 @@ and every lookup written down: none.
 | **CSS, Sass & HTML** | 5 | read as declarations; `<style>` blocks in a page or a Razor component judged on its own lines, and `style=` attributes refused |
 | **every language at once** | 1 | `COPY:1` reads the directory, not the file: a name that says it is a second go at the file beside it |
 
-**753 cases** hold those rules to their own ban text — what must fire, what must
+**773 cases** hold those rules to their own ban text — what must fire, what must
 stay silent — and every rule was run over code nobody here wrote before it
 shipped.
 
