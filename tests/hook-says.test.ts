@@ -157,6 +157,20 @@ test("the Stop hook is left as it was: what failed there is not put in front of 
   assert.equal(answer.warned.length, 1);
 });
 
+test("what is said at Stop is told to the person, not the agent, so a note that repeats cannot keep a session from ending", () => {
+  const answer = answerTo("Stop", dispatched([new Speaks("law")], "Stop"));
+
+  assert.equal(answer.code, 0);
+  assert.equal(answer.said.length, 1);
+  const parsed: unknown = JSON.parse(first(answer.said));
+  assert.ok(parsed !== null && typeof parsed === "object");
+  assert.ok(
+    !("hookSpecificOutput" in parsed),
+    "context handed to the agent at Stop continues the conversation: on a Windows project the outstanding-work note did so nine turns running until Claude Code overrode the hook",
+  );
+  assert.ok(String(Object.getOwnPropertyDescriptor(parsed, "systemMessage")?.value).includes("law has something to say"));
+});
+
 test("a refusal still refuses, and what failed beside it is on the same channel", () => {
   const answer = answerTo("PostToolUse", {
     refusals: [{ capability: "law", reason: "looper found 1 problem." }],

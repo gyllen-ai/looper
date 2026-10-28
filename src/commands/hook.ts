@@ -9,6 +9,8 @@ import { here, remember } from "../session.ts";
 
 const THE_AGENT_IS_LISTENING_ON: readonly HookEvent[] = ["PreToolUse", "PostToolUse"];
 
+const ONLY_THE_PERSON_IS_TOLD_ON: readonly HookEvent[] = ["Stop"];
+
 export type Answer = {
   readonly code: number;
   readonly said: readonly string[];
@@ -27,6 +29,9 @@ export function answerTo(event: HookEvent, result: Dispatch): Answer {
     : [];
   const context = [...result.mentions.map((held) => held.note), ...failed];
   if (context.length === 0) return { code: 0, said: [], warned };
+  if (ONLY_THE_PERSON_IS_TOLD_ON.includes(event)) {
+    return { code: 0, said: [JSON.stringify({ systemMessage: context.join("\n\n") })], warned };
+  }
   return {
     code: 0,
     said: [
