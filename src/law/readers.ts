@@ -68,9 +68,12 @@ export function judgeRustIn(root: string, files: readonly string[]): RustSaid {
 
 const THE_SOURCE_ROOT = "/src/";
 
-function nameTheReaderGives(path: string): string {
-  const at = path.lastIndexOf(THE_SOURCE_ROOT);
-  return at < 0 ? basename(path) : path.slice(at + THE_SOURCE_ROOT.length);
+const A_WINDOWS_SEPARATOR = /\\/g;
+
+export function nameTheReaderGives(path: string): string {
+  const written = path.replace(A_WINDOWS_SEPARATOR, "/");
+  const at = written.lastIndexOf(THE_SOURCE_ROOT);
+  return at < 0 ? basename(written) : written.slice(at + THE_SOURCE_ROOT.length);
 }
 
 function namedApart(files: readonly string[]): readonly ReadonlyMap<string, string>[] {
