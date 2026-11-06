@@ -1,9 +1,10 @@
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { JUDGED_EXTENSIONS, OUTSIDE_THE_LAW } from "../config.ts";
 import { fieldAt, reasonFrom } from "../fields.ts";
 import { intentOf } from "./commit-command.ts";
 import { underAnotherLaw } from "./project.ts";
+import { namedIn } from "./readers.ts";
 
 export type Named =
   | { readonly kind: "none"; readonly why: string }
@@ -75,7 +76,7 @@ export function targetOf(root: string, payload: string): Target {
   if (named.kind === "none") return named;
 
   const full = resolve(root, named.path);
-  const inside = relative(resolve(root), full);
+  const inside = namedIn(resolve(root), full);
   if (inside.startsWith("..") || inside.length === 0) {
     return { kind: "outside", path: full };
   }

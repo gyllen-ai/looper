@@ -89,6 +89,19 @@ test("a file judged by its path is judged alone, so a clean file in a crate with
   }
 });
 
+test("a directory judged by its path is judged with every file under it, named with the slashes git uses, whatever the system's own", WITHOUT_THE_RUST_ENGINE, () => {
+  const root = adopted(HELD_ELSEWHERE);
+  try {
+    const below = spokenIn(root, ["src/parts"]);
+    assert.equal(below.code, 0, below.text);
+    assert.match(below.text, /src\/parts\/b\.rs:2/, "the file under the directory is judged, and named with forward slashes");
+    assert.doesNotMatch(below.text, /main\.rs|src\/a\.rs/, "a file beside the directory is not");
+    assert.doesNotMatch(below.text, /nothing here the law can read/, below.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("every finding is named at the file it was found in, where two files share a short name and outside the module tree", WITHOUT_THE_RUST_ENGINE, () => {
   const root = crateOf(MANIFEST, SHORT_NAMES_SHARED);
   try {

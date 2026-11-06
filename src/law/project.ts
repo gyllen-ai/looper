@@ -31,6 +31,7 @@ import {
   judgePythonIn,
   judgeRustIn,
   looperRoot,
+  namedIn,
   under,
   type RustSaid,
 } from "./readers.ts";
@@ -308,7 +309,7 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
   violations.push(...rustSaid.violations);
   unreadable.push(...rustSaid.unreadable);
 
-  const named = files.map((path) => relative(root, path));
+  const named = files.map((path) => namedIn(root, path));
   violations.push(...undeclaredLanguagesIn(root, named));
   violations.push(...variantsIn(root, named, concessions));
 
@@ -324,7 +325,7 @@ export function surveyProject(root: string, reach: Reach, only: readonly string[
 
   for (const path of files) {
     if (path.endsWith(RUST_EXTENSION) || path.endsWith(PYTHON_EXTENSION)) continue;
-    const named = relative(root, path);
+    const named = namedIn(root, path);
     if (isCsharp(path) && !isStyling(named)) continue;
     if (isStyling(named)) {
       let styling = "";

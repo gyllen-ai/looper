@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { PYTHON_EXTENSION, RUST_EXTENSION, CSHARP_EXTENSIONS } from "../config.ts";
 import { reasonFrom } from "../fields.ts";
@@ -117,7 +117,7 @@ function refusedCrate(root: string, crate: string, detail: string, files: readon
   const rest = files.filter((one) => relative(root, one) !== relative(root, file));
 
   return {
-    violations: [{ rule: known.rule, file: relative(root, file), line }],
+    violations: [{ rule: known.rule, file: namedIn(root, file), line }],
     unreadable:
       rest.length === 0
         ? []
@@ -148,16 +148,20 @@ function judgedBatch(root: string, crate: string, batch: ReadonlyMap<string, str
       unplaced.push(`${relative(root, file)} (the Rust half reported ${hit.rule} there, which looper has no words for)`);
       continue;
     }
-    violations.push({ rule: known.rule, file: relative(root, file), line: hit.line });
+    violations.push({ rule: known.rule, file: namedIn(root, file), line: hit.line });
   }
   return { violations, unreadable: unplaced, unjudged: 0 };
+}
+
+export function namedIn(root: string, file: string): string {
+  return relative(root, file).split(sep).join("/");
 }
 
 export function under(root: string, paths: readonly string[], file: string): boolean {
   if (paths.length === 0) return true;
   return paths.some((asked) => {
     const wanted = resolve(root, asked);
-    return file === wanted || file.startsWith(`${wanted}/`);
+    return file === wanted || file.startsWith(`${wanted}${sep}`);
   });
 }
 
@@ -194,7 +198,7 @@ export function judgePythonIn(root: string, files: readonly string[]): PythonSai
       unreadable.push(`${relative(root, hit.file)} (the Python half reported ${hit.rule} there, which looper has no words for)`);
       continue;
     }
-    const named = relative(root, hit.file);
+    const named = namedIn(root, hit.file);
     if (setAside(standingOf(concessions, named, known.id))) continue;
     violations.push({ rule: known, file: named, line: hit.line });
   }
