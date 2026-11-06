@@ -9280,3 +9280,27 @@ Not covered: an item a test marker covers is still skipped whole, so a quiet
 member inside a `#[test]` body is never read. Files in `benches/` are judged as
 before. The modules of a multi-file example, other than its `main.rs`, are not
 program starts.
+
+## The engines are named with .exe on Windows — 2026-11-06
+
+On a checkout built natively on Windows, every C# edit answered "the C# reader
+could not be started (spawnSync …\looper-csharp ENOENT)", and the outstanding
+count was left alone. `readerAt` named the engines `looper-rust` and
+`looper-csharp` on every platform. The folder still held a Linux `looper-csharp`
+an earlier WSL checkout had built on 2026-10-28, newer than `src/`, so the
+freshness check called the engine current and never ran `dotnet build`; and
+the only program Windows could start by that name did not exist. The Rust
+reader worked by accident: a `looper-rust.exe` from 2026-10-30 sat beside the
+Linux one, and Windows appends `.exe` when starting a program named without it.
+
+Now `readerAt` appends `.exe` on `win32`, for both engines, so freshness looks
+at the binary the platform's toolchain writes, builds it when it is not there,
+and starts the same file it checked; the freshness fixture in `tests/rust.test.ts`
+names its binary through `readerAt` for the same reason. Seen on the same
+checkout: the first judgement after the change built `looper-csharp.exe` and
+the 32 C# files were read. Nothing changes on Linux or macOS, where the suffix
+is empty. Not covered: a Linux binary left in the folder by another platform
+is never removed, only ignored; and four Rust tests that were skipped on
+Windows as "engine not built" now run there and fail, because a Rust finding
+is named `src-tauri\src\main.rs` where the tests expect `/`, which this
+change makes visible and does not fix.
