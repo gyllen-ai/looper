@@ -71,10 +71,18 @@ export function askGit(root: string, args: readonly string[]): Answered {
 
 export type Reader = "rust" | "csharp";
 
+// cargo and dotnet write `name.exe` on win32. Named without it, the freshness
+// check looked at a binary another platform's checkout had left in the same
+// folder, called the engine current, and never built the one this platform
+// can start; the Rust reader ran only because win32 appends .exe when
+// starting a program, and the C# reader answered ENOENT on every edit
+// (2026-11-06).
+const A_PROGRAM_ON_WIN32 = process.platform === "win32" ? ".exe" : "";
+
 export function readerAt(looperRoot: string, which: Reader): string {
   return which === "rust"
-    ? join(looperRoot, RUST_ENGINE_DIR, "target", "release", RUST_ENGINE_NAME)
-    : join(looperRoot, CSHARP_ENGINE_DIR, "bin", "Release", "net10.0", CSHARP_ENGINE_NAME);
+    ? join(looperRoot, RUST_ENGINE_DIR, "target", "release", `${RUST_ENGINE_NAME}${A_PROGRAM_ON_WIN32}`)
+    : join(looperRoot, CSHARP_ENGINE_DIR, "bin", "Release", "net10.0", `${CSHARP_ENGINE_NAME}${A_PROGRAM_ON_WIN32}`);
 }
 
 const RUSTUP_SETTINGS = "settings.toml";

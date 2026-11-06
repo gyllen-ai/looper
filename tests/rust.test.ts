@@ -13,6 +13,7 @@ import { bansTheEngineDeclares } from "../src/law/rust/engine-words.ts";
 import { crossingsIn } from "../src/law/rust/boundary.ts";
 import { answeringFor } from "../src/law/project.ts";
 import { engineIsBuilt } from "../src/law/rust/drive.ts";
+import { readerAt } from "../src/start.ts";
 import { NO_RUST_ENGINE, WITHOUT_THE_RUST_ENGINE } from "./rust-engine.ts";
 
 const LOOPER_ROOT = join(import.meta.dirname, "..");
@@ -427,7 +428,7 @@ function fakeEngine(): { root: string; binary: string; source: string } {
   const src = join(root, "vendor", "rust-law", "src");
   mkdirSync(built, { recursive: true });
   mkdirSync(src, { recursive: true });
-  const binary = join(built, "looper-rust");
+  const binary = readerAt(root, "rust");
   const source = join(src, "patterns.rs");
   writeFileSync(source, "pub fn f() {}\n");
   writeFileSync(binary, "");
